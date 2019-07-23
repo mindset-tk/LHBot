@@ -1,0 +1,13 @@
+{
+	"prefix": "!",
+	"authtoken": "",
+
+	"serverID":"",
+	
+	"roleAdmin": "",
+	"roleBros": "",
+	"roleEveryone": "" ,
+	
+	"channelAnnouncements": "",
+	"channelBotTest": ""
+}

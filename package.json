@@ -1,0 +1,16 @@
+{
+  "name": "brobot",
+  "version": "1.0.0",
+  "description": "bot for bros",
+  "main": "bot.js",
+  "dependencies": {
+    "discord.js": "^11.5.1",
+    "fs": "0.0.1-security"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "ping"
+  },
+  "author": "Mindset",
+  "license": "ISC"
+}
