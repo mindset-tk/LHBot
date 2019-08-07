@@ -127,6 +127,7 @@ client.on('raw', async event => {
 	client.emit(events[event.t], reaction, user, message);
 });
 
+// handlers for reaction added/removed
 client.on('messageReactionAdd', (reaction, user, message) => {
 	if (message == null || message.pinned || message.system) return;
 	if (reaction.emoji.name == '📌') {
@@ -145,4 +146,11 @@ client.on('messageReactionRemove', (reaction, user, message) => {
 		message.unpin();
 		return;
 	}
+});
+
+// very basic error handling.
+// console will log the error but take no further action.
+// if the error is not fatal the bot will continue running
+client.on('error', err => {
+	console.error(err);
 });
