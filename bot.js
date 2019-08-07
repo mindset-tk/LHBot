@@ -150,7 +150,13 @@ client.on('messageReactionRemove', (reaction, user, message) => {
 
 // very basic error handling.
 // console will log the error but take no further action.
-// if the error is not fatal the bot will continue running
+// if the error is not fatal the bot will continue running.
 client.on('error', err => {
-	console.error(err);
+	const ErrTargetPrototype = Object.getPrototypeOf(err.target);
+	// If the error is a network error, display error message.
+	if (ErrTargetPrototype.constructor.name == 'WebSocket') {
+		console.log('Connection Error! The error was: "' + err.message + '". Will automatically attempt to reconnect.');
+	}
+	// Else, display full error object.
+	else{console.error(err);}
 });
