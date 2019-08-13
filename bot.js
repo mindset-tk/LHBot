@@ -25,9 +25,9 @@ const events = {
 	MESSAGE_REACTION_REMOVE: 'messageReactionRemove',
 };
 
-// when the client is ready, run this code
-// this event will only trigger one time after logging in
-client.once('ready', () => {
+// when the client is ready, run this code.
+// should trigger every time the bot returns to ready state.
+client.on('ready', () => {
 	console.log('Ready!');
 	client.user.setActivity('Wrestlemania', { type: 'WATCHING' });
 });
