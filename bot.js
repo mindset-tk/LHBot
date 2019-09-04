@@ -132,7 +132,7 @@ client.on('messageReactionAdd', (reaction, user, message) => {
 	if (message == null || message.pinned || message.system) return;
 	if (reaction.emoji.name == '📌') {
 		console.log(`${user.username} wants to pin a message.`);
-		message.channel.send(user + ' has pinned the message: \n***' + `${message.member.nickname}` + '**: ' + message + '*');
+		message.channel.send(user + ' has pinned a message');
 		message.pin();
 		return;
 	}
@@ -142,7 +142,7 @@ client.on('messageReactionRemove', (reaction, user, message) => {
 	if (reaction.emoji.name == '📌') {
 		if (message == null || message.system || !message.pinned) return;
 		console.log(`${user.username} wants to unpin a message.`);
-		message.channel.send(user + ' has unpinned the message: \n***' + `${message.member.nickname}` + '**: ' + message + '*');
+		message.channel.send(user + ' has unpinned a message');
 		message.unpin();
 		return;
 	}
