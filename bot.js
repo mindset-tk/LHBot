@@ -35,6 +35,10 @@ client.on('ready', () => {
 // login to Discord with your app's token
 client.login(authtoken);
 
+// function getguildmember(guild, user) {
+//	guild.member(user);
+// }
+
 client.on('message', message => {
 	if (message.type == 'PINS_ADD') {
 		message.delete();
@@ -131,8 +135,16 @@ client.on('raw', async event => {
 client.on('messageReactionAdd', (reaction, user, message) => {
 	if (message == null || message.pinned || message.system) return;
 	if (reaction.emoji.name == '📌') {
+		const guild = message.guild;
+		const guildmember = guild.member(user);
 		console.log(`${user.username} wants to pin a message.`);
-		message.channel.send(user + ' has pinned a message');
+		message.channel.send(
+			{ embed: {
+				title: guildmember.nickname + ' has pinned a message.',
+				description: '[click here to go to the message](' + message.url + ')',
+				fields: [],
+			},
+			});
 		message.pin();
 		return;
 	}
@@ -141,8 +153,16 @@ client.on('messageReactionAdd', (reaction, user, message) => {
 client.on('messageReactionRemove', (reaction, user, message) => {
 	if (reaction.emoji.name == '📌') {
 		if (message == null || message.system || !message.pinned) return;
+		const guild = message.guild;
+		const guildmember = guild.member(user);
 		console.log(`${user.username} wants to unpin a message.`);
-		message.channel.send(user + ' has unpinned a message');
+		message.channel.send(
+			{ embed: {
+				title: guildmember.nickname + ' has unpinned a message.',
+				description: '[click here to go to the message](' + message.url + ')',
+				fields: [],
+			},
+			});
 		message.unpin();
 		return;
 	}
