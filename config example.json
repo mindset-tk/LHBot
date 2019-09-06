@@ -9,5 +9,7 @@
 	"roleEveryone": "" ,
 	
 	"channelAnnouncements": "",
-	"channelBotTest": ""
+	"channelBotTest": "",
+
+	"ytAPIkey": ""
 }
