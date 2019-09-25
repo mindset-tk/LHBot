@@ -6,7 +6,7 @@ module.exports = {
 	args: true,
 	usage: '<@user>',
 	guildOnly: true,
-	execute(message, args) {
+	execute(message) {
 		if (message.mentions.members.first()) {
 			const target = message.mentions.members.first();
 			if (message.member.roles.has(roleBros) && !target.roles.has(roleBros)) {
