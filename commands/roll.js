@@ -1,8 +1,8 @@
 module.exports = {
 	name: 'roll',
-	description: 'roll dice. You can roll multiple sets of dice by separating them with a space.',
+	description: 'Roll dice. You can roll multiple sets of dice by separating them with a space. Decimal numbers, negative numbers, 0, and numbers larger than 1000 are not accepted.',
 	cooldown: 5,
-	usage: '<#dice>d<#sides>',
+	usage: '<#dice>d<#sides> (ex. 2d6)',
 
 	async execute(message, args, client) {
 

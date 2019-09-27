@@ -35,9 +35,6 @@ client.on('ready', () => {
 // login to Discord with your app's token
 client.login(authtoken);
 
-// function getguildmember(guild, user) {
-//	guild.member(user);
-// }
 
 client.on('message', message => {
 	if (message.type == 'PINS_ADD') {
@@ -108,6 +105,7 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
 
 // read emoji reaction and emit an event
 client.on('raw', async event => {
+	// eslint-disable-next-line no-prototype-builtins
 	if (!events.hasOwnProperty(event.t)) return;
 	const { d: data } = event;
 	const user = client.users.get(data.user_id);
