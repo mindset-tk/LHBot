@@ -3,6 +3,7 @@
 	"authtoken": "",
 
 	"serverID":"",
+	"botID":"",
 	
 	"roleAdmin": "",
 	"roleBros": "",
