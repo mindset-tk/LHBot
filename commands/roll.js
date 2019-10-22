@@ -41,7 +41,7 @@ module.exports = {
 			let dice = new Array(2);
 			let alldice = new String;
 			let modifier = 0;
-			// parse standard dice notation into an array, then check if input data is valid.
+			// parse standard dice notation into an array called "dice", then check if input data is valid.
 			dice = dieroll.split('d');
 			if (dieroll.includes('+')) {
 				modifier = parseInt(dieroll.split('+')[1]);
@@ -54,7 +54,6 @@ module.exports = {
 
 			if (!dice.some(dicecheck) && dice[1] != '' && !(dice.length > 2)) {
 				const results = new Array;
-				// if there's only one die, perform the die roll math more simply and give a shorter output.
 				for (let i = 0; i < dice[0]; i++) {
 					results[i] = (Math.floor(Math.random() * dice[1] + 1));
 				}
@@ -90,7 +89,7 @@ module.exports = {
 				return;
 			}
 			else {
-				message.channel.send('Invalid input detected! Proper form would be eith d# to roll a single die, or #d#. Decimals and negative numbers are not accepted.');
+				message.channel.send('Invalid input detected! Proper form would be #d#. Decimals and negative numbers are not accepted.');
 				return;
 			}
 		});
