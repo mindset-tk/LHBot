@@ -23,6 +23,7 @@ const events = {
 	// reaction events
 	MESSAGE_REACTION_ADD: 'messageReactionAdd',
 	MESSAGE_REACTION_REMOVE: 'messageReactionRemove',
+	RESUMED: 'Reconnected',
 };
 
 // when the client is ready, run this code.
@@ -103,10 +104,17 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
 	}
 });
 
-// read emoji reaction and emit an event
+// Raw event listener.
 client.on('raw', async event => {
+	// console.log(event);
+	// ensure the 't' field exists on any event read; return if it does not.
 	// eslint-disable-next-line no-prototype-builtins
 	if (!events.hasOwnProperty(event.t)) return;
+	// check if it is a reconnect event and log to console that connection has resumed.
+	if (event.t === 'RESUMED') {
+		client.emit(events[event.t]);
+		return;
+	}
 	const { d: data } = event;
 	const user = client.users.get(data.user_id);
 	const channel = client.channels.get(data.channel_id) || await user.createDM();
@@ -166,6 +174,10 @@ client.on('messageReactionRemove', (reaction, user, message) => {
 	}
 });
 
+client.on('Reconnected', () => {
+	console.log('Reconnected!');
+});
+
 // very basic error handling.
 // console will log the error but take no further action.
 // if the error is not fatal the bot will continue running.
@@ -175,7 +187,11 @@ client.on('error', err => {
 	// If the error is a network error, display error message.
 	if (ErrTargetPrototype.constructor.name == 'WebSocket') {
 		console.log('[' + date + ']: Connection Error! The error was: "' + err.message + '". Will automatically attempt to reconnect.');
+		return;
 	}
 	// Else, display full error object.
-	else{console.error('[' + date + ']:' + err);}
+	else {
+		console.error('[' + date + ']:' + err);
+		return;
+	}
 });
