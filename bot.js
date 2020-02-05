@@ -139,13 +139,11 @@ client.on('raw', async event => {
 
 // handlers for reaction added/removed
  client.on('messageReactionAdd', (reaction, user, message) => {
+	console.log('reaction added.')
 	if (message == null || message.pinned || message.system) return;
-	if (reaction.emoji.name == '📌' && reaction.count >= 5) {
-		const guild = message.guild;
-		const guildmember = guild.member(user);
-		console.log(reaction);
+	if (reaction.emoji.name == '📌') {
 		console.log(`${user.username} wants to pin a message. There are ` + reaction.count + ' pin emojis on this message.');
-		message.pin();
+		if (reaction.count >= 2) {message.pin();}
 		return;
 	}
 });
