@@ -119,22 +119,23 @@ client.on('raw', async event => {
 
 		let reaction = message.reactions.get(emojiKey);
 		
-		// If the message doesn't have any reactions on it, do not emit an event. 
+		// If the message doesn't have any reactions on it, or the channel type is not a guild text channel (like a DM for example), do not emit an event. 
 		// This prevents errors when the last reaction is removed from a message.
-		if (!reaction) return;
+		if (!reaction || message.channel.type !== 'text') return;
 		client.emit(events[event.t], reaction, user, message);
 	}
 });
 
 // handlers for reaction added/removed
  client.on('messageReactionAdd', (reaction, user, message) => {
-	// console.log(message)
 	if (message == null || message.system) return;
 	if (reaction.emoji.name == '📌' && reaction.count >= 5 && !message.pinned) {
+		console.log('Attempting to pin a message in ' + message.channel)
 		message.pin();
 		return;
 	}
 	if (reaction.emoji.name == '🔖') {
+		console.log('Attempting to PM a message from ' + message.channel + ' to ' + message.author)
 		const guild = message.guild;
 		const guildmember = guild.member(message.author);
 		const bookmarkEmbed = new Discord.RichEmbed()
