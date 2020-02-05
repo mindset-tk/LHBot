@@ -1,14 +1,11 @@
 {
-  "name": "brobot",
+  "name": "pinbot",
   "version": "1.0.0",
-  "description": "bot for bros",
+  "description": "bot for pinning",
   "main": "bot.js",
   "dependencies": {
-    "discord-youtube-api": "^0.1.0",
     "discord.js": "^11.5.1",
     "fs": "0.0.1-security",
-    "google-auth-library": "^5.2.1",
-    "googleapis": "^42.0.0"
   },
   "devDependencies": {},
   "scripts": {

@@ -30,18 +30,15 @@ const events = {
 // should trigger every time the bot returns to ready state.
 client.on('ready', () => {
 	console.log('Ready!');
-	client.user.setActivity('Wrestlemania', { type: 'WATCHING' });
+	client.user.setActivity('with pushpins', { type: 'PLAYING' });
 });
 
 // login to Discord with your app's token
 client.login(authtoken);
 
 
-client.on('message', message => {
-	if (message.type == 'PINS_ADD') {
-		message.delete();
-		return;
-	}
+/* client.on('message', message => {
+
 	if (!message.content.startsWith(prefix) || message.author.bot) return;
 
 	const args = message.content.slice(prefix.length).split(/ +/);
@@ -102,7 +99,7 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
 	if (oldChannel.topic != newChannel.topic) {
 		newChannel.send(channelupdateentry.executor + ' has changed the topic to: \n *' + newChannel.topic + '*');
 	}
-});
+}); */
 
 // Raw event listener.
 client.on('raw', async event => {
@@ -113,69 +110,44 @@ client.on('raw', async event => {
 	// check if it is a reconnect event and log to console that connection has resumed.
 	if (event.t === 'RESUMED') {
 		client.emit(events[event.t]);
-		return;
 	}
-	const { d: data } = event;
-	const user = client.users.get(data.user_id);
-	const channel = client.channels.get(data.channel_id) || await user.createDM();
+	else {
+		// console.log(event);
+		const { d: data } = event;
+		const user = client.users.get(data.user_id);
+		const channel = client.channels.get(data.channel_id) || await user.createDM();
+		
+		// prevent confusion between cached and uncached messages; ensure event only occurs once per message
+		// this may not be working as expected.
+		// if (channel.messages.has(data.message_id)) return;
 
-	// prevent confusion between cached and uncached messages; ensure event only occurs once per message
-	// this may not be working as expected.
-	// if (channel.messages.has(data.message_id)) return;
+		// get message and emoji info
+		const message = await channel.fetchMessage(data.message_id);
+		const emojiKey = (data.emoji.id) ? `${data.emoji.name}:${data.emoji.id}` : data.emoji.name;
 
-	// get message and emoji info
-	const message = await channel.fetchMessage(data.message_id);
-	const emojiKey = (data.emoji.id) ? `${data.emoji.name}:${data.emoji.id}` : data.emoji.name;
+		let reaction = message.reactions.get(emojiKey);
+		// console.log(message);
 
-	let reaction = message.reactions.get(emojiKey);
-
-	if (!reaction) {
-	// Create an object that can be passed through the event to prevent errors.
-		const emoji = new Discord.Emoji(client.guilds.get(data.guild_id), data.emoji);
-		reaction = new Discord.MessageReaction(message, emoji, 1, data.user_id === client.user.id);
+		if (!reaction) {
+			// Create an object that can be passed through the event to prevent errors.
+			const emoji = new Discord.Emoji(client.guilds.get(data.guild_id), data.emoji);
+			reaction = new Discord.MessageReaction(message, emoji, 1, data.user_id === client.user.id);
+		}
+		client.emit(events[event.t], reaction, user, message);
 	}
-	client.emit(events[event.t], reaction, user, message);
 });
 
 // handlers for reaction added/removed
-client.on('messageReactionAdd', (reaction, user, message) => {
+ client.on('messageReactionAdd', (reaction, user, message) => {
 	if (message == null || message.pinned || message.system) return;
-	if (reaction.emoji.name == '📌') {
+	if (reaction.emoji.name == '📌' && reaction.count >= 5) {
 		const guild = message.guild;
 		const guildmember = guild.member(user);
-		console.log(`${user.username} wants to pin a message.`);
-		message.channel.send(
-			{ embed: {
-				title: guildmember.nickname + ' has pinned a message.',
-				description: '[click here to go to the message](' + message.url + ')',
-				fields: [],
-			},
-			});
+		console.log(reaction);
+		console.log(`${user.username} wants to pin a message. There are ` + reaction.count + ' pin emojis on this message.');
 		message.pin();
 		return;
 	}
-});
-
-client.on('messageReactionRemove', (reaction, user, message) => {
-	if (reaction.emoji.name == '📌') {
-		if (message == null || message.system || !message.pinned) return;
-		const guild = message.guild;
-		const guildmember = guild.member(user);
-		console.log(`${user.username} wants to unpin a message.`);
-		message.channel.send(
-			{ embed: {
-				title: guildmember.nickname + ' has unpinned a message.',
-				description: '[click here to go to the message](' + message.url + ')',
-				fields: [],
-			},
-			});
-		message.unpin();
-		return;
-	}
-});
-
-client.on('Reconnected', () => {
-	console.log('Reconnected!');
 });
 
 // very basic error handling.
