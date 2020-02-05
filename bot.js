@@ -22,7 +22,6 @@ for (const file of commandFiles) {
 const events = {
 	// reaction events
 	MESSAGE_REACTION_ADD: 'messageReactionAdd',
-	MESSAGE_REACTION_REMOVE: 'messageReactionRemove',
 	RESUMED: 'Reconnected',
 };
 
@@ -37,7 +36,7 @@ client.on('ready', () => {
 client.login(authtoken);
 
 
-/* code in this comment block is used to process incoming commands.  Not used in current iteration of pinbot.
+/* code in this comment block is used to process incoming commands. It works, but is blocked off until needed to prevent accidental parsing in live environment
 client.on('message', message => {
 
 	if (!message.content.startsWith(prefix) || message.author.bot) return;
@@ -50,7 +49,7 @@ client.on('message', message => {
 	|| client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(commandName));
 	if (!command) return;
 
-	// check if command is server only
+	// check if command is server only; prevent it from being run in DMs if so.
 	if (command.guildOnly && message.channel.type !== 'text') {
 		return message.reply('I can\'t execute that command inside DMs!');
 	}
@@ -94,9 +93,9 @@ client.on('message', message => {
 }); */
 
 
-// Raw event listener.
+// Raw event listener. This listens to all actions in discord then emits specialized events for the bot to work with.
+// 
 client.on('raw', async event => {
-	// console.log(event);
 	// ensure the 't' field exists on any event read; return if it does not.
 	// eslint-disable-next-line no-prototype-builtins
 	if (!events.hasOwnProperty(event.t)) return;
@@ -104,14 +103,14 @@ client.on('raw', async event => {
 	if (event.t === 'RESUMED') {
 		client.emit(events[event.t]);
 	}
-	else {
-		// console.log(event);
+	else if (event.t === 'MESSAGE_REACTION_ADD') {
+		
 		const { d: data } = event;
 		const user = client.users.get(data.user_id);
 		const channel = client.channels.get(data.channel_id) || await user.createDM();
 		
 		// prevent confusion between cached and uncached messages; ensure event only occurs once per message
-		// this may not be working as expected.
+		// NOTE: I commented this out because it does not seem to work.
 		// if (channel.messages.has(data.message_id)) return;
 
 		// get message and emoji info
@@ -119,24 +118,30 @@ client.on('raw', async event => {
 		const emojiKey = (data.emoji.id) ? `${data.emoji.name}:${data.emoji.id}` : data.emoji.name;
 
 		let reaction = message.reactions.get(emojiKey);
-		// console.log(message);
-
-		if (!reaction) {
-			// Create an object that can be passed through the event to prevent errors.
-			const emoji = new Discord.Emoji(client.guilds.get(data.guild_id), data.emoji);
-			reaction = new Discord.MessageReaction(message, emoji, 1, data.user_id === client.user.id);
-		}
+		
+		// If the message doesn't have any reactions on it, do not emit an event. 
+		// This prevents errors when the last reaction is removed from a message.
+		if (!reaction) return;
 		client.emit(events[event.t], reaction, user, message);
 	}
 });
 
 // handlers for reaction added/removed
  client.on('messageReactionAdd', (reaction, user, message) => {
-	// console.log('reaction added.')
-	if (message == null || message.pinned || message.system) return;
-	if (reaction.emoji.name == '📌') {
-		// console.log(`${user.username} wants to pin a message. There are ` + reaction.count + ' pin emojis on this message.');
-		if (reaction.count >= 5) {message.pin();}
+	// console.log(message)
+	if (message == null || message.system) return;
+	if (reaction.emoji.name == '📌' && reaction.count >= 5 && !message.pinned) {
+		message.pin();
+		return;
+	}
+	if (reaction.emoji.name == '🔖') {
+		const guild = message.guild;
+		const guildmember = guild.member(message.author);
+		const bookmarkEmbed = new Discord.RichEmbed()
+			.setColor('#0099ff')
+			.setTitle(guildmember.displayName)
+			.setDescription(message.content);
+		user.send('🔖: - from ' + message.channel, bookmarkEmbed);
 		return;
 	}
 });
