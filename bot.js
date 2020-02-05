@@ -37,7 +37,8 @@ client.on('ready', () => {
 client.login(authtoken);
 
 
-/* client.on('message', message => {
+/* code in this comment block is used to process incoming commands.  Not used in current iteration of pinbot.
+client.on('message', message => {
 
 	if (!message.content.startsWith(prefix) || message.author.bot) return;
 
@@ -90,16 +91,8 @@ client.login(authtoken);
 		message.reply('there was an error trying to execute that command!');
 	}
 
-});
-
-// reads channel updates and reports topic change to channel
-client.on('channelUpdate', async (oldChannel, newChannel) => {
-	const server = client.guilds.get(serverID);
-	const channelupdateentry = await server.fetchAuditLogs().then(audit => audit.entries.first());
-	if (oldChannel.topic != newChannel.topic) {
-		newChannel.send(channelupdateentry.executor + ' has changed the topic to: \n *' + newChannel.topic + '*');
-	}
 }); */
+
 
 // Raw event listener.
 client.on('raw', async event => {
@@ -139,11 +132,11 @@ client.on('raw', async event => {
 
 // handlers for reaction added/removed
  client.on('messageReactionAdd', (reaction, user, message) => {
-	console.log('reaction added.')
+	// console.log('reaction added.')
 	if (message == null || message.pinned || message.system) return;
 	if (reaction.emoji.name == '📌') {
-		console.log(`${user.username} wants to pin a message. There are ` + reaction.count + ' pin emojis on this message.');
-		if (reaction.count >= 2) {message.pin();}
+		// console.log(`${user.username} wants to pin a message. There are ` + reaction.count + ' pin emojis on this message.');
+		if (reaction.count >= 5) {message.pin();}
 		return;
 	}
 });
