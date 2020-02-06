@@ -1,7 +1,7 @@
 // require the filesystem and discord.js modules, and pull data from config.json
 const fs = require('fs');
 const Discord = require('discord.js');
-const { prefix, authtoken, serverID } = require('./config.json');
+const { prefix, authtoken } = require('./config.json');
 
 // initialize client, commands, command cooldown collections
 const client = new Discord.Client();
