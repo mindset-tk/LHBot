@@ -12,5 +12,13 @@
     "test": "ping"
   },
   "author": "Mindset",
-  "license": "ISC"
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mindset-tk/LRBot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mindset-tk/LRBot/issues"
+  },
+  "homepage": "https://github.com/mindset-tk/LRBot#readme"
 }
