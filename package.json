@@ -1,5 +1,5 @@
 {
-  "name": "pinbot",
+  "name": "lrbot",
   "version": "1.0.0",
   "description": "bot for pinning",
   "main": "bot.js",
