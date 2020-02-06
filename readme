@@ -1,0 +1,12 @@
+To use:
+1. initialize your config.json by filling in the various IDs; You can rename config example.json for this purpose and fill in the fields.
+    -Prefix is the prefix symbol for your bot commands, by default it will be ! but you can change it here.
+    I haven't tested with emoji or other nonstandard characters, but any unicode should work.
+    -authtoken is your server's auth token !!do not share this with anyone!!
+    -ServerID is the server ID.
+2. run bot.js (typically, 'node bot.js' will be enough)
+
+Currently, no commands are implemented. This will change; however it will pin items with 5 pin reactions on them,
+and DM a copy of a message to you if you react to it with :bookmark:
+
+Dependencies: discord.js, fs (module for node.js)
