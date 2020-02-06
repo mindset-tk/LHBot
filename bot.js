@@ -26,7 +26,6 @@ const events = {
 };
 
 // when the client is ready, run this code.
-// should trigger every time the bot returns to ready state.
 client.on('ready', () => {
 	console.log('Ready!');
 	client.user.setActivity('with pushpins', { type: 'PLAYING' });
@@ -36,7 +35,7 @@ client.on('ready', () => {
 client.login(authtoken);
 
 
-/* code in this comment block is used to process incoming commands. It works, but is blocked off until needed to prevent accidental parsing in live environment
+// command parser
 client.on('message', message => {
 
 	if (!message.content.startsWith(prefix) || message.author.bot) return;
@@ -90,7 +89,7 @@ client.on('message', message => {
 		message.reply('there was an error trying to execute that command!');
 	}
 
-}); */
+});
 
 
 // Raw event listener. This listens to all actions in discord then emits specialized events for the bot to work with.
