@@ -135,12 +135,14 @@ client.on('messageReactionAdd', (reaction, user, message) => {
 	}
 	if (reaction.emoji.name == '🔖') {
 		console.log('Attempting to PM a message from ' + message.channel + ' to ' + message.author);
+		const messagesent = new Date(message.createdTimestamp).toLocaleString('en-US', { timeZone: 'UTC' });
 		const guild = message.guild;
 		const guildmember = guild.member(message.author);
 		const bookmarkEmbed = new Discord.RichEmbed()
 			.setColor('#0099ff')
-			.setTitle(guildmember.displayName)
-			.setDescription(message.content);
+			.setAuthor(guildmember.displayName, message.author.displayAvatarURL)
+			.setDescription(message.content + '\n\n [jump to message](' + message.url + ')')
+			.setFooter('Bookmarked message was sent at ' + messagesent + ' UTC');
 		user.send('🔖: - from ' + message.channel, bookmarkEmbed);
 		return;
 	}
