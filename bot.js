@@ -94,7 +94,7 @@ client.on('message', message => {
 
 
 // Raw event listener. This listens to all actions in discord then emits specialized events for the bot to work with.
-// 
+//
 client.on('raw', async event => {
 	// ensure the 't' field exists on any event read; return if it does not.
 	// eslint-disable-next-line no-prototype-builtins
@@ -104,38 +104,38 @@ client.on('raw', async event => {
 		client.emit(events[event.t]);
 	}
 	else if (event.t === 'MESSAGE_REACTION_ADD') {
-		
+
 		const { d: data } = event;
 		const user = client.users.get(data.user_id);
 		const channel = client.channels.get(data.channel_id) || await user.createDM();
-		
+
 		// prevent confusion between cached and uncached messages; ensure event only occurs once per message
 		// NOTE: I commented this out because it does not seem to work.
 		// if (channel.messages.has(data.message_id)) return;
 
-		// get message and emoji info
+		// fetch info about the message the reaction was added to.
 		const message = await channel.fetchMessage(data.message_id);
+		// custom emojis reactions are keyed in a `name:ID` format, while unicode emojis are keyed by names
 		const emojiKey = (data.emoji.id) ? `${data.emoji.name}:${data.emoji.id}` : data.emoji.name;
+		const reaction = message.reactions.get(emojiKey);
 
-		let reaction = message.reactions.get(emojiKey);
-		
-		// If the message doesn't have any reactions on it, or the channel type is not a guild text channel (like a DM for example), do not emit an event. 
+		// If the message doesn't have any reactions on it, or the channel type is not a guild text channel (like a DM for example), do not emit an event.
 		// This prevents errors when the last reaction is removed from a message.
 		if (!reaction || message.channel.type !== 'text') return;
 		client.emit(events[event.t], reaction, user, message);
 	}
 });
 
-// handlers for reaction added/removed
- client.on('messageReactionAdd', (reaction, user, message) => {
+// handler for reaction added
+client.on('messageReactionAdd', (reaction, user, message) => {
 	if (message == null || message.system) return;
 	if (reaction.emoji.name == '📌' && reaction.count >= 5 && !message.pinned) {
-		console.log('Attempting to pin a message in ' + message.channel)
+		console.log('Attempting to pin a message in ' + message.channel);
 		message.pin();
 		return;
 	}
 	if (reaction.emoji.name == '🔖') {
-		console.log('Attempting to PM a message from ' + message.channel + ' to ' + message.author)
+		console.log('Attempting to PM a message from ' + message.channel + ' to ' + message.author);
 		const guild = message.guild;
 		const guildmember = guild.member(message.author);
 		const bookmarkEmbed = new Discord.RichEmbed()
