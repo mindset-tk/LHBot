@@ -26,7 +26,6 @@ const events = {
 };
 
 // when the client is ready, run this code.
-// should trigger every time the bot returns to ready state.
 client.on('ready', () => {
 	console.log('Ready!');
 	client.user.setActivity('with pushpins', { type: 'PLAYING' });
@@ -36,7 +35,7 @@ client.on('ready', () => {
 client.login(authtoken);
 
 
-/* code in this comment block is used to process incoming commands. It works, but is blocked off until needed to prevent accidental parsing in live environment
+// command parser
 client.on('message', message => {
 
 	if (!message.content.startsWith(prefix) || message.author.bot) return;
@@ -90,7 +89,7 @@ client.on('message', message => {
 		message.reply('there was an error trying to execute that command!');
 	}
 
-}); */
+});
 
 
 // Raw event listener. This listens to all actions in discord then emits specialized events for the bot to work with.
@@ -136,12 +135,14 @@ client.on('messageReactionAdd', (reaction, user, message) => {
 	}
 	if (reaction.emoji.name == '🔖') {
 		console.log('Attempting to PM a message from ' + message.channel + ' to ' + message.author);
+		const messagesent = new Date(message.createdTimestamp).toLocaleString('en-US', { timeZone: 'UTC' });
 		const guild = message.guild;
 		const guildmember = guild.member(message.author);
 		const bookmarkEmbed = new Discord.RichEmbed()
 			.setColor('#0099ff')
-			.setTitle(guildmember.displayName)
-			.setDescription(message.content);
+			.setAuthor(guildmember.displayName, message.author.displayAvatarURL)
+			.setDescription(message.content + '\n\n [jump to message](' + message.url + ')')
+			.setFooter('Bookmarked message was sent at ' + messagesent + ' UTC');
 		user.send('🔖: - from ' + message.channel, bookmarkEmbed);
 		return;
 	}
