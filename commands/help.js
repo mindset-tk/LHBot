@@ -1,4 +1,4 @@
-const { prefix } = require('../config.json');
+const { prefix, roleStaff } = require('../config.json');
 
 module.exports = {
 	name: 'help',
@@ -9,18 +9,29 @@ module.exports = {
 	execute(message, args) {
 		const data = [];
 		const { commands } = message.client;
-		if (!args.length) {
+		// If the help invoker is staff, give all commands.
+		if (!args.length && message.member.roles.has(roleStaff)) {
 			data.push('Here\'s a list of all my commands:');
-			data.push(commands.map(command => command.name).join('\n'));
-			data.push(`\nYou can send \`${prefix}help [command name]\` to get info on a specific command!`);
+			// map all command names to an array, filter(Boolean) to remove empty values, then join for clean output
+			data.push(commands.map(command => command.name).filter(Boolean).join('\n'));
+			data.push(`You can send \`${prefix}help [command name]\` to get info on a specific command!`);
+
+			return message.channel.send(data, { split: true });
+		}
+		// If the invoker is not staff, but has permission to invoke the command, give only commands available to them.
+		if (!args.length && !message.member.roles.has(roleStaff)) {
+			data.push('Here\'s a list of commands available to you:');
+			// map all non-staffOnly command names to an array, filter(Boolean) to remove empty values, then join for clean output
+			data.push(commands.map(command => {if (!command.staffOnly) return command.name;}).filter(Boolean).join('\n'));
+			data.push(`You can send \`${prefix}help [command name]\` to get info on a specific command!`);
 
 			return message.channel.send(data, { split: true });
 		}
 		const name = args[0].toLowerCase();
 		const command = commands.get(name) || commands.find(c => c.aliases && c.aliases.includes(name));
 
-		if (!command) {
-			return message.reply('that\'s not a valid command!');
+		if (!command || (command.staffOnly && !message.member.roles.has(roleStaff))) {
+			return message.reply('that\'s not a valid command, or you don\'t have permission to use it!');
 		}
 
 		data.push(`**Name:** ${command.name}`);

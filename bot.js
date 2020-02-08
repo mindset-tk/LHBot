@@ -1,7 +1,7 @@
 // require the filesystem and discord.js modules, and pull data from config.json
 const fs = require('fs');
 const Discord = require('discord.js');
-const { prefix, authtoken } = require('./config.json');
+const { prefix, authtoken, roleStaff, roleComrade } = require('./config.json');
 
 // initialize client, commands, command cooldown collections
 const client = new Discord.Client();
@@ -22,13 +22,12 @@ for (const file of commandFiles) {
 const events = {
 	// reaction events
 	MESSAGE_REACTION_ADD: 'messageReactionAdd',
-	RESUMED: 'Reconnected',
+	RESUMED: 'Resumed',
 };
 
 // when the client is ready, run this code.
 client.on('ready', () => {
 	console.log('Ready!');
-	client.user.setActivity('with pushpins', { type: 'PLAYING' });
 });
 
 // login to Discord with your app's token
@@ -37,21 +36,23 @@ client.login(authtoken);
 
 // command parser
 client.on('message', message => {
-
-	if (!message.content.startsWith(prefix) || message.author.bot) return;
+	// prevent parsing commands without correct prefix, from bots, and from non-staff non-comrades.
+	if (!message.content.startsWith(prefix) || message.author.bot || !(message.member.roles.has(roleStaff) || message.member.roles.has(roleComrade))) return;
 
 	const args = message.content.slice(prefix.length).split(/ +/);
 	const commandName = args.shift().toLowerCase();
 
 	// checking both command names and aliases, else return from function
-	const command = client.commands.get(commandName)
-	|| client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(commandName));
+	const command = client.commands.get(commandName) || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(commandName));
 	if (!command) return;
 
 	// check if command is server only; prevent it from being run in DMs if so.
 	if (command.guildOnly && message.channel.type !== 'text') {
 		return message.reply('I can\'t execute that command inside DMs!');
 	}
+
+	// check permission level of command. Prevent staffonly commands from being run by non-staff.
+	if (command.staffOnly && !message.member.roles.has(roleStaff)) return;
 
 	// check if command requires arguments
 	if (command.args && !args.length) {
@@ -93,7 +94,6 @@ client.on('message', message => {
 
 
 // Raw event listener. This listens to all actions in discord then emits specialized events for the bot to work with.
-//
 client.on('raw', async event => {
 	// ensure the 't' field exists on any event read; return if it does not.
 	// eslint-disable-next-line no-prototype-builtins
@@ -146,6 +146,10 @@ client.on('messageReactionAdd', (reaction, user, message) => {
 		user.send('🔖: - from ' + message.channel, bookmarkEmbed);
 		return;
 	}
+});
+
+// whenever client completes session resume, run this code.
+client.on('Resumed', () => {
 });
 
 // very basic error handling.
