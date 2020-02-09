@@ -93,18 +93,19 @@ client.on('message', message => {
 });
 
 
-// Raw event listener. This listens to all actions in discord then emits specialized events for the bot to work with.
-client.on('raw', async event => {
-	// ensure the 't' field exists on any event read; return if it does not.
+// Raw packet listener. This listens to all actions in discord then emits specialized events for the bot to work with.
+client.on('raw', async packet => {
+	// ensure the 't' field matches one of the raw events that we are listening for.
 	// eslint-disable-next-line no-prototype-builtins
-	if (!events.hasOwnProperty(event.t)) return;
-	// check if it is a reconnect event and log to console that connection has resumed.
-	if (event.t === 'RESUMED') {
-		client.emit(events[event.t]);
+	if (!events.hasOwnProperty(packet.t)) return;
+	// check if it is a reconnect packet and emit reconnection event.
+	if (packet.t === 'RESUMED') {
+		client.emit(events[packet.t]);
+		return;
 	}
-	else if (event.t === 'MESSAGE_REACTION_ADD') {
+	else if (packet.t === 'MESSAGE_REACTION_ADD') {
 
-		const { d: data } = event;
+		const { d: data } = packet;
 		const user = client.users.get(data.user_id);
 		const channel = client.channels.get(data.channel_id) || await user.createDM();
 
@@ -118,10 +119,11 @@ client.on('raw', async event => {
 		const emojiKey = (data.emoji.id) ? `${data.emoji.name}:${data.emoji.id}` : data.emoji.name;
 		const reaction = message.reactions.get(emojiKey);
 
-		// If the message doesn't have any reactions on it, or the channel type is not a guild text channel (like a DM for example), do not emit an event.
-		// This prevents errors when the last reaction is removed from a message.
+		// If the message somehow doesn't have any reactions on it, or the channel type is not a guild text channel (like a DM for example),
+		// do not emit a reaction add event.
 		if (!reaction || message.channel.type !== 'text') return;
-		client.emit(events[event.t], reaction, user, message);
+		// emit event with details of the message and sender.
+		client.emit(events[packet.t], reaction, user, message);
 	}
 });
 
@@ -150,6 +152,7 @@ client.on('messageReactionAdd', (reaction, user, message) => {
 
 // whenever client completes session resume, run this code.
 client.on('Resumed', () => {
+	// do nothing for now.
 });
 
 // very basic error handling.
@@ -169,3 +172,5 @@ client.on('error', err => {
 		return;
 	}
 });
+
+process.on('unhandledRejection', error => console.error('Uncaught Promise Rejection! Error details:\n', error));
