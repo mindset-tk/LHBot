@@ -1,7 +1,25 @@
-const { lastCount } = require('./counting.json');
 const { countingChannelId } = require('./config.json');
+const { lastCountSaved } = require('./counting.json');
+let lastCount = lastCountSaved;
+const validCountRegex = /^[0-9]+$/;
 
-function OnReady(client)
+function CheckMessages(messages)
+{
+  console.log(`Received ${messages.size} messages`);
+
+  for(let [snowflake, message] of messages.entries())
+  {
+    if(!validCountRegex.test(message.content))
+    {
+      console.log('Counting failed: ' + snowflake + ': ' + message);
+      continue;
+    }
+
+    console.log(message.content);
+  }
+}
+
+function RestoreCountingState(client)
 {
   console.log('Counting channel: ' + countingChannelId);
 
@@ -12,9 +30,11 @@ function OnReady(client)
     console.log('Trying to get Counting channel');
     countingChannel = client.channels.get(countingChannelId);
   }
+  
   console.log('Counting channel: ' + countingChannel.name);
 
   var queryOptions = {};
+
   if (lastCount == null)
   {
     queryOptions.limit = 100;
@@ -25,8 +45,12 @@ function OnReady(client)
   }
 
   countingChannel.fetchMessages(queryOptions)
-    .then(messages => console.log(`Received ${messages.size} messages`))
-    .catch(console.error);
+    .then(messages => CheckMessages(messages));
 }
 
-exports.OnReady = OnReady;
+function PublicOnReady(client)
+{
+  RestoreCountingState(client);
+}
+
+exports.OnReady = PublicOnReady;
