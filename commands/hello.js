@@ -6,6 +6,5 @@ module.exports = {
 	execute(message) {
 		const botguildmember = message.guild.me;
 		message.channel.send('Hello, I am ' + botguildmember.displayName + '.');
-		message.delete();
 	},
 };
