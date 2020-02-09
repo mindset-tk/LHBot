@@ -1,8 +1,8 @@
 // require the filesystem and discord.js modules, and pull data from config.json
 const fs = require('fs');
 const Discord = require('discord.js');
-const { prefix, authtoken, countingChannelId } = require('./config.json');
-const { lastCount } = require('./counting.json');
+const { prefix, authtoken } = require('./config.json');
+const Counting = require('./counting.js');
 
 // initialize client, commands, command cooldown collections
 const client = new Discord.Client();
@@ -31,30 +31,7 @@ client.on('ready', () => {
 	console.log('Ready!');
 	client.user.setActivity('with pushpins', { type: 'PLAYING' });
 
-  console.log('Counting channel: ' + countingChannelId);
-
-  // Init counting
-  var countingChannel;
-  while(countingChannel == null)
-  {
-    console.log('Trying to get Counting channel');
-    countingChannel = client.channels.get(countingChannelId);
-  }
-  console.log('Counting channel: ' + countingChannel.name);
-
-  var queryOptions = {};
-  if (lastCount == null)
-  {
-    queryOptions.limit = 100;
-  }
-  else
-  {
-    queryOptions.after = lastCount;
-  }
-
-  countingChannel.fetchMessages(queryOptions)
-    .then(messages => console.log(`Received ${messages.size} messages`))
-    .catch(console.error);
+  Counting.OnReady(client);
 });
 
 // login to Discord with your app's token
