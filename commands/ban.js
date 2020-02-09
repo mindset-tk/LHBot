@@ -30,22 +30,23 @@ module.exports = {
 		}
 		// Test if user is already banned. If so, report it and return.
 		const banList = await message.guild.fetchBans();
-		let bannedUser = banList.find(user => user.id === bantarget);
+		const bannedUser = banList.find(user => user.id === bantarget);
 		if (bannedUser) {
 			message.channel.send('User ' + targetuser.username + '#' + targetuser.discriminator + ' already appears on the ban list for this server!');
 			return;
 		}
-		// attempt to ban user. Check banlist afterward.
+		// attempt to ban user. If an error is thrown while banning, log the error and send error text.
+		let isBanned = false;
 		try {
 			await message.guild.ban(targetuser, banreason);
-			bannedUser = true;
+			isBanned = true;
 		}
 		catch(err) {
-			bannedUser = false;
+			isBanned = false;
 			console.log(err);
 		}
-		if (!bannedUser) {
-			message.channel.send('I was not able to ban ' + targetuser.username + '#' + targetuser.discriminator + '. This is likely because I do not have the right roles, or because the target has roles above mine in the heirarchy.');
+		if (!isBanned) {
+			message.channel.send('I was not able to ban ' + targetuser.username + '#' + targetuser.discriminator + '. \n Possible reasons for this: I do not have the right roles, or the target has roles I cannot ban.\nCheck the console log for details.');
 			return;
 		}
 		if (!banreason) {
