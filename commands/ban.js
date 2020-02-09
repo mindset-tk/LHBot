@@ -1,6 +1,6 @@
 module.exports = {
 	name: 'ban',
-	description: 'Bans a user from the server it is used on. Accepts Discord ID or an @mention.  Hand-typing the username#xxxx format is not supported due to API limitations. The bot may silently fail to ban the user if they have any roles above the role that permits the bot to ban users.',
+	description: 'Bans a user from the server it is used on. Accepts Discord ID or an @mention.  Hand-typing the username#xxxx format is not supported due to API limitations.',
 	usage: '[ID or @mention] [ban reason (optional)]',
 	cooldown: 3,
 	guildOnly: true,
