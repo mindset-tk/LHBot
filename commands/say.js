@@ -1,6 +1,6 @@
 module.exports = {
 	name: 'say',
-	description: 'Make the bot talk. Will speak in the same channel as ',
+	description: 'Make the bot talk. Will speak in the same channel as the command is used unless one is #mentioned as the first argument.',
 	usage: '[channel #mention (optional)] [what to say]',
 	cooldown: 3,
 	guildOnly: true,
