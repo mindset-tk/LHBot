@@ -2,7 +2,6 @@
 const fs = require('fs');
 const Discord = require('discord.js');
 const { prefix, authtoken } = require('./config.json');
-const Counting = require('./counting.js');
 
 // initialize client, commands, command cooldown collections
 const client = new Discord.Client();
@@ -30,12 +29,11 @@ const events = {
 client.on('ready', () => {
 	console.log('Ready!');
 	client.user.setActivity('with pushpins', { type: 'PLAYING' });
-
-  Counting.OnReady(client);
 });
 
 // login to Discord with your app's token
 client.login(authtoken);
+
 
 // command parser
 client.on('message', message => {
@@ -53,7 +51,7 @@ client.on('message', message => {
 	// check if command is server only; prevent it from being run in DMs if so.
 	if (command.guildOnly && message.channel.type !== 'text') {
 		return message.reply('I can\'t execute that command inside DMs!');
-  }
+	}
 
 	// check if command requires arguments
 	if (command.args && !args.length) {
