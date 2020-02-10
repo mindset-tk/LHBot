@@ -2,5 +2,9 @@
 	"prefix": "!",
 	"authtoken": "",
 	"roleStaff": "",
-	"roleComrade": ""
+	"roleComrade": "",
+	"currentActivity": {
+		"Type": "",
+		"Name": ""
+	   }
 }
