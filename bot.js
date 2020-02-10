@@ -65,15 +65,14 @@ client.on('message', message => {
 		return message.channel.send(reply);
 	}
 
-	// check cooldown status
+	// Cooldowns. First, create a collection that includes all cooldowns.
 	if (!cooldowns.has(command.name)) {
 		cooldowns.set(command.name, new Discord.Collection());
 	}
-
 	const now = Date.now();
 	const timestamps = cooldowns.get(command.name);
 	const cooldownAmount = (command.cooldown || 0.1) * 1000;
-
+	// Then, check if the user is sending the command before the cooldown is up.
 	if (timestamps.has(message.author.id)) {
 		const expirationTime = timestamps.get(message.author.id) + cooldownAmount;
 		if (now < expirationTime) {
@@ -81,9 +80,11 @@ client.on('message', message => {
 			return message.channel.send(`please wait ${timeLeft.toFixed(1)} more second(s) before reusing the \`${command.name}\` command.`);
 		}
 	}
+	// Then, start the cooldown for the command.
 	timestamps.set(message.author.id, now);
 	setTimeout(() => timestamps.delete(message.author.id), cooldownAmount);
 
+	// Try to execute the command and return an error if it fails.
 	try {
 		command.execute(message, args, client, config);
 	}
