@@ -1,7 +1,8 @@
 // require the filesystem and discord.js modules, and pull data from config.json
 const fs = require('fs');
 const Discord = require('discord.js');
-const { prefix, authtoken, roleStaff, roleComrade } = require('./config.json');
+const configPath = './config.json';
+const config = require(configPath);
 
 // initialize client, commands, command cooldown collections
 const client = new Discord.Client();
@@ -28,18 +29,19 @@ const events = {
 // when the client is ready, run this code.
 client.on('ready', () => {
 	console.log('Ready!');
+	client.user.setActivity(config.currentActivity.Name, { type: config.currentActivity.Type });
 });
 
 // login to Discord with your app's token
-client.login(authtoken);
+client.login(config.authtoken);
 
 
 // command parser
 client.on('message', message => {
 	// prevent parsing commands without correct prefix, from bots, and from non-staff non-comrades.
-	if (!message.content.startsWith(prefix) || message.author.bot || !(message.member.roles.has(roleStaff) || message.member.roles.has(roleComrade))) return;
+	if (!message.content.startsWith(config.prefix) || message.author.bot || !(message.member.roles.has(config.roleStaff) || message.member.roles.has(config.roleComrade))) return;
 
-	const args = message.content.slice(prefix.length).split(/ +/);
+	const args = message.content.slice(config.prefix.length).split(/ +/);
 	const commandName = args.shift().toLowerCase();
 
 	// checking both command names and aliases, else return from function
@@ -52,7 +54,7 @@ client.on('message', message => {
 	}
 
 	// check permission level of command. Prevent staffonly commands from being run by non-staff.
-	if (command.staffOnly && !message.member.roles.has(roleStaff)) return;
+	if (command.staffOnly && !message.member.roles.has(config.roleStaff)) return;
 
 	// check if command requires arguments
 	if (command.args && !args.length) {
@@ -83,7 +85,7 @@ client.on('message', message => {
 	setTimeout(() => timestamps.delete(message.author.id), cooldownAmount);
 
 	try {
-		command.execute(message, args, client);
+		command.execute(message, args, client, config);
 	}
 	catch (error) {
 		console.error(error);
