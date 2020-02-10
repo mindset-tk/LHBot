@@ -1,10 +1,4 @@
 {
 	"prefix": "!",
-	"authtoken": "",
-	"roleStaff": "",
-	"roleComrade": "",
-	"currentActivity": {
-		"Type": "",
-		"Name": ""
-	   }
+	"authtoken": ""
 }
