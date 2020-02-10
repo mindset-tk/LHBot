@@ -1,8 +1,13 @@
 // require the filesystem and discord.js modules, and pull data from config.json
 const fs = require('fs');
 const Discord = require('discord.js');
+<<<<<<< HEAD
 const { prefix, authtoken } = require('./config.json');
 const Counting = require('./counting.js');
+=======
+const configPath = './config.json';
+const config = require(configPath);
+>>>>>>> c3d9730237d3fcd1d5f41f05cd9ccb3d58d5ce9c
 
 // initialize client, commands, command cooldown collections
 const client = new Discord.Client();
@@ -23,37 +28,43 @@ for (const file of commandFiles) {
 const events = {
 	// reaction events
 	MESSAGE_REACTION_ADD: 'messageReactionAdd',
-	RESUMED: 'Reconnected',
+	RESUMED: 'Resumed',
 };
 
 // when the client is ready, run this code.
 client.on('ready', () => {
 	console.log('Ready!');
+<<<<<<< HEAD
 	client.user.setActivity('with pushpins', { type: 'PLAYING' });
 
   Counting.OnReady(client);
+=======
+	client.user.setActivity(config.currentActivity.Name, { type: config.currentActivity.Type });
+>>>>>>> c3d9730237d3fcd1d5f41f05cd9ccb3d58d5ce9c
 });
 
 // login to Discord with your app's token
-client.login(authtoken);
+client.login(config.authtoken);
 
 // command parser
 client.on('message', message => {
+	// prevent parsing commands without correct prefix, from bots, and from non-staff non-comrades.
+	if (!message.content.startsWith(config.prefix) || message.author.bot || !(message.member.roles.has(config.roleStaff) || message.member.roles.has(config.roleComrade))) return;
 
-	if (!message.content.startsWith(prefix) || message.author.bot) return;
-
-	const args = message.content.slice(prefix.length).split(/ +/);
+	const args = message.content.slice(config.prefix.length).split(/ +/);
 	const commandName = args.shift().toLowerCase();
 
 	// checking both command names and aliases, else return from function
-	const command = client.commands.get(commandName)
-	|| client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(commandName));
+	const command = client.commands.get(commandName) || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(commandName));
 	if (!command) return;
 
 	// check if command is server only; prevent it from being run in DMs if so.
 	if (command.guildOnly && message.channel.type !== 'text') {
 		return message.reply('I can\'t execute that command inside DMs!');
   }
+
+	// check permission level of command. Prevent staffonly commands from being run by non-staff.
+	if (command.staffOnly && !message.member.roles.has(config.roleStaff)) return;
 
 	// check if command requires arguments
 	if (command.args && !args.length) {
@@ -84,7 +95,7 @@ client.on('message', message => {
 	setTimeout(() => timestamps.delete(message.author.id), cooldownAmount);
 
 	try {
-		command.execute(message, args, client);
+		command.execute(message, args, client, config);
 	}
 	catch (error) {
 		console.error(error);
@@ -94,19 +105,19 @@ client.on('message', message => {
 });
 
 
-// Raw event listener. This listens to all actions in discord then emits specialized events for the bot to work with.
-//
-client.on('raw', async event => {
-	// ensure the 't' field exists on any event read; return if it does not.
+// Raw packet listener. This listens to all actions in discord then emits specialized events for the bot to work with.
+client.on('raw', async packet => {
+	// ensure the 't' field matches one of the raw events that we are listening for.
 	// eslint-disable-next-line no-prototype-builtins
-	if (!events.hasOwnProperty(event.t)) return;
-	// check if it is a reconnect event and log to console that connection has resumed.
-	if (event.t === 'RESUMED') {
-		client.emit(events[event.t]);
+	if (!events.hasOwnProperty(packet.t)) return;
+	// check if it is a reconnect packet and emit reconnection event.
+	if (packet.t === 'RESUMED') {
+		client.emit(events[packet.t]);
+		return;
 	}
-	else if (event.t === 'MESSAGE_REACTION_ADD') {
+	else if (packet.t === 'MESSAGE_REACTION_ADD') {
 
-		const { d: data } = event;
+		const { d: data } = packet;
 		const user = client.users.get(data.user_id);
 		const channel = client.channels.get(data.channel_id) || await user.createDM();
 
@@ -120,10 +131,11 @@ client.on('raw', async event => {
 		const emojiKey = (data.emoji.id) ? `${data.emoji.name}:${data.emoji.id}` : data.emoji.name;
 		const reaction = message.reactions.get(emojiKey);
 
-		// If the message doesn't have any reactions on it, or the channel type is not a guild text channel (like a DM for example), do not emit an event.
-		// This prevents errors when the last reaction is removed from a message.
+		// If the message somehow doesn't have any reactions on it, or the channel type is not a guild text channel (like a DM for example),
+		// do not emit a reaction add event.
 		if (!reaction || message.channel.type !== 'text') return;
-		client.emit(events[event.t], reaction, user, message);
+		// emit event with details of the message and sender.
+		client.emit(events[packet.t], reaction, user, message);
 	}
 });
 
@@ -150,6 +162,11 @@ client.on('messageReactionAdd', (reaction, user, message) => {
 	}
 });
 
+// whenever client completes session resume, run this code.
+client.on('Resumed', () => {
+	// do nothing for now.
+});
+
 // very basic error handling.
 // console will log the error but take no further action.
 // if the error is not fatal the bot will continue running.
@@ -167,3 +184,8 @@ client.on('error', err => {
 		return;
 	}
 });
+<<<<<<< HEAD
+=======
+
+process.on('unhandledRejection', error => console.error('Uncaught Promise Rejection! Error details:\n', error));
+>>>>>>> c3d9730237d3fcd1d5f41f05cd9ccb3d58d5ce9c
