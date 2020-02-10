@@ -60,7 +60,7 @@ client.on('message', message => {
 	if (command.args && !args.length) {
 		let reply = 'You didn\'t provide any arguments!';
 		if (command.usage) {
-			reply += `\nThe proper usage would be: \`${prefix}${command.name} ${command.usage}\``;
+			reply += `\nThe proper usage would be: \`${config.prefix}${command.name} ${command.usage}\``;
 		}
 		return message.channel.send(reply);
 	}
