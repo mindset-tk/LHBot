@@ -31,7 +31,7 @@ const events = {
 client.on('ready', () => {
 	console.log('Ready!');
 	client.user.setActivity(config.currentActivity.Name, { type: config.currentActivity.Type });
-  Counting.OnReady(client);
+  //Counting.OnReady(client);
 });
 
 // login to Discord with your app's token
