@@ -18,6 +18,9 @@ for (const file of commandFiles) {
 	// set a new item in the Collection
 	// with the name attribute as the command name and the value as the exported module
 	client.commands.set(command.name, command);
+	if (command.init) {
+		command.init(client);
+	}
 }
 
 // initialize raw events to listen for
