@@ -67,7 +67,7 @@ module.exports = {
 			}
 			else {
 				const system = args[1].toLowerCase();
-				if (!gameList[system].accounts) {
+				if (!gameList[system].accounts[0]) {
 					message.channel.send('I don\'t have anyone on that roster yet.  Will you be the first?');
 					return;
 				}
@@ -92,7 +92,7 @@ module.exports = {
 					const accountInfo = gameList[sysname].accounts.filter(info => info.userID === message.member.id);
 					if (accountInfo[0]) {
 						const accountIndex = gameList[sysname].accounts.findIndex(info => info.userID === message.member.id);
-						delete gameList[sysname].accounts[accountIndex];
+						gameList[system].accounts.splice(accountIndex, 1);
 					}
 				});
 				writegameList();
@@ -110,7 +110,7 @@ module.exports = {
 			}
 			else {
 				const accountIndex = gameList[system].accounts.findIndex(info => info.userID === message.member.id);
-				delete gameList[system].accounts[accountIndex];
+				gameList[system].accounts.splice(accountIndex, 1);
 				writegameList();
 				message.channel.send('Successfully removed you from the roster for ' + capitalize(system) + '.');
 				return;
