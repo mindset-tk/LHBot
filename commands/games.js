@@ -83,8 +83,9 @@ module.exports = {
 						numRow++;
 					}
 				});
+				if (!column1[0]) { return message.channel.send('Nobody on this server is on that roster!');}
 				const gameListEmbed = new Discord.RichEmbed()
-					.setColor('#000000')
+					.setColor(gameList[system].embedColor)
 					.setTitle(capitalize(system) + ' Roster')
 					.setDescription('*Member Game Profiles for ' + capitalize(system) + '*')
 					.addField('Member', column1.join('\n'), true)
