@@ -129,5 +129,6 @@ module.exports = {
 				return;
 			}
 		}
+		else {return message.channel.send('I couldn\'t parse that. try' + config.prefix + 'help games to see full information on this command.');}
 	},
 };
