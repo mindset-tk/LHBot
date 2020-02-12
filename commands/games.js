@@ -4,12 +4,12 @@ const configPath = path.resolve('./config.json');
 const config = require(configPath);
 const listPath = path.resolve('./gamelist.json');
 const gameList = require(listPath);
+const Discord = require('discord.js');
 
 module.exports = {
 	name: 'games',
-	description: 'Display/manage rosters for the specified game or system.\n\nArguments:\nAdd: Add or update your roster information for a game/system.\nList: List available games/systems\nRemove: Remove your profile info from one or all rosters.',
-	aliases: [],
-	usage: '[add] [system] [account name/code] to add yourself to a roster.\n' + config.prefix + 'games [list] to see all roster options, or ' + config.prefix + 'games [list] [system] to see the roster for a given system.\n' + config.prefix + 'games [remove] [system], or ' + config.prefix + 'games [remove] [all] to strip all your accounts from the system',
+	description: 'Display/manage rosters for the specified game or system.',
+	usage: '[add] [system] [account name/code] to add yourself to a roster.\n' + config.prefix + 'games [list] to see all roster options, or ' + config.prefix + 'games [list] [system] to see the roster for a given system.\n' + config.prefix + 'games [remove] [system] to remove yourself a single roster, or ' + config.prefix + 'games [remove] [all] to strip all your accounts from all rosters.',
 	cooldown: 3,
 	args: true,
 	guildOnly: true,
@@ -60,8 +60,10 @@ module.exports = {
 
 		}
 		else if (action === 'list') {
-			const data = [];
+			const column1 = [];
+			const column2 = [];
 			if (!args[1]) {
+				const data = [];
 				Object.keys(gameList).forEach(sysname => data.push(capitalize(sysname)));
 				message.channel.send('Here are the systems I maintain rosters for:\n' + data.join('\n'));
 			}
@@ -71,23 +73,33 @@ module.exports = {
 					message.channel.send('I don\'t have anyone on that roster yet.  Will you be the first?');
 					return;
 				}
+				let numRow = 1;
 				gameList[system].accounts.forEach(acctinfo => {
 					const guild = message.guild;
 					const guildmember = guild.member(acctinfo.userID);
-					data.push(guildmember.displayName + ' - ' + acctinfo.account);
+					if (guildmember) {
+						column1.push('**' + numRow + '.** ' + guildmember.displayName);
+						column2.push('**' + numRow + '.** ' + acctinfo.account);
+						numRow++;
+					}
 				});
-				message.channel.send('Here is my roster for ' + capitalize(system) + ':\n' + data.join('\n'));
+				const gameListEmbed = new Discord.RichEmbed()
+					.setColor('#000000')
+					.setTitle(capitalize(system) + ' Roster')
+					.setDescription('*Member Game Profiles for ' + capitalize(system) + '*')
+					.addField('Member', column1.join('\n'), true)
+					.addField('Account', column2.join('\n'), true);
+				message.channel.send(gameListEmbed);
 			}
 		}
 		else if (action === 'remove') {
 			if (!args[1]) {
-				message.channel.send('Sorry, I need a system name and your account info to remove anything!');
+				message.channel.send('Sorry, I need a system name to remove anything!');
 				return;
 			}
 			const system = args[1].toLowerCase();
 			if (system == 'all') {
 				Object.keys(gameList).forEach(sysname => {
-					console.log('Deleting ' + sysname + ' data...');
 					if (!gameList[sysname].accounts[0]) return;
 					const accountInfo = gameList[sysname].accounts.filter(info => info.userID === message.member.id);
 					if (accountInfo[0]) {
