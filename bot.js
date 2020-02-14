@@ -143,7 +143,7 @@ client.on('messageReactionAdd', (reaction, user, message) => {
 		return;
 	}
 	if (reaction.emoji.name == '🔖') {
-		console.log('Attempting to PM a message from ' + message.channel + ' to ' + message.author);
+		console.log('Attempting to PM a message from ' + message.channel + ' to ' + user);
 		const messagesent = new Date(message.createdTimestamp).toLocaleString('en-US', { timeZone: 'UTC' });
 		const guild = message.guild;
 		const guildmember = guild.member(message.author);
