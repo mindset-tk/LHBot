@@ -43,7 +43,7 @@ module.exports = {
 			const accountname = args.join(' ');
 			// check inputs and give errors for bad data
 			if (!gameList.hasOwnProperty(system)) { return message.channel.send('I\'m sorry, I don\'t have any rosters for that system... check your spelling, or try **' + config.prefix + 'games list** to see a list of systems available.'); }
-			if (!accountname) {	message.channel.send('I\'ll need an account name if I\'m going to add you to the roster!');	}
+			if (!accountname) {	return message.channel.send('I\'ll need an account name if I\'m going to add you to the roster!');	}
 			// check if user's data is already in the game list.
 			const accountInfo = gameList[system].accounts.filter(info => info.userID === message.member.id);
 			// add data to table or update existing roster data.
