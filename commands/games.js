@@ -14,12 +14,14 @@ module.exports = {
 	args: true,
 	guildOnly: true,
 	execute(message, args) {
+		// Quick function to capitalize gamelist output
 		function capitalize(str) {
 			return str.replace(/(?:^\w|\b\w)/g, function(ltr) {
 				return ltr.toUpperCase();
 			});
 		}
 
+		// Function to write game list data to file
 		function writegameList() {
 			fs.writeFile(listPath, JSON.stringify(gameList, null, 2), function(err) {
 				if (err) {
@@ -29,6 +31,7 @@ module.exports = {
 			});
 		}
 
+		// Block for adding a user's data to a given roster
 		const action = args[0].toLowerCase();
 		if (action === 'add') {
 			if (!args[1]) {
@@ -38,14 +41,12 @@ module.exports = {
 			const system = args[1].toLowerCase();
 			args.splice(0, 2);
 			const accountname = args.join(' ');
-			if (!gameList.hasOwnProperty(system)) {
-				message.channel.send('I\'m sorry, I don\'t have any rosters for that system... check your spelling, or try \'' + config.prefix + 'games list\' to see a list of systems available.');
-				return;
-			}
-			if (!accountname) {
-				message.channel.send('I\'ll need an account name if I\'m going to add you to the roster!');
-			}
+			// check inputs and give errors for bad data
+			if (!gameList.hasOwnProperty(system)) { return message.channel.send('I\'m sorry, I don\'t have any rosters for that system... check your spelling, or try **' + config.prefix + 'games list** to see a list of systems available.'); }
+			if (!accountname) {	message.channel.send('I\'ll need an account name if I\'m going to add you to the roster!');	}
+			// check if user's data is already in the game list.
 			const accountInfo = gameList[system].accounts.filter(info => info.userID === message.member.id);
+			// add data to table or update existing roster data.
 			if (!accountInfo[0]) {
 				gameList[system].accounts.push({ userID: message.member.id, account: accountname });
 				message.channel.send('Successfully added you to my roster for ' + capitalize(system) + '!');
@@ -60,19 +61,21 @@ module.exports = {
 
 		}
 		else if (action === 'list') {
+			// Columns for game roster output
 			const column1 = [];
 			const column2 = [];
+			// if no args, just list the names of each roster.
+			// need to convert this into a rich embed, or otherwise make output look nicer?
 			if (!args[1]) {
 				const data = [];
 				Object.keys(gameList).forEach(sysname => data.push(capitalize(sysname)));
 				message.channel.send('Here are the systems I maintain rosters for:\n' + data.join('\n'));
 			}
 			else {
+				// game roster output - error response for bad sysname, then create and send embed if sysname is valid.
 				const system = args[1].toLowerCase();
-				if (!gameList[system].accounts[0]) {
-					message.channel.send('I don\'t have anyone on that roster yet.  Will you be the first?');
-					return;
-				}
+				if (!gameList.hasOwnProperty(system)) { return message.channel.send('I\'m sorry, I don\'t have any rosters for that system... check your spelling, or try **' + config.prefix + 'games list** to see a list of systems available.'); }
+				if (!gameList[system].accounts[0]) { return	message.channel.send('I don\'t have anyone on that roster yet.  Will you be the first?'); }
 				let numRow = 1;
 				gameList[system].accounts.forEach(acctinfo => {
 					const guild = message.guild;
@@ -90,15 +93,18 @@ module.exports = {
 					.setDescription('*Member Game Profiles for ' + capitalize(system) + '*')
 					.addField('Member', column1.join('\n'), true)
 					.addField('Account', column2.join('\n'), true);
+				// try to include the embedicon for the system in question.  If this causes an error, log to console and continue sending the embed.
+				if (gameList[system].embedIcon) {
+					gameListEmbed.setThumbnail(gameList[system].embedIcon);
+				}
 				message.channel.send(gameListEmbed);
 			}
 		}
+		// removal block
 		else if (action === 'remove') {
-			if (!args[1]) {
-				message.channel.send('Sorry, I need a system name to remove anything!');
-				return;
-			}
+			if (!args[1]) { return message.channel.send('Sorry, I need a system name to remove anything!');	}
 			const system = args[1].toLowerCase();
+			// special case for .games remove all
 			if (system == 'all') {
 				Object.keys(gameList).forEach(sysname => {
 					if (!gameList[sysname].accounts[0]) return;
@@ -112,10 +118,7 @@ module.exports = {
 				message.channel.send('Successfully removed you from all game rosters.');
 				return;
 			}
-			else if (!gameList.hasOwnProperty(system)) {
-				message.channel.send('I\'m sorry, I don\'t have any rosters for that system... check your spelling, or try \'' + config.prefix + 'games list\' to see a list of systems available.');
-				return;
-			}
+			else if (!gameList.hasOwnProperty(system)) { return message.channel.send('I\'m sorry, I don\'t have any rosters for that system... check your spelling, or try **' + config.prefix + 'games list** to see a list of systems available.'); }
 			const accountInfo = gameList[system].accounts.filter(info => info.userID === message.member.id);
 			if (!accountInfo[0]) {
 				message.channel.send('I don\'t seem to see you on that roster.');
@@ -129,6 +132,6 @@ module.exports = {
 				return;
 			}
 		}
-		else {return message.channel.send('I couldn\'t parse that. try' + config.prefix + 'help games to see full information on this command.');}
+		else {return message.channel.send('I couldn\'t parse that. try **' + config.prefix + 'help games** to see full information on this command.');}
 	},
 };
