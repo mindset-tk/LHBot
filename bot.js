@@ -4,6 +4,7 @@ const Discord = require('discord.js');
 const configPath = './config.json';
 const config = require(configPath);
 const Counting = require('./counting.js');
+const wait = require('util').promisify(setTimeout);
 
 // initialize client, commands, command cooldown collections
 const client = new Discord.Client();
@@ -30,11 +31,21 @@ const events = {
 	RESUMED: 'Resumed',
 };
 
+// initialize invite cache
+const invites = {};
+
 // when the client is ready, run this code.
-client.on('ready', () => {
+client.on('ready', async () => {
 	console.log('Ready!');
 	client.user.setActivity(config.currentActivity.Name, { type: config.currentActivity.Type });
-  //Counting.OnReady(client);
+	// wait 1000ms without holding up the rest of the script. This way we can ensure recieving all guild invite info.
+	await wait(1000);
+	client.guilds.forEach(g => {
+		g.fetchInvites().then(guildInvites => {
+			invites[g.id] = guildInvites;
+		});
+	});
+	// Counting.OnReady(client);
 });
 
 // login to Discord with your app's token
@@ -46,16 +57,21 @@ client.on('message', message => {
 	if (!message.content.startsWith(config.prefix) || message.author.bot || !(message.member.roles.has(config.roleStaff) || message.member.roles.has(config.roleComrade))) return;
 
 	const args = message.content.slice(config.prefix.length).split(/ +/);
-	const commandName = args.shift().toLowerCase();
+	let commandName = args.shift().toLowerCase();
+
+	// handle using help as an argument
+	if (args[0] && args[0].toLowerCase() === 'help') {
+		args.length = 1;
+		args[0] = commandName;
+		commandName = 'help';
+	}
 
 	// checking both command names and aliases, else return from function
 	const command = client.commands.get(commandName) || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(commandName));
 	if (!command) return;
 
 	// check if command is server only; prevent it from being run in DMs if so.
-	if (command.guildOnly && message.channel.type !== 'text') {
-		return message.reply('I can\'t execute that command inside DMs!');
-  }
+	if (command.guildOnly && message.channel.type !== 'text') {	return message.reply('I can\'t execute that command inside DMs!'); }
 
 	// check permission level of command. Prevent staffonly commands from being run by non-staff.
 	if (command.staffOnly && !message.member.roles.has(config.roleStaff)) return;
@@ -103,7 +119,6 @@ client.on('message', message => {
 // Raw packet listener. This listens to all actions in discord then emits specialized events for the bot to work with.
 client.on('raw', async packet => {
 	// ensure the 't' field matches one of the raw events that we are listening for.
-	// eslint-disable-next-line no-prototype-builtins
 	if (!events.hasOwnProperty(packet.t)) return;
 	// check if it is a reconnect packet and emit reconnection event.
 	if (packet.t === 'RESUMED') {
@@ -158,8 +173,14 @@ client.on('messageReactionAdd', (reaction, user, message) => {
 });
 
 // whenever client completes session resume, run this code.
-client.on('Resumed', () => {
-	// do nothing for now.
+client.on('Resumed', async () => {
+	await wait(1000);
+	// cache invites from server.
+	client.guilds.forEach(g => {
+		g.fetchInvites().then(guildInvites => {
+			invites[g.id] = guildInvites;
+		});
+	});
 });
 
 // very basic error handling.
@@ -178,6 +199,26 @@ client.on('error', err => {
 		console.error('[' + date + ']:' + err);
 		return;
 	}
+});
+
+client.on('guildMemberAdd', member => {
+	// load the current invite list.
+	member.guild.fetchInvites().then(guildInvites => {
+		let invite = new Discord.Collection();
+		// This is the *existing* invites for the guild.
+		const ei = invites[member.guild.id];
+		// Update the cached invites for the guild.
+		invites[member.guild.id] = guildInvites;
+		// Look through the invites, find the one for which the uses went up. This will find any invite that's cached.
+		try { invite = guildInvites.find(i => ei.get(i.code).uses < i.uses); }
+		// however, if the previous line throws an error, the invite used was not cached.
+		// in this case, since invites are cached every time someone joins, the invite must be the uncached invite, that has exactly one use on it.
+		catch {	invite = guildInvites.find(i => (!ei.get(i.code) && i.uses === 1));	}
+		// This is just to simplify the message being sent below (inviter doesn't have a tag property)
+		const inviter = client.users.get(invite.inviter.id);
+		// A real basic message with the information we need.
+		config.logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined using invite code **${invite.code}** from ${inviter} (${inviter.tag}). This invite has been used **${invite.uses}** times since its creation.`);
+	});
 });
 
 process.on('unhandledRejection', error => console.error('Uncaught Promise Rejection! Error details:\n', error));
