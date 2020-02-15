@@ -5,6 +5,8 @@ const configPath = './config.json';
 const config = require(configPath);
 const Counting = require('./counting.js');
 const wait = require('util').promisify(setTimeout);
+const listPath = './gamelist.json';
+const gameList = require(listPath);
 
 // initialize client, commands, command cooldown collections
 const client = new Discord.Client();
@@ -202,23 +204,51 @@ client.on('error', err => {
 });
 
 client.on('guildMemberAdd', member => {
+	const logChannel = client.channels.get(config.channelInvLogs);
 	// load the current invite list.
 	member.guild.fetchInvites().then(guildInvites => {
-		let invite = new Discord.Collection();
-		// This is the *existing* invites for the guild.
-		const ei = invites[member.guild.id];
-		// Update the cached invites for the guild.
-		invites[member.guild.id] = guildInvites;
-		// Look through the invites, find the one for which the uses went up. This will find any invite that's cached.
-		try { invite = guildInvites.find(i => ei.get(i.code).uses < i.uses); }
-		// however, if the previous line throws an error, the invite used was not cached.
-		// in this case, since invites are cached every time someone joins, the invite must be the uncached invite, that has exactly one use on it.
-		catch {	invite = guildInvites.find(i => (!ei.get(i.code) && i.uses === 1));	}
-		// This is just to simplify the message being sent below (inviter doesn't have a tag property)
-		const inviter = client.users.get(invite.inviter.id);
-		// A real basic message with the information we need.
-		config.logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined using invite code **${invite.code}** from ${inviter} (${inviter.tag}). This invite has been used **${invite.uses}** times since its creation.`);
+		try {
+			let invite = new Discord.Collection();
+			// This is the *existing* invites for the guild.
+			const ei = invites[member.guild.id];
+			// Update the cached invites for the guild.
+			invites[member.guild.id] = guildInvites;
+			// Look through the invites, find the one for which the uses went up. This will find any invite that's cached.
+			try { invite = guildInvites.find(i => ei.get(i.code).uses < i.uses); }
+			// however, if the previous line throws an error, the invite used was not cached.
+			// in this case, since invites are cached every time someone joins, the invite must be the uncached invite, that has exactly one use on it.
+			catch {	invite = guildInvites.find(i => (!ei.get(i.code) && i.uses === 1));	}
+			// This is just to simplify the message being sent below (inviter doesn't have a tag property)
+			const inviter = client.users.get(invite.inviter.id);
+			// A real basic message with the information we need.
+			logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined using invite code **${invite.code}** from ${inviter} (${inviter.tag}). This invite has been used **${invite.uses}** times since its creation.`);
+		}
+		catch {
+			logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined the server, but no invite information was available.`);
+		}
 	});
+});
+
+client.on('guildMemberRemove', member => {
+	const logChannel = client.channels.get(config.channelInvLogs);
+	const data = [];
+	logChannel.send(`${member} (${member.user.tag} / ${member.id}) left the server.`);
+	Object.keys(gameList).forEach(sysname => {
+		if (!gameList[sysname].accounts[0]) return;
+		const accountInfo = gameList[sysname].accounts.filter(info => info.userID === member.id);
+		if (accountInfo[0]) {
+			const accountIndex = gameList[sysname].accounts.findIndex(info => info.userID === member.id);
+			gameList[sysname].accounts.splice(accountIndex, 1);
+			data.push(sysname);
+		}
+	});
+	fs.writeFile(listPath, JSON.stringify(gameList, null, 2), function(err) {
+		if (err) {
+			logChannel.send('There was an error updating games list information for exited user!');
+			return console.log(err);
+		}
+	});
+	console.log(`User exited - removed ${member.user.tag} from the following game rosters: ${data.join(', ')}`);
 });
 
 process.on('unhandledRejection', error => console.error('Uncaught Promise Rejection! Error details:\n', error));
