@@ -9,7 +9,10 @@ const Discord = require('discord.js');
 module.exports = {
 	name: 'games',
 	description: 'Display/manage rosters for the specified game or system.',
-	usage: '[add] [system] [account name/code] to add yourself to a roster.\n' + config.prefix + 'games [list] to see all roster options, or ' + config.prefix + 'games [list] [system] to see the roster for a given system.\n' + config.prefix + 'games [remove] [system] to remove yourself a single roster, or ' + config.prefix + 'games [remove] [all] to strip all your accounts from all rosters.',
+	usage: '[add] [system] [account name or friend code] to add yourself to a roster. If you\'re already on that roster, it will update your info.\n' +
+		config.prefix + 'games [list] to see all roster options, or ' + config.prefix + 'games [list] [system] to see the roster for a given system.\n' +
+		config.prefix + 'games [remove] [system] to remove yourself a single roster, or ' + config.prefix + 'games [remove] [all] to strip all your accounts from all rosters.' +
+		'\n\n*If you leave the server for any reason, please note that your data will be cleared from all rosters.*',
 	cooldown: 3,
 	args: true,
 	guildOnly: true,
@@ -111,7 +114,7 @@ module.exports = {
 					const accountInfo = gameList[sysname].accounts.filter(info => info.userID === message.member.id);
 					if (accountInfo[0]) {
 						const accountIndex = gameList[sysname].accounts.findIndex(info => info.userID === message.member.id);
-						gameList[system].accounts.splice(accountIndex, 1);
+						gameList[sysname].accounts.splice(accountIndex, 1);
 					}
 				});
 				writegameList();
