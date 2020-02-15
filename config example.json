@@ -3,6 +3,9 @@
 	"authtoken": "",
 	"roleStaff": "",
 	"roleComrade": "",
+
+	"channelInvLogs": "",
+
 	"currentActivity": {
 		"Type": "",
 		"Name": ""
