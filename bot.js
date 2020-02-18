@@ -47,7 +47,7 @@ client.on('ready', async () => {
 			invites[g.id] = guildInvites;
 		});
 	});
-	// Counting.OnReady(client);
+	Counting.OnReady(client);
 });
 
 // login to Discord with your app's token

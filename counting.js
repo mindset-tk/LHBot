@@ -7,13 +7,25 @@ function CheckMessages(messages)
 {
   console.log(`Received ${messages.size} messages`);
 
-  for(let [snowflake, message] of messages.entries())
+  for(let snowflake of Array.from(messages.keys()).reverse())
   {
+    const message = messages.get(snowflake);
     if(!validCountRegex.test(message.content))
     {
-      console.log('Counting failed: ' + snowflake + ': ' + message);
+      console.log('Counting failed because invalid attempt: ' + snowflake + ': ' + message + ' expected ' + (lastCount + 1));
+      lastCount = 0;
       continue;
     }
+
+    const number = parseInt(message.content);
+    if(lastCount != null && number != lastCount + 1)
+    {
+      console.log('Counting failed because out of order: ' + snowflake + ': ' + message + ' expected ' + (lastCount + 1));
+      lastCount = 0;
+      continue;
+    }
+
+    lastCount = number;
 
     console.log(message.content);
   }
