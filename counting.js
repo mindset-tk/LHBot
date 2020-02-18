@@ -69,4 +69,15 @@ function PublicOnReady(client)
   RestoreCountingState(client);
 }
 
+function PublicHandleMessage(message)
+{
+  if(message.channel.id === countingChannelId)
+  {
+    CheckNextMessage(message);
+    return(true);
+  }
+  return(false);
+}
+
 exports.OnReady = PublicOnReady;
+exports.HandleMessage = PublicHandleMessage;

@@ -55,6 +55,10 @@ client.login(config.authtoken);
 
 // command parser
 client.on('message', message => {
+  if(Counting.HandleMessage(message))
+  {
+    return;
+  }
 	// prevent parsing commands without correct prefix, from bots, and from non-staff non-comrades.
 	if (!message.content.startsWith(config.prefix) || message.author.bot || !(message.member.roles.has(config.roleStaff) || message.member.roles.has(config.roleComrade))) return;
 
