@@ -151,10 +151,10 @@ client.on('raw', async packet => {
 	}
 });
 
-// handler for reaction added
+// Handler for reaction added
 client.on('messageReactionAdd', (reaction, user, message) => {
 	if (message == null || message.system) return;
-	if (reaction.emoji.name == '📌' && reaction.count >= 5 && !message.pinned) {
+	if (reaction.emoji.name == '📌' && reaction.count >= config.pinsToPin && !message.pinned && !config.pinIgnoreChannels.includes(message.channel.id)) {
 		console.log('Attempting to pin a message in ' + message.channel);
 		message.pin();
 		return;
