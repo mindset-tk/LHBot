@@ -1,27 +1,42 @@
+const fs = require('fs');
+const path = require('path');
 const { countingChannelId } = require('./config.json');
-const { lastCountSaved } = require('./counting.json');
-let lastCount = lastCountSaved;
+const countingDataPath = path.resolve('./counting.json');
+const countingData = require(countingDataPath);
 const validCountRegex = /^[0-9]+$/;
+
+// Function to write game list data to file
+function WriteState() {
+  fs.writeFile(countingDataPath, JSON.stringify(countingData, null, 2), function(err) {
+    if (err) {
+      //message.channel.send('There was an error saving counting data!');
+      return console.log(err);
+    }
+  });
+}
 
 function CheckNextMessage(message)
 {
-    if(!validCountRegex.test(message.content))
-    {
-      console.log('Counting failed because invalid attempt: ' + message + ' expected ' + (lastCount + 1));
-      lastCount = 0;
-      return;
-    }
+  if(!validCountRegex.test(message.content))
+  {
+    console.log('Counting failed because invalid attempt: ' + message + ' expected ' + (countingData.lastCount + 1));
+    countingData.lastCount = 0;
+    countingData.lastMessage = message.id;
+    return;
+  }
 
-    const number = parseInt(message.content);
-    if(lastCount != null && number != lastCount + 1)
-    {
-      console.log('Counting failed because out of order: ' + message + ' expected ' + (lastCount + 1));
-      lastCount = 0;
-      return;
-    }
+  const number = parseInt(message.content);
+  if(countingData.lastCount != null && number != countingData.lastCount + 1)
+  {
+    console.log('Counting failed because out of order: ' + message + ' expected ' + (countingData.lastCount + 1));
+    countingData.lastCount = 0;
+    countingData.lastMessage = message.id;
+    return;
+  }
 
-    lastCount = number;
-    console.log(message.content);
+  countingData.lastCount = number;
+  countingData.lastMessage = message.id;
+  console.log(message.content);
 }
 
 function CheckMessages(messages)
@@ -33,6 +48,7 @@ function CheckMessages(messages)
     const message = messages.get(snowflake);
     CheckNextMessage(message);
   }
+  WriteState();
 }
 
 function RestoreCountingState(client)
@@ -51,13 +67,13 @@ function RestoreCountingState(client)
 
   var queryOptions = {};
 
-  if (lastCount == null)
+  if (countingData.lastMessage == null)
   {
     queryOptions.limit = 100;
   }
   else
   {
-    queryOptions.after = lastCount;
+    queryOptions.after = countingData.lastMessage;
   }
 
   countingChannel.fetchMessages(queryOptions)
@@ -74,6 +90,7 @@ function PublicHandleMessage(message)
   if(message.channel.id === countingChannelId)
   {
     CheckNextMessage(message);
+    WriteState();
     return(true);
   }
   return(false);
