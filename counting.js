@@ -2,13 +2,15 @@ const fs = require('fs');
 const path = require('path');
 let config = null;
 const countingDataPath = path.resolve('./counting.json');
-const countingData = require(countingDataPath);
+if(global.countingData == null)
+{
+  global.countingData = require(countingDataPath);
+}
 const validCountRegex = /^[0-9]+$/;
 let countingChannel = null;
 
-// Function to write game list data to file
 function WriteState() {
-  fs.writeFile(countingDataPath, JSON.stringify(countingData, null, 2), function(err) {
+  fs.writeFile(countingDataPath, JSON.stringify(global.countingData, null, 2), function(err) {
     if (err) {
       return console.log(err);
     }
@@ -27,8 +29,8 @@ function BuildBotMessage(author, botMessages)
 function FailCounting(message, reason)
 {
   //console.log(reason);
-  countingData.lastCount = 0;
-  countingData.lastMessage = message.id;
+  global.countingData.lastCount = 0;
+  global.countingData.lastMessage = message.id;
   return BuildBotMessage(message.author, config.countingFailMessages);
 }
 
@@ -37,17 +39,17 @@ function CheckNextMessage(message)
   //console.log(message);
   if(!validCountRegex.test(message.content))
   {
-    return FailCounting(message, 'Counting failed because invalid attempt: ' + message + ' expected ' + (countingData.lastCount + 1));
+    return FailCounting(message, 'Counting failed because invalid attempt: ' + message + ' expected ' + (global.countingData.lastCount + 1));
   }
 
   const number = parseInt(message.content);
-  if(countingData.lastCount != null && number != countingData.lastCount + 1)
+  if(global.countingData.lastCount != null && number != global.countingData.lastCount + 1)
   {
-    return FailCounting(message, 'Counting failed because out of order: ' + message + ' expected ' + (countingData.lastCount + 1));
+    return FailCounting(message, 'Counting failed because out of order: ' + message + ' expected ' + (global.countingData.lastCount + 1));
   }
 
-  countingData.lastCount = number;
-  countingData.lastMessage = message.id;
+  global.countingData.lastCount = number;
+  global.countingData.lastMessage = message.id;
   //console.log(message.content);
   return null;
 }
@@ -79,13 +81,13 @@ function CheckMessages(messages)
   }
   if(outputMessages)
   {
-    if(countingData.lastCount == 0)
+    if(global.countingData.lastCount == 0)
     {
       outputMessages += '\n' + BuildBotMessage({author: "dummy"}, config.countingStartMessages);
     }
     countingChannel.send(outputMessages);
   }
-  console.log(`Resuming counting from ${countingData.lastCount}`);
+  console.log(`Resuming counting from ${global.countingData.lastCount}`);
   WriteState();
 }
 
@@ -103,13 +105,13 @@ function RestoreCountingState(client)
 
   var queryOptions = {};
 
-  if (countingData.lastMessage == null)
+  if (global.countingData.lastMessage == null)
   {
     queryOptions.limit = 100;
   }
   else
   {
-    queryOptions.after = countingData.lastMessage;
+    queryOptions.after = global.countingData.lastMessage;
   }
 
   countingChannel.fetchMessages(queryOptions)
@@ -142,7 +144,7 @@ function PublicHandleMessage(message)
     let output = CheckNextMessage(message);
     if(output)
     {
-      if(countingData.lastCount == 0)
+      if(global.countingData.lastCount == 0)
       {
         output += '\n' + BuildBotMessage(message, config.countingStartMessages);
       }
