@@ -20,7 +20,7 @@ function BuildBotMessage(author, botMessages)
   const messageIndex = Math.floor(Math.random() * botMessages.length);
   let botMessage = botMessages[messageIndex];
 
-  botMessage = botMessage.replace(/\$user/g, author.username);
+  botMessage = botMessage.replace(/\$user/g, author);
   return(botMessage);
 }
 
