@@ -28,7 +28,7 @@ function BuildBotMessage(author, botMessages)
 
 function FailCounting(message, reason)
 {
-  //console.log(reason);
+  console.log(reason);
   global.countingData.lastCount = 0;
   global.countingData.lastMessage = message.id;
   return BuildBotMessage(message.author, config.countingFailMessages);
@@ -36,19 +36,20 @@ function FailCounting(message, reason)
 
 function CheckNextMessage(message)
 {
+  const nextNumber = global.countingData.lastCount + 1;
+  const numberString = Number(nextNumber).toString();
   //console.log(message);
   if(!validCountRegex.test(message.content))
   {
-    return FailCounting(message, 'Counting failed because invalid attempt: ' + message + ' expected ' + (global.countingData.lastCount + 1));
+    return FailCounting(message, 'Counting failed because invalid attempt: ' + message + ' expected ' + numberString);
   }
 
-  const number = parseInt(message.content);
-  if(global.countingData.lastCount != null && number != global.countingData.lastCount + 1)
+  if(global.countingData.lastCount != null && message.content.localeCompare(numberString) != 0)
   {
-    return FailCounting(message, 'Counting failed because out of order: ' + message + ' expected ' + (global.countingData.lastCount + 1));
+    return FailCounting(message, 'Counting failed because out of order: ' + message + ' expected ' + numberString);
   }
 
-  global.countingData.lastCount = number;
+  global.countingData.lastCount = nextNumber;
   global.countingData.lastMessage = message.id;
   //console.log(message.content);
   return null;
@@ -139,6 +140,10 @@ function PublicOnReady(lrConfig, client)
 
 function PublicHandleMessage(message)
 {
+  if(!config)
+  {
+    return;
+  }
   if(message.channel.id === config.countingChannelId && !message.author.bot)
   {
     let output = CheckNextMessage(message);
