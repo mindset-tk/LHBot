@@ -68,18 +68,14 @@ function CheckNextMessage(message)
 
   let relay = true;
 
-  console.log(userCounts);
   for(var id in userCounts)
   {
     var count = userCounts[id];
-    console.log(id + ' ' + count);
     if(count < 2)
     {
       relay = false;
     }
   }
-
-  console.log(relay);
 
   if(relay)
   {
