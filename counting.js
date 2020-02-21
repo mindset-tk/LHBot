@@ -31,6 +31,7 @@ function FailCounting(message, reason)
   console.log(reason);
   global.countingData.lastCount = 0;
   global.countingData.lastMessage = message.id;
+  global.countingData.lastCounters = [];
   return BuildBotMessage(message.author, config.countingFailMessages);
 }
 
@@ -51,6 +52,21 @@ function CheckNextMessage(message)
 
   global.countingData.lastCount = nextNumber;
   global.countingData.lastMessage = message.id;
+
+  for(let counterId of global.countingData.lastCounters)
+  {
+    if(counterId === message.author.id)
+    {
+      const reactIdx = Math.floor(Math.random() * config.repeatReacts.length);
+      message.react(config.repeatReacts[reactIdx]);
+    }
+  }
+
+  global.countingData.lastCounters.push(message.author.id);
+  if(global.countingData.lastCounters.length > config.numCountsBetweenRepeats)
+  {
+    global.countingData.lastCounters.shift();
+  }
   //console.log(message.content);
   return null;
 }
@@ -119,7 +135,7 @@ function RestoreCountingState(client)
     .then(messages => CheckMessages(messages));
 }
 
-function InitConfig(lrConfig)
+function InitConfig(lrConfig, client)
 {
   config = lrConfig;
   if(config.countingFailMessages == null)
@@ -130,11 +146,28 @@ function InitConfig(lrConfig)
   {
     config.countingStartMessages = ["Time to start over", "Back to the beginning!", "Gimme a 1", "What do we start with?", "0"];
   }
+  if(config.repeatReacts == null)
+  {
+    config.repeatReacts = ['😠','🤔','😡','🤨', '😑', '🙄', '😣', '😥', '🤐', '😫', '😒', '😓', '😔', '☹️', '🙁', '😖', '😞', '😟', '😢', '😭', '😦', '😧', '😨', '😩', '😬', '😱', '🤫', '👿', '😾', '🙅', '🤬'];
+  }
+  if(config.numCountsBetweenRepeats == null)
+  {
+    config.numCountsBetweenRepeats = 2;
+  }
+}
+
+function InitCountingData()
+{
+  if(global.countingData.lastCounters == null)
+  {
+    global.countingData.lastCounters = [];
+  }
 }
 
 function PublicOnReady(lrConfig, client)
 {
-  InitConfig(lrConfig);
+  InitConfig(lrConfig,client);
+  InitCountingData();
   RestoreCountingState(client);
 }
 
