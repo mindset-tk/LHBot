@@ -5,7 +5,7 @@ const config = require(configPath);
 
 module.exports = {
   name: 'config',
-  description: 'Access configuration options for this bot. Currently, you can manage pin ignore channels via .config pinignore add [channel mention] & .config pinignore remove [channel mention] and change the # of pins to pin with .config pins [number]. More functionality forthcoming.',
+  description: 'Access configuration options for this bot. Currently, you can manage pin ignore channels via .config pinignore add [channel mention] & .config pinignore remove [channel mention] and change the # of pins to pin with .config pins [number]. More functionality forthcoming...',
   usage: '',
   cooldown: 3,
   guildOnly: true,
