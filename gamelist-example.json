@@ -1,0 +1,42 @@
+{
+  "battle.net": {
+    "embedColor": "#0088CD",
+    "embedIcon": "https://lefthome.info/LHBot/icons/battlenet.png",
+    "accounts": []
+  },
+  "epicgames": {
+    "embedColor": "#000000",
+    "embedIcon": "https://lefthome.info/LHBot/icons/epic.png",
+    "accounts": []
+  },
+  "origin": {
+    "embedColor": "#F15A23",
+    "embedIcon": "https://lefthome.info/LHBot/icons/origin.png",
+    "accounts": []
+  },
+  "playstation": {
+    "embedColor": "#0070d1",
+    "embedIcon": "https://lefthome.info/LHBot/icons/playstation.png",
+    "accounts": []
+  },
+  "steam": {
+    "embedColor": "#000000",
+    "embedIcon": "https://lefthome.info/LHBot/icons/steam.png",
+    "accounts": []
+  },
+  "switch": {
+    "embedColor": "#E70009",
+    "embedIcon": "https://lefthome.info/LHBot/icons/switch.png",
+    "accounts": []
+  },
+  "uplay": {
+    "embedColor": "#4993CC",
+    "embedIcon": "https://lefthome.info/LHBot/icons/uplay.png",
+    "accounts": []
+  },
+  "xbox": {
+    "embedColor": "#0e7a0d",
+    "embedIcon": "https://lefthome.info/LHBot/icons/xbox.png",
+    "accounts": []
+  }
+}
