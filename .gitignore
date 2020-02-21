@@ -2,3 +2,4 @@ config.json
 .eslintrc.json
 /node_modules/*
 gamelist.json
+.editorconfig
