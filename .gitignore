@@ -1,8 +1,4 @@
 config.json
 .eslintrc.json
 /node_modules/*
-<<<<<<< HEAD
 gamelist.json
-=======
-gamelist.json
->>>>>>> 57821f2a56bc995d13977621d0ee6e05e29963aa
