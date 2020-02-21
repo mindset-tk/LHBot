@@ -5,9 +5,12 @@
 	"roleComrade": "",
 
 	"channelInvLogs": "",
+	"countingChannelId": "",
 
 	"currentActivity": {
 		"Type": "",
 		"Name": ""
-	   }
+	   },
+	"pinsToPin": 5,
+	"pinIgnoreChannels": []
 }
