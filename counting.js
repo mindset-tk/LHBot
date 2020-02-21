@@ -53,20 +53,46 @@ function CheckNextMessage(message)
   global.countingData.lastCount = nextNumber;
   global.countingData.lastMessage = message.id;
 
+  global.countingData.lastCounters.push(message.author.id);
+
+  let userCounts = [];
   for(let counterId of global.countingData.lastCounters)
   {
-    if(counterId === message.author.id)
+    if(userCounts[counterId] == null)
     {
-      const reactIdx = Math.floor(Math.random() * config.repeatReacts.length);
-      message.react(config.repeatReacts[reactIdx]);
+      userCounts[counterId] = 0;
+    }
+
+    userCounts[counterId] = userCounts[counterId] + 1;
+  }
+
+  let relay = true;
+
+  console.log(userCounts);
+  for(var id in userCounts)
+  {
+    var count = userCounts[id];
+    console.log(id + ' ' + count);
+    if(count < 2)
+    {
+      relay = false;
     }
   }
 
-  global.countingData.lastCounters.push(message.author.id);
-  if(global.countingData.lastCounters.length > config.numCountsBetweenRepeats)
+  console.log(relay);
+
+  if(relay)
+  {
+    const reactIdx = Math.floor(Math.random() * config.repeatReacts.length);
+    message.react(config.repeatReacts[reactIdx]);
+  }
+
+
+  if(global.countingData.lastCounters.length > 3)
   {
     global.countingData.lastCounters.shift();
   }
+
   //console.log(message.content);
   return null;
 }
@@ -149,10 +175,6 @@ function InitConfig(lrConfig, client)
   if(config.repeatReacts == null)
   {
     config.repeatReacts = ['😠','🤔','😡','🤨', '😑', '🙄', '😣', '😥', '🤐', '😫', '😒', '😓', '😔', '☹️', '🙁', '😖', '😞', '😟', '😢', '😭', '😦', '😧', '😨', '😩', '😬', '😱', '🤫', '👿', '😾', '🙅', '🤬'];
-  }
-  if(config.numCountsBetweenRepeats == null)
-  {
-    config.numCountsBetweenRepeats = 2;
   }
 }
 
