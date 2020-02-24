@@ -208,29 +208,31 @@ client.on('error', err => {
 });
 
 client.on('guildMemberAdd', member => {
-  const logChannel = client.channels.get(config.channelInvLogs);
-  // load the current invite list.
-  member.guild.fetchInvites().then(guildInvites => {
-    try {
-      let invite = new Discord.Collection();
-      // This is the *existing* invites for the guild.
-      const ei = invites[member.guild.id];
-      // Update the cached invites for the guild.
-      invites[member.guild.id] = guildInvites;
-      // Look through the invites, find the one for which the uses went up. This will find any invite that's cached.
-      try { invite = guildInvites.find(i => ei.get(i.code).uses < i.uses); }
-      // however, if the previous line throws an error, the invite used was not cached.
-      // in this case, since invites are cached every time someone joins, the invite must be the uncached invite, that has exactly one use on it.
-      catch {	invite = guildInvites.find(i => (!ei.get(i.code) && i.uses === 1));	}
-      // This is just to simplify the message being sent below (inviter doesn't have a tag property)
-      const inviter = client.users.get(invite.inviter.id);
-      // A real basic message with the information we need.
-      logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined using invite code **${invite.code}** from ${inviter} (${inviter.tag}). This invite has been used **${invite.uses}** times since its creation.`);
-    }
-    catch {
-      logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined the server, but no invite information was available.`);
-    }
-  });
+  if (config.invLogToggle) {
+    const logChannel = client.channels.get(config.channelInvLogs);
+    // load the current invite list.
+    member.guild.fetchInvites().then(guildInvites => {
+      try {
+        let invite = new Discord.Collection();
+        // This is the *existing* invites for the guild.
+        const ei = invites[member.guild.id];
+        // Update the cached invites for the guild.
+        invites[member.guild.id] = guildInvites;
+        // Look through the invites, find the one for which the uses went up. This will find any invite that's cached.
+        try { invite = guildInvites.find(i => ei.get(i.code).uses < i.uses); }
+        // however, if the previous line throws an error, the invite used was not cached.
+        // in this case, since invites are cached every time someone joins, the invite must be the uncached invite, that has exactly one use on it.
+        catch {	invite = guildInvites.find(i => (!ei.get(i.code) && i.uses === 1));	}
+        // This is just to simplify the message being sent below (inviter doesn't have a tag property)
+        const inviter = client.users.get(invite.inviter.id);
+        // A real basic message with the information we need.
+        logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined using invite code **${invite.code}** from ${inviter} (${inviter.tag}). This invite has been used **${invite.uses}** times since its creation.`);
+      }
+      catch {
+        logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined the server, but no invite information was available.`);
+      }
+    });
+  }
 });
 
 client.on('guildMemberRemove', member => {

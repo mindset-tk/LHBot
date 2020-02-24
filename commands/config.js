@@ -2,6 +2,18 @@ const fs = require('fs');
 const path = require('path');
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
+const countingDataPath = path.resolve('./counting.json');
+if(global.countingData == null) {
+  global.countingData = require(countingDataPath);
+}
+
+function writeCounting() {
+  fs.writeFile(countingDataPath, JSON.stringify(global.countingData, null, 2), function(err) {
+    if (err) {
+      return console.log(err);
+    }
+  });
+}
 
 module.exports = {
   name: 'config',
@@ -37,6 +49,7 @@ module.exports = {
         mention = mention.slice(2, -1);
         return client.channels.get(mention);
       }
+      else {return null;}
     }
 
     // initialize disallowed prefix characters. None of these will be permitted in any part of the command prefix.
@@ -65,7 +78,8 @@ Staff role: @${getRoleName(config.roleStaff)}
 Comrade role: @${getRoleName(config.roleComrade)}
 
 Special Channels:
-User join/exit notification channel: #${getChannelName(config.channelInvLogs)}
+User join/exit notification channel: ${config.invLogToggle ? ('#' + getChannelName(config.channelInvLogs)) : 'off.'}
+Counting channel: ${config.countingToggle ? ('#' + getChannelName(config.countingChannelId)) : 'off.'}
 
 Pins:
 Number of pins needed to pin a message: ${config.pinsToPin}
@@ -138,6 +152,40 @@ Channel(s) to ignore for pinning: ${(config.pinIgnoreChannels[0]) ? '#' + ignore
         else if (!failed[0] && succeeded[0]) { output.push(`Successfully removed the following channels from the pin ignore list: #${succeeded.join(', #')}.`); }
         if (notonlist[0]) { output.push(`The following channels were not in the ignore list: #${notonlist.join(', #')}.`); }
         message.channel.send(output.join(' '));
+        writeConfig();
+      }
+    }
+    // Set invite log channel
+    if (args[0].toLowerCase() === 'invitelogs') {
+      if (args[2]) { return message.channel.send('Too many arguments!'); }
+      if (args[1].toLowerCase() === 'off') {
+        message.channel.send('Disabling leave/join information.');
+        config.invLogToggle = false;
+        writeConfig();
+      }
+      else if (!getChannelFromMention(args[1])) { return message.channel.send('Couldn\'t get a channel from that. Please #mention the channel.'); }
+      else {
+        message.channel.send('Future leave/join information will go to ' + args[1] + '.');
+        config.channelInvLogs = (getChannelFromMention(args[1]).id);
+        config.invLogToggle = true;
+        writeConfig();
+      }
+    }
+    if (args[0].toLowerCase() === 'counting') {
+      if (args[2]) { return message.channel.send('Too many arguments!'); }
+      if (args[1].toLowerCase() === 'off') {
+        message.channel.send('Disabling counting.');
+        config.countingToggle = false;
+        writeConfig();
+      }
+      else if (!getChannelFromMention(args[1])) { return message.channel.send('Couldn\'t get a channel from that. Please #mention the channel.'); }
+      else {
+        message.channel.send('The new counting channel will be ' + args[1] + '.  I am setting the count to 0 - please use ' + config.prefix + 'setcounting to change it if necessary.');
+        config.countingChannelId = (getChannelFromMention(args[1]).id);
+        config.countingToggle = true;
+        global.countingData.lastCount = 0;
+        global.countingData.lastMessage = message.id;
+        writeCounting();
         writeConfig();
       }
     }
