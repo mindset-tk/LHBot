@@ -11,12 +11,13 @@ module.exports = {
   description: 'Display/manage rosters for the specified game or system.',
   usage: '[add] [system] [account name or friend code] to add yourself to a roster. If you\'re already on that roster, it will update your info.\n' +
 		config.prefix + 'games [list] to see all roster options, or ' + config.prefix + 'games [list] [system] to see the roster for a given system.\n' +
-		config.prefix + 'games [remove] [system] to remove yourself a single roster, or ' + config.prefix + 'games [remove] [all] to strip all your accounts from all rosters.' +
+    config.prefix + 'games [remove] [system] to remove yourself a single roster, or ' + config.prefix + 'games [remove] [all] to strip all your accounts from all rosters.' +
+    '\n Additionally, staff can use ' + config.prefix + 'games [purge] [@mention or discord ID] to remove all accounts from a user automatically' +
 		'\n\n*If you leave the server for any reason, please note that your data will be cleared from all rosters.*',
   cooldown: 3,
   args: true,
   guildOnly: true,
-  execute(message, args) {
+  async execute(message, args, client) {
     // Quick function to capitalize gamelist output
     function capitalize(str) {
       return str.replace(/(?:^\w|\b\w)/g, function(ltr) {
@@ -34,6 +35,17 @@ module.exports = {
       });
     }
 
+    function getUserFromMention(mention) {
+      if (mention.startsWith('<@') && mention.endsWith('>')) {
+        mention = mention.slice(2, -1);
+        if (mention.startsWith('!')) {
+          mention = mention.slice(1);
+        }
+        return client.fetchUser(mention);
+      }
+      else {return false;}
+    }
+    const IDFormat = new RegExp('^(\\d{16,})$');
     // Block for adding a user's data to a given roster
     const action = args[0].toLowerCase();
     if (action === 'add') {
@@ -134,6 +146,26 @@ module.exports = {
         message.channel.send('Successfully removed you from the roster for ' + capitalize(system) + '.');
         return;
       }
+    }
+    else if (action === 'purge' && message.member.roles.has(config.roleStaff)) {
+      let targetUser;
+      if (!args[1]) { return message.channel.send('Sorry, I need a user @mention or ID to purge them from the list');	}
+      else if (IDFormat.test(args[1])) { targetUser = await client.fetchUser(args[1]); }
+      else if (getUserFromMention(args[1])) { targetUser = await getUserFromMention(args[1]); }
+      else if (!getUserFromMention(args[1])) { return message.channel.send('Couldn\'t get a user from that. Please @mention the user or type their ID.'); }
+      const data = [];
+      Object.keys(gameList).forEach(sysname => {
+        if (!gameList[sysname].accounts[0]) return;
+        const accountInfo = gameList[sysname].accounts.filter(info => info.userID === targetUser.id);
+        if (accountInfo[0]) {
+          const accountIndex = gameList[sysname].accounts.findIndex(info => info.userID === targetUser.id);
+          gameList[sysname].accounts.splice(accountIndex, 1);
+          data.push(sysname);
+        }
+      });
+      writegameList();
+      if (!data[0]) { return message.channel.send(targetUser.tag + ' was not on any game rosters.'); }
+      else {return message.channel.send('Removed ' + targetUser.tag + ' from the following rosters: ' + data.join(' '));}
     }
     else {return message.channel.send('I couldn\'t parse that. try **' + config.prefix + 'help games** to see full information on this command.');}
   },
