@@ -53,7 +53,7 @@ async function restoreMessages(client) {
       // check if each channel has an entry in the log. if not, create a new property with info about the channel.
       if (gc.type === 'text' && !global.dataLog[g.id][gc.id] && gc.memberPermissions(g.me).has('READ_MESSAGES') && gc.memberPermissions(g.me).has('READ_MESSAGE_HISTORY')) {
         // initialize data for new channel
-        global.dataLog[g.id][gc.id] = { channelName:gc.name, lastMessageID:gc.lastMessageID };
+        global.dataLog[g.id][gc.id] = { channelName:gc.name, lastMessageID:null };
         writeData();
       }
       else if (gc.lastMessageID != null && gc.memberPermissions(g.me).has('READ_MESSAGES') && gc.memberPermissions(g.me).has('READ_MESSAGE_HISTORY')) {
@@ -61,9 +61,12 @@ async function restoreMessages(client) {
         if (global.dataLog[g.id][gc.id].lastMessageID) {
           let lastSeenMessage = global.dataLog[g.id][gc.id].lastMessageID;
           let numMsgsFetched = 0;
+          let loopbreaker = 0;
+          let prevLastSeen;
           // fetch messages repeatedly, looping until the guild's last message ID matches our last message ID.
-          while (gc.lastMessageID != lastSeenMessage) {
-            await gc.fetchMessages({ after: lastSeenMessage }).then(messages => {
+          while (gc.lastMessageID != lastSeenMessage && loopbreaker < 2) {
+            prevLastSeen = lastSeenMessage;
+            await gc.fetchMessages({ limit: 100, after: lastSeenMessage }).then(messages => {
               if (messages.size > 0) {
                 for (let message of messages) {
                   message = message[1];
@@ -73,9 +76,15 @@ async function restoreMessages(client) {
               }
               lastSeenMessage = global.dataLog[g.id][gc.id].lastMessageID;
             });
-            await wait(500);
+            // if the last message in a channel was deleted, there will be a mismatch in gc.lastMessageID, leading to an infinite loop.
+            // if that happens, since lastSeenMessage isn't being changed, this conditional will break the loop after 2 tries.
+            if (prevLastSeen === lastSeenMessage) {
+              loopbreaker++;
+            }
+            await wait(200);
           }
           console.log(`Fetched ${numMsgsFetched} offline messages in #${gc.name}.`);
+          await wait(200);
         }
         // if it was a new channel when we last saw it, we need to do a little more work to iterate back to the first message ever sent, since we don't know the ID of the first message sent.
         else if (!global.dataLog[g.id][gc.id].lastMessageID) {
@@ -85,7 +94,7 @@ async function restoreMessages(client) {
           // loop fetching messages until the oldest seen message no longer changes.
           do {
             prevOldest = oldestSeenMessageID;
-            await gc.fetchMessages({ before: oldestSeenMessageID }).then(messages => {
+            await gc.fetchMessages({ limit: 100, before: oldestSeenMessageID }).then(messages => {
               if (messages.size > 0) {
                 for (let message of messages) {
                   message = message[1];
@@ -95,10 +104,11 @@ async function restoreMessages(client) {
                 numMsgsFetched += messages.size;
               }
             });
-            await wait(500);
+            await wait(200);
           }
           while (oldestSeenMessageID != prevOldest);
           console.log(`Fetched ${numMsgsFetched} offline messages in #${gc.name}.`);
+          await wait(200);
         }
       }
     }

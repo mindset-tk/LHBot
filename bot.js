@@ -57,7 +57,7 @@ client.login(config.authtoken);
 
 // command parser
 client.on('message', message => {
-  dataLogger.OnMessage(message);
+  if (message.channel.type === 'text') { dataLogger.OnMessage(message); }
   if(Counting.HandleMessage(message))
   {
     return;
