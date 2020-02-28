@@ -5,7 +5,7 @@
 // * choose which channel to use
 // * owner/staff check
 
-const Discord = require("discord.js");
+/* const Discord = require("discord.js");
 const path = require("path");
 const configPath = path.resolve("./config.json");
 const config = require(configPath);
@@ -363,4 +363,4 @@ ${config.prefix}event delete [name] to delete an event`,
 		eventManager.start();
 		console.log("Event manager ready.");
 	}
-};
+}; */
