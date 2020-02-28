@@ -90,7 +90,7 @@ async function restoreMessages(client) {
                 for (let message of messages) {
                   message = message[1];
                   publicOnMessage(message);
-                  oldestSeenMessageID = Math.min(parseInt(message.id),parseInt(oldestSeenMessageID)).toString();
+                  oldestSeenMessageID = Math.min(parseInt(message.id), parseInt(oldestSeenMessageID)).toString();
                 }
                 numMsgsFetched += messages.size;
               }
