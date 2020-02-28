@@ -57,7 +57,8 @@ client.login(config.authtoken);
 
 // command parser
 client.on('message', message => {
-  dataLogger.OnMessage(message);
+  // only do datalogging on non-DM text channels.
+  if (message.channel.type === 'text') { dataLogger.OnMessage(message); }
   if(Counting.HandleMessage(message))
   {
     return;
