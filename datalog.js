@@ -73,7 +73,7 @@ async function restoreMessages(client) {
               }
               lastSeenMessage = global.dataLog[g.id][gc.id].lastMessageID;
             });
-            wait(500);
+            await wait(500);
           }
           console.log(`Fetched ${numMsgsFetched} offline messages in #${gc.name}.`);
         }
@@ -95,7 +95,7 @@ async function restoreMessages(client) {
                 numMsgsFetched += messages.size;
               }
             });
-            wait(500);
+            await wait(500);
           }
           while (oldestSeenMessageID != prevOldest);
           console.log(`Fetched ${numMsgsFetched} offline messages in #${gc.name}.`);
