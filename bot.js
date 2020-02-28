@@ -7,6 +7,7 @@ const Counting = require('./counting.js');
 const wait = require('util').promisify(setTimeout);
 const listPath = './gamelist.json';
 const gameList = require(listPath);
+const dataLogger = require('./datalog.js');
 
 // initialize client, commands, command cooldown collections
 const client = new Discord.Client();
@@ -48,6 +49,7 @@ client.on('ready', async () => {
     });
   });
   Counting.OnReady(config, client);
+  dataLogger.OnReady(config, client);
 });
 
 // login to Discord with your app's token
@@ -55,6 +57,7 @@ client.login(config.authtoken);
 
 // command parser
 client.on('message', message => {
+  dataLogger.OnMessage(message);
   if(Counting.HandleMessage(message))
   {
     return;
