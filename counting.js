@@ -32,7 +32,6 @@ function FailCounting(message, reason)
   global.countingData.lastCount = 0;
   global.countingData.lastMessage = message.id;
   global.countingData.lastCounters = [];
-  return BuildBotMessage(message.author, config.countingFailMessages);
 }
 
 function CheckNextMessage(message)
@@ -42,12 +41,22 @@ function CheckNextMessage(message)
   //console.log(message);
   if(!validCountRegex.test(message.content))
   {
-    return FailCounting(message, 'Counting failed because invalid attempt: ' + message + ' expected ' + numberString);
+    FailCounting(message, 'Counting failed because invalid attempt: ' + message + ' expected ' + numberString);
+    return BuildBotMessage(message.author, config.countingFailMessages);
   }
 
   if(global.countingData.lastCount != null && message.content.localeCompare(numberString) != 0)
   {
-    return FailCounting(message, 'Counting failed because out of order: ' + message + ' expected ' + numberString);
+    FailCounting(message, 'Counting failed because out of order: ' + message + ' expected ' + numberString);
+    return BuildBotMessage(message.author, config.countingFailMessages);
+  }
+
+  const lastCountersSize = global.countingData.lastCounters.length;
+
+  if(lastCountersSize > 0 && global.countingData.lastCounters[lastCountersSize - 1] == message.author.id)
+  {
+    FailCounting(message, 'Counting failed because user counted twice: ' + message.author);
+    return BuildBotMessage(message.author, config.countingFailRepeatMessages);
   }
 
   global.countingData.lastCount = nextNumber;
@@ -163,6 +172,10 @@ function InitConfig(lrConfig, client)
   if(config.countingFailMessages == null)
   {
     config.countingFailMessages = ["I think $user broke counting!", "That's not right, $user", "Here's $user, ruining it for everyone", "Oh dear, $user. Oh dear.", "It's ok $user, I love you anyway"];
+  }
+  if(config.countingFailRepeatMessages == null)
+  {
+    config.countingFailRepeatMessages = ["Sorry $user, you're not allowed to count twice in a row"];
   }
   if(config.countingStartMessages == null)
   {
