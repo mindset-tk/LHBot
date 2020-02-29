@@ -104,7 +104,7 @@ function CheckNextMessage(message)
 
 function CheckMessages(messages)
 {
-  console.log(`Received ${messages.size} messages`);
+  console.log(`Retrieved ${messages.size} messages from counting.`);
   let outputMessages = null;
 
   for(let snowflake of Array.from(messages.keys()).reverse())

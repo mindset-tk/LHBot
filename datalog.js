@@ -40,6 +40,7 @@ function publicOnMessage(message) {
 }
 
 async function restoreMessages(client) {
+  console.log('Fetching offline messages...');
   for (let g of await client.guilds) {
     g = g[1];
     // check if log has the info for this guild. if not, create an entry that we'll push channel info into
@@ -83,7 +84,7 @@ async function restoreMessages(client) {
             }
             await wait(200);
           }
-          console.log(`Fetched ${numMsgsFetched} offline messages in #${gc.name}.`);
+          if (numMsgsFetched > 0) { console.log(`Fetched ${numMsgsFetched} offline messages in #${gc.name}.`); }
           await wait(200);
         }
         // if it was a new channel when we last saw it, we need to do a little more work to iterate back to the first message ever sent, since we don't know the ID of the first message sent.
@@ -107,12 +108,13 @@ async function restoreMessages(client) {
             await wait(200);
           }
           while (oldestSeenMessageID != prevOldest);
-          console.log(`Fetched ${numMsgsFetched} offline messages in #${gc.name}.`);
+          if (numMsgsFetched > 0) { console.log(`Fetched ${numMsgsFetched} offline messages in #${gc.name}.`); }
           await wait(200);
         }
       }
     }
   }
+  console.log('Offline message fetch complete!');
 }
 
 function publicOnReady(lhconfig, client) {
