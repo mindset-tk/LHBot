@@ -56,7 +56,7 @@ client.on('ready', async () => {
 client.login(config.authtoken);
 
 // command parser
-client.on('message', message => {
+client.on('message',  async message => {
   // only do datalogging on non-DM text channels.
   if (message.channel.type === 'text') { dataLogger.OnMessage(message); }
   if(Counting.HandleMessage(message))
@@ -81,7 +81,7 @@ client.on('message', message => {
   if (!command) return;
 
   // check if command is server only; prevent it from being run in DMs if so.
-  if (command.guildOnly && message.channel.type !== 'text') {	return message.reply('I can\'t execute that command inside DMs!'); }
+  if (command.guildOnly && message.channel.type !== 'text') { return await message.reply('I can\'t execute that command inside DMs!'); }
 
   // check permission level of command. Prevent staffonly commands from being run by non-staff.
   if (command.staffOnly && !message.member.roles.has(config.roleStaff)) return;
@@ -92,7 +92,7 @@ client.on('message', message => {
     if (command.usage) {
       reply += `\nThe proper usage would be: \`${config.prefix}${command.name} ${command.usage}\``;
     }
-    return message.channel.send(reply);
+    return await message.channel.send(reply);
   }
 
   // Cooldowns. First, create a collection that includes all cooldowns.
@@ -107,7 +107,7 @@ client.on('message', message => {
     const expirationTime = timestamps.get(message.author.id) + cooldownAmount;
     if (now < expirationTime) {
       const timeLeft = (expirationTime - now) / 1000;
-      return message.channel.send(`please wait ${timeLeft.toFixed(1)} more second(s) before reusing the \`${command.name}\` command.`);
+      return await message.channel.send(`please wait ${timeLeft.toFixed(1)} more second(s) before reusing the \`${command.name}\` command.`);
     }
   }
   // Then, start the cooldown for the command.
@@ -116,11 +116,11 @@ client.on('message', message => {
 
   // Try to execute the command and return an error if it fails.
   try {
-    command.execute(message, args, client, config);
+    await command.execute(message, args, client, config);
   }
   catch (error) {
     console.error(error);
-    message.reply('there was an error trying to execute that command!');
+    await message.reply('there was an error trying to execute that command!');
   }
 
 });
