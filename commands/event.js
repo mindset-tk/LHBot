@@ -1,11 +1,11 @@
 // TODO:
-// * join events (incl. by reacts)
+// * join events by reacts
 // * choose which channel to use
 // * recurring events
-// * set user/guild default timezone
 
 const Discord = require("discord.js");
 const fs = require("fs");
+const fsp = fs.promises;
 const path = require("path");
 const configPath = path.resolve("./config.json");
 const config = require(configPath);
@@ -26,12 +26,12 @@ if (global.eventData == null) {
     global.eventData = require(eventDataPath);
 }
 
-function writeEventState() {
-    fs.writeFile(eventDataPath, JSON.stringify(global.eventData, null, 2), function (err) {
-        if (err) {
-            return console.log(err);
-        }
-    });
+// We make writing state async because I found in testing
+// that it was fairly common when events were removed that the
+// JSON would get clobbered by multiple asynchronous writeFile commands,
+// especially when
+async function writeEventState() {
+    return fsp.writeFile(eventDataPath, JSON.stringify(global.eventData, null, 2));
 }
 
 const dateInputFormats = ['YYYY-MM-DD', 'YYYY/MM/DD', 'MM-DD', 'MM/DD'];
@@ -63,14 +63,14 @@ function getUserTimeZone(message) {
     return getTimeZoneFromUserInput(userZone) || getGuildTimeZone(message.guild);
 }
 
-function setGuildTimeZone(guild, timeZone) {
+async function setGuildTimeZone(guild, timeZone) {
     global.eventData.guildDefaultTimeZones[guild.id] = timeZone;
-    writeEventState();
+    return writeEventState();
 }
 
-function setUserTimeZone(user, timeZone) {
+async function setUserTimeZone(user, timeZone) {
     global.eventData.userTimeZones[user.id] = timeZone;
-    writeEventState();
+    return writeEventState();
 }
 
 // Used to make the timezone into the 'canonical' format vs whatever user provided
@@ -89,65 +89,76 @@ class EventManager {
 
     loadState() {
         if (global.eventData.events) {
-            // Convert saved date strings back into Moment datetime objects
+            // Convert saved date strings back into Moment datetime objects,
+            // and participants into sets
             Object.entries(global.eventData.events).forEach(([guild, events]) => {
                 this.upcomingEvents[guild] = events.map(event => ({
                     ...event,
                     due: moment.utc(event.due, moment.ISO_8601, true),
+                    participants: new Set(event.participants),
                 }));
             });
         }
     }
 
-    saveState() {
-        // Serialize moment datetimes as ISO8601 strings
+    async saveState() {
+        // Serialize moment datetimes as ISO8601 strings,
+        // and participants as arrays
         Object.entries(this.upcomingEvents).forEach(([guild, events]) => {
-            global.eventData.events[guild] = events.map(event => ({
-                ...event,
-                due: event.due.toISOString(),
-            }));
+            if (events.length !== undefined) {
+                global.eventData.events[guild] = events.map(event => ({
+                    ...event,
+                    due: event.due.toISOString(),
+                    participants: Array.from(event.participants),
+                }));
+            }
         });
-        writeEventState();
+        return writeEventState();
     }
 
     start() {
         // Tick immediately at start to do cleanup
-        this.tick();
-
-        // Ensure we're always at (or close to) the 'top' of a minute when we run our tick
-        const topOfMinute = 60000 - (Date.now() % 60000);
-        this.timer = this.client.setTimeout(() => {
-            this.timer = this.client.setInterval(() => this.tick(), 60000);
-            this.tick();
-        }, topOfMinute);
+        this.tick().then(() => {
+            // Ensure we're always at (or close to) the 'top' of a minute when we run our tick
+            const topOfMinute = 60000 - (Date.now() % 60000);
+            this.timer = this.client.setTimeout(() => {
+                this.timer = this.client.setInterval(() => this.tick(), 60000);
+                this.tick();
+            }, topOfMinute);
+        });
     }
 
-    tick() {
+    async tick() {
         const now = moment.utc();
         const eventsByGuild = Object.entries(this.upcomingEvents);
-        eventsByGuild.forEach(([guild, events]) => {
+        for (const [guild, events] of eventsByGuild) {
             const dueEvents = events.filter(event => event.due.isSameOrBefore(now));
             this.upcomingEvents[guild] = events.filter(event => event.due.isAfter(now));
-            this.saveState();
+            await this.saveState();
 
             if (dueEvents) {
-                dueEvents.forEach(event => {
+                for (const event of dueEvents) {
                     const eventAge = moment.duration(now.diff(event.due));
                     // Discard events we missed for more than 5 minutes
                     if (eventAge.asMinutes() >= 5) {
-                        return;
+                        break;
                     }
-
                     const destChannel = this.client.channels.get(event.channel);
                     if (!destChannel) {
                         console.log("Got event for unknown channel", event.channel);
-                        return;
+                        break;
                     }
 
-                    destChannel.send(`The event **'${event.name}'** is starting now!`);
-                });
+                    const pingList = [event.owner, ...event.participants].map(snowflake => `<@${snowflake}>`).join(" ");
+
+                    await destChannel.send(`The event **'${event.name}'** is starting now! ${pingList}`,
+                        embedEvent(event, {
+                            title: event.name,
+                            description: "This event is starting now."
+                        }));
+                }
             }
-        })
+        }
     }
 
     stop() {
@@ -156,54 +167,129 @@ class EventManager {
         this.timer = null;
     }
 
-    add(event) {
+    async add(event) {
         const guild = event.guild;
         if (!this.upcomingEvents[guild]) {
             this.upcomingEvents[guild] = [];
         }
         this.upcomingEvents[guild].push(event);
         this.upcomingEvents[guild].sort((a, b) => a.due.diff(b.due));
-        this.saveState();
+        return this.saveState();
+    }
+
+    indexByName(guild, eventName) {
+        let lowerEventName = eventName.toLowerCase();
+        if (!this.upcomingEvents[guild]) {
+            return undefined;
+        }
+
+        const index = this.upcomingEvents[guild].findIndex(
+            event => event.name.toLowerCase() === lowerEventName
+        );
+
+        return index !== -1 ? index : undefined;
     }
 
     getByName(guild, eventName) {
-        let lowerEventName = eventName.toLowerCase();
-        return this.upcomingEvents[guild] && this.upcomingEvents[guild].find(
-            event => event.name.toLowerCase() === lowerEventName
-        );
+        const index = this.indexByName(guild, eventName);
+        return index !== undefined ? this.upcomingEvents[guild][index] : index;
     }
 
-    deleteByName(guild, eventName) {
-        if (!this.upcomingEvents[guild]) {
+    async updateByName(guild, eventName, event) {
+        const index = this.indexByName(guild, eventName);
+        if (index === undefined) {
             return;
         }
 
-        let lowerEventName = eventName.toLowerCase();
-        this.upcomingEvents[guild].splice(
-            this.upcomingEvents[guild].indexOf(
-                event => event.name.toLowerCase() === lowerEventName
-            )
-        );
-        this.saveState();
+        this.upcomingEvents[guild][index] = event;
+        await this.saveState();
     }
 
+    async deleteByName(guild, eventName) {
+        const index = this.indexByName(guild, eventName);
+        if (index === undefined) {
+            return;
+        }
+
+        this.upcomingEvents[guild].splice(index);
+        await this.saveState();
+    }
+
+    /**
+     * Get the active events for a specified guild.
+     *
+     * @param guild Snowflake of the Guild to scope events to.
+     * @returns Array of events for guild.
+     */
     guildEvents(guild) {
         return this.upcomingEvents[guild] || [];
+    }
+
+    /**
+     * Adds a participant to an event.
+     *
+     * @param guild Snowflake of the Guild to scope events to.
+     * @param user Snowflake of the User to be added to the event.
+     * @param eventName Name of the event to be updated.
+     * @returns {boolean} Whether the user was added to the event (false if already added).
+     */
+    async addParticipant(guild, user, eventName) {
+        const event = this.getByName(guild, eventName);
+        if (!event || event.participants.has(user)) {
+            return false;
+        }
+
+        event.participants.add(user);
+
+        await this.updateByName(guild, eventName, event);
+
+        return true;
+    }
+
+    /**
+     * Removes a participant from an event.
+     *
+     * @param guild Snowflake of the Guild to scope events to.
+     * @param user Snowflake of the User to be removed to the event.
+     * @param eventName Name of the event to be updated.
+     * @returns {boolean} Whether the user was removed from the event (false if not already added).
+     */
+    async removeParticipant(guild, user, eventName) {
+        const event = this.getByName(guild, eventName);
+        if (!event || !event.participants.has(user)) {
+            return false;
+        }
+
+        event.participants.delete(user);
+
+        await this.updateByName(guild, eventName, event);
+
+        return true;
     }
 }
 
 let eventManager;
 
-function embedEvent(title, event) {
-    return new Discord.RichEmbed()
+function embedEvent(event, options = {}) {
+    const {title, description, forUser} = options;
+
+    const eventEmbed = new Discord.RichEmbed()
         .setTitle(title)
         .setDescription(
-            `A message will be posted in <#${event.channel}> when this event starts.`
+            description || `A message will be posted in <#${event.channel}> when this event starts.`
         )
         .addField("Event name", event.name)
         .addField("Creator", `<@${event.owner}>`)
         .addField("Channel", `<#${event.channel}>`)
+        .addField("Participants", `${event.participants.size + 1}`)
         .setTimestamp(event.due);
+
+    if (forUser) {
+        eventEmbed.addField("Participating?",
+            forUser === event.owner || event.participants.has(forUser) ? "Yes" : "No");
+    }
+
+    return eventEmbed;
 }
 
 async function createCommand(message, args, client) {
@@ -214,42 +300,36 @@ async function createCommand(message, args, client) {
     const minimumDate = moment.tz(timeZone).add('1', 'minutes');
 
     if (eventManager.getByName(message.guild.id, name)) {
-        await message.channel.send(`An event called '${name}' already exists.`);
-        return;
+        return message.channel.send(`An event called '${name}' already exists.`);
     }
 
     if (!date) {
-        await message.channel.send("You must specify a date for the event.");
-        return;
+        return message.channel.send("You must specify a date for the event.");
     }
 
     if (!time) {
-        await message.channel.send("You must specify a time for the event.");
-        return;
+        return message.channel.send("You must specify a time for the event.");
     }
 
     if (!name) {
-        await message.channel.send("You must specify a name for the event.");
-        return;
+        return message.channel.send("You must specify a name for the event.");
     }
 
     // Process date and time separately for better error handling
     const datePart = moment.tz(date, dateInputFormats, true, timeZone);
 
     if (!datePart.isValid()) {
-        await message.channel.send(
+        return message.channel.send(
             `The date format used wasn't recognized, or you entered an invalid date. Supported date formats are: ${dateInputFormats.map(date => `\`${date}\``).join(', ')}.`
         );
-        return;
     }
 
     const timePart = moment.tz(time, timeInputFormat, true, timeZone);
 
     if (!timePart.isValid()) {
-        await message.channel.send(
+        return message.channel.send(
             `The time format used wasn't recognized. The supported format is \`${timeInputFormat}\`.`
         );
-        return;
     }
 
     const resolvedDate = datePart.set({
@@ -261,8 +341,7 @@ async function createCommand(message, args, client) {
 
     // Ensure the event is in the future.
     if (resolvedDate.diff(minimumDate) < 0) {
-        await message.channel.send("The event must start in the future.");
-        return;
+        return message.channel.send("The event must start in the future.");
     }
 
     const newEvent = {
@@ -271,54 +350,60 @@ async function createCommand(message, args, client) {
         channel: message.channel.id,
         owner: message.author.id,
         guild: message.guild.id,
+        participants: new Set(),
     };
 
-    eventManager.add(newEvent);
+    await eventManager.add(newEvent);
 
-    await message.channel.send(
+    return message.channel.send(
         "Your event has been created.",
-        embedEvent(`New event: ${name}`, newEvent)
+        embedEvent(newEvent, {
+            title: `New event: ${name}`,
+            forUser: message.author.id,
+        })
     );
 }
 
 async function deleteCommand(message, client, name) {
     if (!name) {
-        await message.channel.send(
+        return message.channel.send(
             "You must specify which event you want to delete."
         );
-        return;
     }
 
     const event = eventManager.getByName(message.guild.id, name);
     if (event) {
         if (event.owner !== message.author.id && !message.member.roles.has(config.roleStaff)) {
-            await message.channel.send(`Only staff and the event creator can delete an event.`);
-            return;
+            return message.channel.send(`Only staff and the event creator can delete an event.`);
         }
 
-        eventManager.deleteByName(message.guild.id, name);
-        await message.channel.send(
+        await eventManager.deleteByName(message.guild.id, name);
+        return message.channel.send(
             "The event was deleted.",
-            embedEvent(`Deleted event: ${event.name}`, event)
+            embedEvent(event, {
+                title: `Deleted event: ${event.name}`
+            })
         );
     } else {
-        await message.channel.send(`The event '${name}' does not exist.`);
+        return message.channel.send(`The event '${name}' does not exist.`);
     }
 }
 
 async function infoCommand(message, client, name) {
     if (!name) {
-        await message.channel.send(
+        return message.channel.send(
             "You must specify which event you want info on."
         );
-        return;
     }
 
     const event = eventManager.getByName(message.guild.id, name);
     if (event) {
-        await message.channel.send("", embedEvent(event.name, event));
+        return message.channel.send("", embedEvent(event, {
+            title: event.name,
+            forUser: message.author.id,
+        }));
     } else {
-        await message.channel.send(`The event '${name}' does not exist.`);
+        return message.channel.send(`The event '${name}' does not exist.`);
     }
 }
 
@@ -326,17 +411,15 @@ async function listCommand(message, client, timeZone) {
     timeZone = getTimeZoneFromUserInput(timeZone) || getUserTimeZone(message);
 
     if (!isValidTimeZone(timeZone)) {
-        await message.channel.send(
+        return message.channel.send(
             `'${timeZone}' is an invalid or unknown time zone.`
         );
-        return;
     }
 
     const guildUpcomingEvents = eventManager.guildEvents(message.guild.id);
 
     if (guildUpcomingEvents.length === 0) {
-        await message.channel.send("There are no events coming up.");
-        return;
+        return message.channel.send("There are no events coming up.");
     }
 
     const displayLimit = 10;
@@ -373,7 +456,7 @@ async function listCommand(message, client, timeZone) {
                 ? ""
                 : " Use !event list [timezone] to show in your time zone.")
         );
-    await message.channel.send("Here are the upcoming events:", embed);
+    return message.channel.send("Here are the upcoming events:", embed);
 }
 
 async function servertzCommand(message, client, timeZone) {
@@ -390,13 +473,13 @@ async function servertzCommand(message, client, timeZone) {
 
     timeZone = getTimeZoneFromUserInput(timeZone);
 
-    if(!isValidTimeZone(timeZone)) {
+    if (!isValidTimeZone(timeZone)) {
         return message.channel.send(
             `'${timeZone}' is an invalid or unknown time zone.`
         );
     }
 
-    setGuildTimeZone(message.guild.id, timeZone);
+    await setGuildTimeZone(message.guild.id, timeZone);
 
     return message.channel.send(
         `The server's default time zone is now set to **${getTimeZoneCanonicalDisplayName(timeZone)}** (UTC${moment().tz(timeZone).format('Z')}).`
@@ -413,23 +496,93 @@ async function tzCommand(message, client, timeZone) {
 
     timeZone = getTimeZoneFromUserInput(timeZone);
 
-    if(!isValidTimeZone(timeZone)) {
+    if (!isValidTimeZone(timeZone)) {
         return message.channel.send(
             `'${timeZone}' is an invalid or unknown time zone.`
         );
     }
 
-    setUserTimeZone(message.author, timeZone);
+    await setUserTimeZone(message.author, timeZone);
 
     return message.channel.send(
         `<@${message.author.id}>, your default time zone is now set to **${getTimeZoneCanonicalDisplayName(timeZone)}** (UTC${moment().tz(timeZone).format('Z')}).`
     );
 }
 
+async function joinCommand(message, client, eventName) {
+    if (!eventName) {
+        return message.channel.send(
+            `<@${message.author.id}>, you must specify which event you want to join.`
+        );
+    }
+
+    const event = eventManager.getByName(message.guild.id, eventName);
+
+    if (!event) {
+        return message.channel.send(
+            `<@${message.author.id}>, the event '${eventName}' does not exist.`
+        );
+    }
+
+    if (event.owner.id === message.author.id) {
+        return message.channel.send(
+            `<@${message.author.id}>, you created '${eventName}', so you don't need to join it.`
+        );
+    }
+
+    const success = await eventManager.addParticipant(message.guild.id, message.author.id, eventName);
+
+    if (success) {
+        return message.channel.send(
+            `<@${message.author.id}> was successfully added to the event '${eventName}'.`
+        );
+    } else {
+        return message.channel.send(
+            `<@${message.author.id}>, you've already joined the event '${eventName}'.`
+        );
+    }
+}
+
+async function leaveCommand(message, client, eventName) {
+    if (!eventName) {
+        return message.channel.send(
+            `<@${message.author.id}>, you must specify which event you want to join.`
+        );
+    }
+
+    const event = eventManager.getByName(message.guild.id, eventName);
+
+    if (!event) {
+        return message.channel.send(
+            `<@${message.author.id}>, the event '${eventName}' does not exist.`
+        );
+    }
+
+    if (event.owner.id === message.author.id) {
+        return message.channel.send(
+            `<@${message.author.id}>, you created '${eventName}', so you can't leave it.`
+        );
+    }
+
+    const success = await eventManager.removeParticipant(message.guild.id, message.author.id, eventName);
+
+    if (success) {
+        return message.channel.send(
+            `<@${message.author.id}> was successfully removed from the event '${eventName}'.`
+        );
+    } else {
+        return message.channel.send(
+            `<@${message.author.id}>, you aren't participating in '${eventName}'.`
+        );
+    }
+}
+
 module.exports = {
     name: "event",
     description: "Allows people on a server to participate in events",
     usage: `create [YYYY/MM/DD|MM/DD|today|tomorrow] [HH:mm] [name] to create a new event
+${config.prefix}event join [name] to join an event
+${config.prefix}event leave [name] to leave an event
 ${config.prefix}event list [timezone] to list events (optionally in a chosen timezone)
 ${config.prefix}event info [name] for info on an event
 ${config.prefix}event delete [name] to delete an event
@@ -445,37 +598,36 @@ ${config.prefix}event tz [name] to get/set your default timezone`,
         switch (subcommand) {
             case "add":
             case "create":
-                await createCommand(message, cmdArgs, client);
-                return;
+                return createCommand(message, cmdArgs, client);
             case "delete":
             case "remove":
-                await deleteCommand(message, client, cmdArgs.join(" ") || undefined);
-                return;
+                return deleteCommand(message, client, cmdArgs.join(" ") || undefined);
+            case "join":
+                return joinCommand(message, client, cmdArgs.join(" ") || undefined);
+            case "leave":
+                return leaveCommand(message, client, cmdArgs.join(" ") || undefined);
             case "info":
-                await infoCommand(message, client, cmdArgs.join(" "));
-                return;
+                return infoCommand(message, client, cmdArgs.join(" "));
             case "list":
-                await listCommand(message, client, cmdArgs.join(" ") || undefined);
-                return;
+                return listCommand(message, client, cmdArgs.join(" ") || undefined);
             case "servertz":
-                await servertzCommand(message, client, cmdArgs.join(" "));
-                return;
+                return servertzCommand(message, client, cmdArgs.join(" "));
             case "tz":
                 await tzCommand(message, client, cmdArgs.join(" "));
                 return;
             case "":
-                await message.channel.send(
+                return message.channel.send(
                     "You must specify a subcommand. See help for usage."
                 );
-                return;
             default:
-                await message.channel.send(
+                return message.channel.send(
                     `Unknown subcommand '${subcommand}'. See help for usage.`
                 );
-                return;
         }
     },
     init(client) {
+        // Ensure the client is ready so that event catch-up doesn't fail
+        // due to not knowing about the channel.
         const onReady = () => {
             eventManager = new EventManager(client);
             eventManager.start();
