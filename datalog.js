@@ -26,6 +26,9 @@ function writeData() {
 
 function publicOnMessage(message) {
   const dateString = formatDate(message.createdTimestamp);
+  if (!global.dataLog[message.guild.id][message.channel.id]) {
+    global.dataLog[message.guild.id][message.channel.id] = { channelName:message.channel.name, lastMessageID:null };
+  }
   if (!global.dataLog[message.guild.id][message.channel.id][dateString]) {
     global.dataLog[message.guild.id][message.channel.id][dateString] = {};
     global.dataLog[message.guild.id][message.channel.id][dateString].numMessages = 1;
