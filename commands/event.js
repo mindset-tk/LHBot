@@ -12,9 +12,16 @@ const config = require(configPath);
 const moment = require("moment-timezone");
 const tz = require("../extras/timezones");
 const eventDataPath = path.resolve('./events.json');
+
+const DEFAULT_EVENT_DATA = {
+    guildDefaultTimeZones: {},
+    events: {},
+    userTimeZones: {},
+};
+
 if (global.eventData == null) {
     if (!fs.existsSync(eventDataPath)) {
-        fs.writeFileSync(eventDataPath, '{}');
+        fs.writeFileSync(eventDataPath, JSON.stringify(DEFAULT_EVENT_DATA));
     }
     global.eventData = require(eventDataPath);
 }
@@ -31,6 +38,7 @@ const dateInputFormats = ['YYYY-MM-DD', 'YYYY/MM/DD', 'MM-DD', 'MM/DD'];
 const timeInputFormat = 'HH:mm';
 
 function getTimeZoneFromUserInput(timeZone) {
+    timeZone = timeZone && timeZone.replace(' ', '_');
     return timeZone &&
         (tz.TIMEZONE_CODES[timeZone.toUpperCase()] || timeZone);
 }
@@ -39,15 +47,30 @@ function formatDateCalendar(date, timeZone) {
     return date.tz(getTimeZoneFromUserInput(timeZone)).calendar();
 }
 
-function getTimeZoneOfDate(date) {
-    return date.tz().zoneName();
+function isValidTimeZone(timeZone) {
+    return moment.tz(timeZone).tz() !== undefined;
 }
 
 function getGuildTimeZone(guild) {
-    const guildZone = global.eventData.guildDefaultTimeZones[guild];
+    const guildZone = guild && global.eventData.guildDefaultTimeZones[guild.id];
 
     // Return a default if none specified (the system time zone)
-    return getTimeZoneFromUserInput(guildZone) || moment.tz().zoneName();
+    return getTimeZoneFromUserInput(guildZone) || moment.tz.guess();
+}
+
+function getUserTimeZone(message) {
+    const userZone = global.eventData.userTimeZones[message.author.id];
+    return getTimeZoneFromUserInput(userZone) || getGuildTimeZone(message.guild);
+}
+
+function setGuildTimeZone(guild, timeZone) {
+    global.eventData.guildDefaultTimeZones[guild.id] = timeZone;
+    writeEventState();
+}
+
+function setUserTimeZone(user, timeZone) {
+    global.eventData.userTimeZones[user.id] = timeZone;
+    writeEventState();
 }
 
 // Used to make the timezone into the 'canonical' format vs whatever user provided
@@ -59,7 +82,7 @@ class EventManager {
     constructor(client) {
         this.client = client;
         this.timer = null;
-        this.upcomingEvents = [];
+        this.upcomingEvents = {};
 
         this.loadState();
     }
@@ -67,23 +90,30 @@ class EventManager {
     loadState() {
         if (global.eventData.events) {
             // Convert saved date strings back into Moment datetime objects
-            this.upcomingEvents = global.eventData.events.map(event => ({
-                ...event,
-                due: moment.utc(event.due, moment.ISO_8601, true),
-            }));
+            Object.entries(global.eventData.events).forEach(([guild, events]) => {
+                this.upcomingEvents[guild] = events.map(event => ({
+                    ...event,
+                    due: moment.utc(event.due, moment.ISO_8601, true),
+                }));
+            });
         }
     }
 
     saveState() {
         // Serialize moment datetimes as ISO8601 strings
-        global.eventData.events = this.upcomingEvents.map(event => ({
-            ...event,
-            due: event.due.toISOString(),
-        }));
+        Object.entries(this.upcomingEvents).forEach(([guild, events]) => {
+            global.eventData.events[guild] = events.map(event => ({
+                ...event,
+                due: event.due.toISOString(),
+            }));
+        });
         writeEventState();
     }
 
     start() {
+        // Tick immediately at start to do cleanup
+        this.tick();
+
         // Ensure we're always at (or close to) the 'top' of a minute when we run our tick
         const topOfMinute = 60000 - (Date.now() % 60000);
         this.timer = this.client.setTimeout(() => {
@@ -94,26 +124,30 @@ class EventManager {
 
     tick() {
         const now = moment.utc();
-        const dueEvents = this.upcomingEvents.filter(event => event.due.isSameOrBefore(now));
-        this.upcomingEvents = this.upcomingEvents.filter(event => event.due.isAfter(now));
+        const eventsByGuild = Object.entries(this.upcomingEvents);
+        eventsByGuild.forEach(([guild, events]) => {
+            const dueEvents = events.filter(event => event.due.isSameOrBefore(now));
+            this.upcomingEvents[guild] = events.filter(event => event.due.isAfter(now));
+            this.saveState();
 
-        if (dueEvents) {
-            dueEvents.forEach(event => {
-                const eventAge = moment.duration(now.diff(event.due));
-                // Discard events we missed for more than 5 minutes
-                if (eventAge.asMinutes() >= 5) {
-                    return;
-                }
+            if (dueEvents) {
+                dueEvents.forEach(event => {
+                    const eventAge = moment.duration(now.diff(event.due));
+                    // Discard events we missed for more than 5 minutes
+                    if (eventAge.asMinutes() >= 5) {
+                        return;
+                    }
 
-                const destChannel = this.client.channels.get(event.channel);
-                if (!destChannel) {
-                    console.log("Got event for unknown channel", event.channel);
-                    return;
-                }
+                    const destChannel = this.client.channels.get(event.channel);
+                    if (!destChannel) {
+                        console.log("Got event for unknown channel", event.channel);
+                        return;
+                    }
 
-                destChannel.send(`The event **'${event.name}'** is starting now!`);
-            });
-        }
+                    destChannel.send(`The event **'${event.name}'** is starting now!`);
+                });
+            }
+        })
     }
 
     stop() {
@@ -123,26 +157,38 @@ class EventManager {
     }
 
     add(event) {
-        this.upcomingEvents.push(event);
-        this.upcomingEvents.sort((a, b) => a.due.diff(b.due));
+        const guild = event.guild;
+        if (!this.upcomingEvents[guild]) {
+            this.upcomingEvents[guild] = [];
+        }
+        this.upcomingEvents[guild].push(event);
+        this.upcomingEvents[guild].sort((a, b) => a.due.diff(b.due));
         this.saveState();
     }
 
-    getByName(eventName) {
+    getByName(guild, eventName) {
         let lowerEventName = eventName.toLowerCase();
-        return this.upcomingEvents.find(
+        return this.upcomingEvents[guild] && this.upcomingEvents[guild].find(
             event => event.name.toLowerCase() === lowerEventName
         );
     }
 
-    deleteByName(eventName) {
+    deleteByName(guild, eventName) {
+        if (!this.upcomingEvents[guild]) {
+            return;
+        }
+
         let lowerEventName = eventName.toLowerCase();
-        this.upcomingEvents.splice(
-            this.upcomingEvents.indexOf(
+        this.upcomingEvents[guild].splice(
+            this.upcomingEvents[guild].indexOf(
                 event => event.name.toLowerCase() === lowerEventName
             )
         );
         this.saveState();
+    }
+
+    guildEvents(guild) {
+        return this.upcomingEvents[guild] || [];
     }
 }
 
@@ -154,6 +200,7 @@ function embedEvent(title, event) {
         .setDescription(
             `A message will be posted in <#${event.channel}> when this event starts.`
         )
+        .addField("Event name", event.name)
         .addField("Creator", `<@${event.owner}>`)
         .addField("Channel", `<#${event.channel}>`)
         .setTimestamp(event.due);
@@ -163,10 +210,10 @@ async function createCommand(message, args, client) {
     const [date, time, ...nameParts] = args;
     const name = nameParts.join(" ");
     // 1 minute from now
-    const timeZone = getGuildTimeZone(message.guild.id);
+    const timeZone = getUserTimeZone(message);
     const minimumDate = moment.tz(timeZone).add('1', 'minutes');
 
-    if (eventManager.getByName(name)) {
+    if (eventManager.getByName(message.guild.id, name)) {
         await message.channel.send(`An event called '${name}' already exists.`);
         return;
     }
@@ -222,7 +269,8 @@ async function createCommand(message, args, client) {
         due: resolvedDate.utc(),
         name,
         channel: message.channel.id,
-        owner: message.author.id
+        owner: message.author.id,
+        guild: message.guild.id,
     };
 
     eventManager.add(newEvent);
@@ -241,14 +289,14 @@ async function deleteCommand(message, client, name) {
         return;
     }
 
-    const event = eventManager.getByName(name);
+    const event = eventManager.getByName(message.guild.id, name);
     if (event) {
-        if (event.owner !== message.author.id && !message.author.roles.has(config.roleStaff)) {
+        if (event.owner !== message.author.id && !message.member.roles.has(config.roleStaff)) {
             await message.channel.send(`Only staff and the event creator can delete an event.`);
             return;
         }
 
-        eventManager.deleteByName(name);
+        eventManager.deleteByName(message.guild.id, name);
         await message.channel.send(
             "The event was deleted.",
             embedEvent(`Deleted event: ${event.name}`, event)
@@ -266,7 +314,7 @@ async function infoCommand(message, client, name) {
         return;
     }
 
-    const event = eventManager.getByName(name);
+    const event = eventManager.getByName(message.guild.id, name);
     if (event) {
         await message.channel.send("", embedEvent(event.name, event));
     } else {
@@ -275,57 +323,107 @@ async function infoCommand(message, client, name) {
 }
 
 async function listCommand(message, client, timeZone) {
-    if (eventManager.upcomingEvents.length === 0) {
+    timeZone = getTimeZoneFromUserInput(timeZone) || getUserTimeZone(message);
+
+    if (!isValidTimeZone(timeZone)) {
+        await message.channel.send(
+            `'${timeZone}' is an invalid or unknown time zone.`
+        );
+        return;
+    }
+
+    const guildUpcomingEvents = eventManager.guildEvents(message.guild.id);
+
+    if (guildUpcomingEvents.length === 0) {
         await message.channel.send("There are no events coming up.");
         return;
     }
-    timeZone = getTimeZoneFromUserInput(timeZone) || getGuildTimeZone(message.guild.id);
 
-    try {
-        const displayLimit = 10;
-        const displayAmount = Math.min(
-            eventManager.upcomingEvents.length,
-            displayLimit
+    const displayLimit = 10;
+    const displayAmount = Math.min(
+        guildUpcomingEvents.length,
+        displayLimit
+    );
+    const eventList = guildUpcomingEvents
+        .slice(0, displayLimit)
+        .map(
+            (event, i) =>
+                `${i + 1}. **${event.name}** (${formatDateCalendar(
+                    moment(event.due),
+                    timeZone
+                )}) - in <#${event.channel}>`
+        )
+        .join("\n");
+
+    const embed = new Discord.RichEmbed()
+        .setTitle(`Upcoming events in ${message.guild.name}`)
+        .setDescription(
+            `
+        ${
+                displayAmount === 1
+                    ? "There's only one upcoming event."
+                    : `Next ${displayAmount} events, ordered soonest-first.`
+            }
+        
+        ${eventList}`
+        )
+        .setFooter(
+            `All event times are in ${getTimeZoneCanonicalDisplayName(timeZone)}.` +
+            (timeZone
+                ? ""
+                : " Use !event list [timezone] to show in your time zone.")
         );
-        const eventList = eventManager.upcomingEvents
-            .slice(0, displayLimit)
-            .map(
-                (event, i) =>
-                    `${i + 1}. **${event.name}** (${formatDateCalendar(
-                        moment(event.due),
-                        timeZone
-                    )}) - in <#${event.channel}>`
-            )
-            .join("\n");
+    await message.channel.send("Here are the upcoming events:", embed);
+}
 
-        const embed = new Discord.RichEmbed()
-            .setTitle(`Upcoming events in ${message.guild.name}`)
-            .setDescription(
-                `
-			${
-                    displayAmount === 1
-                        ? "There's only one upcoming event."
-                        : `Next ${displayAmount} events, ordered soonest-first.`
-                }
-			
-			${eventList}`
-            )
-            .setFooter(
-                `All event times are in ${getTimeZoneCanonicalDisplayName(timeZone)}.` +
-                (timeZone
-                    ? ""
-                    : " Use !event list [timezone] to show in your time zone.")
-            );
-        await message.channel.send("Here are the upcoming events:", embed);
-    } catch (e) {
-        if (e instanceof RangeError) {
-            await message.channel.send(
-                `'${timeZone}' is an invalid or unknown time zone.`
-            );
-        } else {
-            throw e;
-        }
+async function servertzCommand(message, client, timeZone) {
+    if (!timeZone) {
+        const defaultTimeZone = getGuildTimeZone(message.guild);
+        return message.channel.send(
+            `The server's default time zone is **${getTimeZoneCanonicalDisplayName(defaultTimeZone)}** (UTC${moment().tz(defaultTimeZone).format('Z')}).`
+        );
     }
+
+    if (!message.member.roles.has(config.roleStaff)) {
+        return message.channel.send(`Only staff can set the server's default timezone.`);
+    }
+
+    timeZone = getTimeZoneFromUserInput(timeZone);
+
+    if(!isValidTimeZone(timeZone)) {
+        return message.channel.send(
+            `'${timeZone}' is an invalid or unknown time zone.`
+        );
+    }
+
+    setGuildTimeZone(message.guild.id, timeZone);
+
+    return message.channel.send(
+        `The server's default time zone is now set to **${getTimeZoneCanonicalDisplayName(timeZone)}** (UTC${moment().tz(timeZone).format('Z')}).`
+    );
+}
+
+async function tzCommand(message, client, timeZone) {
+    if (!timeZone) {
+        const defaultTimeZone = getUserTimeZone(message);
+        return message.channel.send(
+            `<@${message.author.id}>, your default time zone is **${getTimeZoneCanonicalDisplayName(defaultTimeZone)}** (UTC${moment().tz(defaultTimeZone).format('Z')}).`
+        );
+    }
+
+    timeZone = getTimeZoneFromUserInput(timeZone);
+
+    if(!isValidTimeZone(timeZone)) {
+        return message.channel.send(
+            `'${timeZone}' is an invalid or unknown time zone.`
+        );
+    }
+
+    setUserTimeZone(message.author, timeZone);
+
+    return message.channel.send(
+        `<@${message.author.id}>, your default time zone is now set to **${getTimeZoneCanonicalDisplayName(timeZone)}** (UTC${moment().tz(timeZone).format('Z')}).`
+    );
 }
 
 module.exports = {
@@ -334,7 +432,9 @@ module.exports = {
     usage: `create [YYYY/MM/DD|MM/DD|today|tomorrow] [HH:mm] [name] to create a new event
 ${config.prefix}event list [timezone] to list events (optionally in a chosen timezone)
 ${config.prefix}event info [name] for info on an event
-${config.prefix}event delete [name] to delete an event`,
+${config.prefix}event delete [name] to delete an event
+${config.prefix}event servertz [name] to get/set the server's default timezone (staff only)
+${config.prefix}event tz [name] to get/set your default timezone`,
     cooldown: 3,
     guildOnly: true,
     staffOnly: false,
@@ -357,6 +457,12 @@ ${config.prefix}event delete [name] to delete an event`,
             case "list":
                 await listCommand(message, client, cmdArgs.join(" ") || undefined);
                 return;
+            case "servertz":
+                await servertzCommand(message, client, cmdArgs.join(" "));
+                return;
+            case "tz":
+                await tzCommand(message, client, cmdArgs.join(" "));
+                return;
             case "":
                 await message.channel.send(
                     "You must specify a subcommand. See help for usage."
@@ -370,9 +476,17 @@ ${config.prefix}event delete [name] to delete an event`,
         }
     },
     init(client) {
-        eventManager = new EventManager(client);
-        eventManager.start();
-        console.log("Event manager ready.");
+        const onReady = () => {
+            eventManager = new EventManager(client);
+            eventManager.start();
+            console.log("Event manager ready.");
+        };
+
+        if (client.status !== Discord.Constants.Status.READY) {
+            client.on('ready', onReady);
+        } else {
+            onReady();
+        }
     }
 };
 
