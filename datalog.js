@@ -90,7 +90,7 @@ async function restoreMessages(client) {
             // fetch messages repeatedly, looping until the guild's last message ID matches our last message ID.
             while (gc.lastMessageID != lastSeenMessage && loopbreaker < 2) {
               prevLastSeen = lastSeenMessage;
-              await gc.fetchMessages({ limit: 10, after: lastSeenMessage }).then(messages => {
+              await gc.fetchMessages({ limit: 100, after: lastSeenMessage }).then(messages => {
                 if (messages.size > 0) {
                   for (let message of messages) {
                     message = message[1];
@@ -133,7 +133,7 @@ async function restoreMessages(client) {
             // loop fetching messages until the oldest seen message no longer changes.
             do {
               prevOldest = oldestSeenMessageID;
-              await gc.fetchMessages({ limit: 10, before: oldestSeenMessageID }).then(messages => {
+              await gc.fetchMessages({ limit: 100, before: oldestSeenMessageID }).then(messages => {
                 if (messages.size > 0) {
                   for (let message of messages) {
                     message = message[1];
