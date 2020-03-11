@@ -61,7 +61,7 @@ function publicOnMessage(message) {
   writeData();
 }
 
-async function restoreMessages(client) {
+async function restoreMessages(client, callback) {
   let retrievedMessages = 0;
   console.log('Fetching offline messages...');
   do {
@@ -110,7 +110,6 @@ async function restoreMessages(client) {
             }
             retrievedMessages += numMsgsFetched;
             if (numMsgsFetched > 0) { console.log(`Fetched ${numMsgsFetched} offline messages in #${gc.name}.`); }
-            await wait(100);
           }
           // if it was a new channel when we last wrote data, we need to do a little more work to iterate back to the first message ever sent, since we don't know the ID of the first message sent.
           else if (!global.dataLog[g.id][gc.id].lastMessageID) {
@@ -148,7 +147,6 @@ async function restoreMessages(client) {
             while (oldestSeenMessageID != prevOldest);
             retrievedMessages += numMsgsFetched;
             if (numMsgsFetched > 0) { console.log(`Fetched ${numMsgsFetched} offline messages in #${gc.name}.`); }
-            await wait(100);
           }
         }
       }
@@ -156,10 +154,11 @@ async function restoreMessages(client) {
   }
   while (retrievedMessages > 0);
   console.log('Offline message fetch complete!');
+  callback();
 }
 
-function publicOnReady(config, client) {
-  restoreMessages(client);
+function publicOnReady(config, client, callback) {
+  restoreMessages(client, callback);
 }
 
 exports.OnReady = publicOnReady;

@@ -44,6 +44,12 @@ let dataLogLock = 0;
 client.on('ready', async () => {
   console.log('Ready!');
   client.user.setActivity(config.currentActivity.Name, { type: config.currentActivity.Type });
+  Counting.OnReady(config, client);
+  // Lock datalog while caching offline messages. When that finishes, the callback will unlock the log.
+  dataLogLock = 1;
+  dataLogger.OnReady(config, client, function() {
+    dataLogLock = 0;
+  });
   // wait 1000ms without holding up the rest of the script. This way we can ensure recieving all guild invite info.
   await wait(1000);
   client.guilds.forEach(g => {
@@ -51,10 +57,6 @@ client.on('ready', async () => {
       invites[g.id] = guildInvites;
     });
   });
-  Counting.OnReady(config, client);
-  dataLogLock = 1;
-  dataLogger.OnReady(config, client)
-    .then(dataLogLock = 0);
 });
 
 // login to Discord with your app's token
@@ -189,6 +191,11 @@ client.on('messageReactionAdd', (reaction, user, message) => {
 
 // whenever client completes session resume, run this code.
 client.on('Resumed', async () => {
+  // Lock datalog while caching offline messages. When that finishes, the callback will unlock the log.
+  dataLogLock = 1;
+  dataLogger.OnReady(config, client, function() {
+    dataLogLock = 0;
+  });
   await wait(1000);
   // cache invites from server.
   client.guilds.forEach(g => {
@@ -196,10 +203,6 @@ client.on('Resumed', async () => {
       invites[g.id] = guildInvites;
     });
   });
-  // check for missed messages.
-  dataLogLock = 1;
-  dataLogger.OnReady(config, client)
-    .then(dataLogLock = 0);
 });
 
 // very basic error handling.
