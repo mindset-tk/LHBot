@@ -141,6 +141,11 @@ function CheckMessages(messages)
 
 function RestoreCountingState(client)
 {
+  if (!config.countingChannelId) {
+    console.log('No counting channel set!');
+    return;
+  }
+
   console.log('Counting channel: ' + config.countingChannelId);
 
   while(countingChannel == null)

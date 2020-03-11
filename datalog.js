@@ -12,7 +12,7 @@ function formatDate(timestamp) {
   const messageDate = new Date(timestamp);
   const month = (messageDate.getMonth() + 1);
   const year = messageDate.getFullYear();
-  const dateString = ((month < 10) ? ('0' + month) : month) + '-' + year;
+  const dateString = year + '-' + ((month < 10) ? ('0' + month) : month);
   return dateString;
 }
 
@@ -26,12 +26,30 @@ function writeData() {
 
 function publicOnMessage(message) {
   const dateString = formatDate(message.createdTimestamp);
-  if (!global.dataLog[message.guild.id][message.channel.id][dateString]) {
-    global.dataLog[message.guild.id][message.channel.id][dateString] = {};
-    global.dataLog[message.guild.id][message.channel.id][dateString].numMessages = 1;
+  let numMsgData = new Map();
+  if (!global.dataLog[message.guild.id][message.channel.id]) {
+    numMsgData.set(dateString, 1);
+    numMsgData = new Map([...numMsgData.entries()].sort());
+    global.dataLog[message.guild.id][message.channel.id] = { channelName:message.channel.name, lastMessageID:null };
+    global.dataLog[message.guild.id][message.channel.id].numMessages = [...numMsgData];
+  }
+  if (!global.dataLog[message.guild.id][message.channel.id].numMessages) {
+    numMsgData.set(dateString, 1);
+    numMsgData = new Map([...numMsgData.entries()].sort());
+    global.dataLog[message.guild.id][message.channel.id].numMessages = [...numMsgData];
   }
   else {
-    global.dataLog[message.guild.id][message.channel.id][dateString].numMessages++;
+    numMsgData = new Map(global.dataLog[message.guild.id][message.channel.id].numMessages);
+    if (!numMsgData.get(dateString)) {
+      numMsgData.set(dateString, 1);
+    }
+    else {
+      let msgNo = numMsgData.get(dateString);
+      msgNo++;
+      numMsgData.set(dateString, msgNo);
+    }
+    numMsgData = new Map([...numMsgData.entries()].sort());
+    global.dataLog[message.guild.id][message.channel.id].numMessages = [...numMsgData];
   }
   if ((parseInt(message.id) > parseInt(global.dataLog[message.guild.id][message.channel.id].lastMessageID)) || !global.dataLog[message.guild.id][message.channel.id].lastMessageID) {
     global.dataLog[message.guild.id][message.channel.id].lastMessageID = message.id;
@@ -57,7 +75,7 @@ async function restoreMessages(client) {
         global.dataLog[g.id][gc.id] = { channelName:gc.name, lastMessageID:null };
         writeData();
       }
-      else if (gc.lastMessageID != null && gc.memberPermissions(g.me).has('READ_MESSAGES') && gc.memberPermissions(g.me).has('READ_MESSAGE_HISTORY')) {
+      if (gc.lastMessageID != null && gc.memberPermissions(g.me).has('READ_MESSAGES') && gc.memberPermissions(g.me).has('READ_MESSAGE_HISTORY')) {
         // if the channel doesn't have a null lastMessage, we can just iterate back to the most recent seen message.
         if (global.dataLog[g.id][gc.id].lastMessageID) {
           let lastSeenMessage = global.dataLog[g.id][gc.id].lastMessageID;
@@ -87,11 +105,18 @@ async function restoreMessages(client) {
           if (numMsgsFetched > 0) { console.log(`Fetched ${numMsgsFetched} offline messages in #${gc.name}.`); }
           await wait(200);
         }
-        // if it was a new channel when we last saw it, we need to do a little more work to iterate back to the first message ever sent, since we don't know the ID of the first message sent.
+        // if it was a new channel when we last wrote data, we need to do a little more work to iterate back to the first message ever sent, since we don't know the ID of the first message sent.
         else if (!global.dataLog[g.id][gc.id].lastMessageID) {
           let oldestSeenMessageID = gc.lastMessageID;
           let numMsgsFetched = 0;
           let prevOldest;
+          // first, pull info for the most recent message in the channel.
+          // this is necessary because the "before:" param on fetchMessages will not include the message that is within that param.
+          if (gc.lastMessageID != null) {
+            const lastmsg = await gc.fetchMessage(gc.lastMessageID);
+            publicOnMessage(lastmsg);
+          }
+          // then, using the "before:" param of fetchMessages,
           // loop fetching messages until the oldest seen message no longer changes.
           do {
             prevOldest = oldestSeenMessageID;

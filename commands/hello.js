@@ -3,8 +3,13 @@ module.exports = {
   aliases: ['ping', 'beep'],
   description: 'Pings bot to verify operation',
   cooldown: 3,
-  execute(message) {
-    const botguildmember = message.guild.me;
-    message.channel.send('Hello, I am ' + botguildmember.displayName + '.');
+  execute(message, args, client) {
+    if (message.channel.type == 'text') {
+      const botguildmember = message.guild.me;
+      message.channel.send('Hello, I am ' + botguildmember.displayName + '.');
+    }
+    else {
+      message.channel.send('Hello, I am ' + client.user + '.');
+    }
   },
 };
