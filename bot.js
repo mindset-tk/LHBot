@@ -37,6 +37,9 @@ const events = {
 // initialize invite cache
 const invites = {};
 
+// since the datalogger takes some time to cache messages, especially on larger servers, create a check digit to block unwanted processing of new messages during datalogging
+let dataLogLock = 0;
+
 // when the client is ready, run this code.
 client.on('ready', async () => {
   console.log('Ready!');
@@ -49,7 +52,9 @@ client.on('ready', async () => {
     });
   });
   Counting.OnReady(config, client);
-  dataLogger.OnReady(config, client);
+  dataLogLock = 1;
+  dataLogger.OnReady(config, client)
+    .then(dataLogLock = 0);
 });
 
 // login to Discord with your app's token
@@ -57,9 +62,9 @@ client.login(config.authtoken);
 
 // command parser
 client.on('message', async message => {
-  // only do datalogging on non-DM text channels.
-  if (message.channel.type === 'text') { dataLogger.OnMessage(message); }
-  if(Counting.HandleMessage(message))  {
+  // only do datalogging on non-DM text channels. Don't process messages while offline retrieval is proceeding.
+  if (message.channel.type === 'text' && dataLogLock != 1) { dataLogger.OnMessage(message); }
+  if(Counting.HandleMessage(message)) {
     return;
   }
   // prevent parsing commands without correct prefix, from bots, and from non-staff non-comrades.
@@ -191,6 +196,10 @@ client.on('Resumed', async () => {
       invites[g.id] = guildInvites;
     });
   });
+  // check for missed messages.
+  dataLogLock = 1;
+  dataLogger.OnReady(config, client)
+    .then(dataLogLock = 0);
 });
 
 // very basic error handling.
