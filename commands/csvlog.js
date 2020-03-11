@@ -4,7 +4,7 @@ const dataLog = require(dataLogpath);
 const fs = require('fs');
 
 module.exports = {
-  name: 'log2csv',
+  name: 'csvlog',
   description: 'DMs a CSV file with log data to the command sender.',
   usage: '',
   cooldown: 3,
