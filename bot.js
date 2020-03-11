@@ -56,15 +56,15 @@ client.on('ready', async () => {
 client.login(config.authtoken);
 
 // command parser
-client.on('message',  async message => {
+client.on('message', async message => {
   // only do datalogging on non-DM text channels.
   if (message.channel.type === 'text') { dataLogger.OnMessage(message); }
-  if(Counting.HandleMessage(message))
-  {
+  if(Counting.HandleMessage(message))  {
     return;
   }
   // prevent parsing commands without correct prefix, from bots, and from non-staff non-comrades.
-  if (!message.content.startsWith(config.prefix) || message.author.bot || !(message.member.roles.has(config.roleStaff) || message.member.roles.has(config.roleComrade))) return;
+  if (!message.content.startsWith(config.prefix) || message.author.bot) return;
+  if (message.channel.type == 'text' && !(message.member.roles.has(config.roleStaff) || message.member.roles.has(config.roleComrade))) return;
 
   const args = message.content.slice(config.prefix.length).split(/ +/);
   let commandName = args.shift().toLowerCase();
