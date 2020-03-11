@@ -48,6 +48,7 @@ module.exports = {
     // sort the column headers stored within CSVData[0], then splice Channel to the start.
     CSVData[0].sort();
     CSVData[0].splice(0, 0, 'Channel');
+    // Set rowIndex to 1; we are skipping CSVData[0] because it is our headers.
     let rowIndex = 1;
     // loop through the dataholder - each item in dataholder looks like [Channel, %ChannelName], [%Month1, %#messages], [%Month2, %#messages]...
     dataHolder.forEach(chandata => {
@@ -68,11 +69,42 @@ module.exports = {
           if (!CSVData[rowIndex][CSVData[0].indexOf(CSVdate)]) CSVData[rowIndex][CSVData[0].indexOf(CSVdate)] = 0;
         }
         else if (CSVdate.localeCompare(creationArray[rowIndex]) < 0) {
-        // console.log(CSVdate + ' is before ' + creationArray[rowIndex]);
+          if (!CSVData[rowIndex][CSVData[0].indexOf(CSVdate)]) CSVData[rowIndex][CSVData[0].indexOf(CSVdate)] = ' ';
         }
       });
       rowIndex++;
     });
+
+    // To total up each column - first rotate the table via forEach commands.
+    const rotatedTable = [];
+    rowIndex = 0;
+    CSVData.forEach((chanCounts => {
+      if (chanCounts[0] == 'Channel') return;
+      let columnIndex = 0;
+      chanCounts.forEach(monthlyCount =>{
+        if (!rotatedTable[columnIndex]) rotatedTable[columnIndex] = [];
+        rotatedTable[columnIndex][rowIndex] = monthlyCount;
+        columnIndex++;
+      });
+      rowIndex++;
+    }));
+    // then, snip off the first row of the new table (it had Channel names in it), and sum across each row, pushing it into a new totals array
+    rotatedTable.splice(0, 1);
+    const totals = [];
+    rotatedTable.forEach(monthlyCount => {
+      console.log(monthlyCount);
+      const monthlySum = arr => arr.reduce((a, b) => {
+        if ((typeof a == 'number') && (typeof b == 'number')) return a + b;
+        else if ((typeof a == 'number') && !(typeof b == 'number')) return a;
+        else if (!(typeof a == 'number') && (typeof b == 'number')) return b;
+        return 0;
+      });
+      totals.push(monthlySum(monthlyCount));
+    });
+    // Add a label and append the row to the end of CSVData [creating a new row in the process]
+    totals.splice(0, 0, 'Monthly Total Messages:');
+    CSVData.push(totals);
+
     fs.writeFile('./stats.csv', CSVData.join('\n'), function(err) {
       if (err) {
         return console.log(err);
