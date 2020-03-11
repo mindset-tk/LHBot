@@ -11,7 +11,7 @@ module.exports = {
   guildOnly: true,
   staffOnly: true,
   args: false,
-  async execute(message, args, client) {
+  async execute(message) {
     const dataHolder = [];
     let chanindex = 0;
     const CSVData = [];
@@ -39,10 +39,12 @@ module.exports = {
         }
         dataHolder[chanindex].splice(0, 0, ['Channel', dataLog[gID][cID].channelName]);
         const chanCreationDate = new Date((parseInt(cID) / 4194304) + 1420070400000);
-        creationArray[(chanindex + 1)] = [formatDate(chanCreationDate)];
+        creationArray[chanindex] = [formatDate(chanCreationDate)];
         chanindex++;
       });
     });
+    // Pad the array of channel creation dates in order to match it with the CSVData indices.
+    creationArray.splice(0, 0, ' ');
     // sort the column headers stored within CSVData[0], then splice Channel to the start.
     CSVData[0].sort();
     CSVData[0].splice(0, 0, 'Channel');
@@ -57,7 +59,7 @@ module.exports = {
       chandata.forEach((data, col) => {
         CSVData[rowIndex][CSVData[0].indexOf(col)] = data;
       });
-      // Backfill months after channel creation with 0s in order to differentiate from months prior to channel creation.
+      // Go through all months there is data for, then fill months after channel creation with 0s in order to differentiate from months prior to channel creation.
       CSVData[0].forEach(CSVdate => {
         CSVdate = CSVdate.toString();
         if (CSVdate == 'Channel') return;
