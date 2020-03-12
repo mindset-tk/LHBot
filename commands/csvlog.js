@@ -4,14 +4,14 @@ const dataLog = require(dataLogpath);
 const fs = require('fs');
 
 module.exports = {
-  name: 'log2csv',
+  name: 'csvlog',
   description: 'DMs a CSV file with log data to the command sender.',
   usage: '',
   cooldown: 3,
   guildOnly: true,
   staffOnly: true,
   args: false,
-  async execute(message, args, client) {
+  async execute(message) {
     const dataHolder = [];
     let chanindex = 0;
     const CSVData = [];
@@ -39,13 +39,16 @@ module.exports = {
         }
         dataHolder[chanindex].splice(0, 0, ['Channel', dataLog[gID][cID].channelName]);
         const chanCreationDate = new Date((parseInt(cID) / 4194304) + 1420070400000);
-        creationArray[(chanindex + 1)] = [formatDate(chanCreationDate)];
+        creationArray[chanindex] = [formatDate(chanCreationDate)];
         chanindex++;
       });
     });
+    // Pad the array of channel creation dates in order to match it with the CSVData indices.
+    creationArray.splice(0, 0, ' ');
     // sort the column headers stored within CSVData[0], then splice Channel to the start.
     CSVData[0].sort();
     CSVData[0].splice(0, 0, 'Channel');
+    // Set rowIndex to 1; we are skipping CSVData[0] because it is our headers.
     let rowIndex = 1;
     // loop through the dataholder - each item in dataholder looks like [Channel, %ChannelName], [%Month1, %#messages], [%Month2, %#messages]...
     dataHolder.forEach(chandata => {
@@ -57,7 +60,7 @@ module.exports = {
       chandata.forEach((data, col) => {
         CSVData[rowIndex][CSVData[0].indexOf(col)] = data;
       });
-      // Backfill months after channel creation with 0s in order to differentiate from months prior to channel creation.
+      // Go through all months there is data for, then fill months after channel creation with 0s in order to differentiate from months prior to channel creation.
       CSVData[0].forEach(CSVdate => {
         CSVdate = CSVdate.toString();
         if (CSVdate == 'Channel') return;
@@ -66,11 +69,42 @@ module.exports = {
           if (!CSVData[rowIndex][CSVData[0].indexOf(CSVdate)]) CSVData[rowIndex][CSVData[0].indexOf(CSVdate)] = 0;
         }
         else if (CSVdate.localeCompare(creationArray[rowIndex]) < 0) {
-        // console.log(CSVdate + ' is before ' + creationArray[rowIndex]);
+          if (!CSVData[rowIndex][CSVData[0].indexOf(CSVdate)]) CSVData[rowIndex][CSVData[0].indexOf(CSVdate)] = ' ';
         }
       });
       rowIndex++;
     });
+
+    // To total up each column - first rotate the table via forEach commands.
+    const rotatedTable = [];
+    rowIndex = 0;
+    CSVData.forEach((chanCounts => {
+      if (chanCounts[0] == 'Channel') return;
+      let columnIndex = 0;
+      chanCounts.forEach(monthlyCount =>{
+        if (!rotatedTable[columnIndex]) rotatedTable[columnIndex] = [];
+        rotatedTable[columnIndex][rowIndex] = monthlyCount;
+        columnIndex++;
+      });
+      rowIndex++;
+    }));
+    // then, snip off the first row of the new table (it had Channel names in it), and sum across each row, pushing it into a new totals array
+    rotatedTable.splice(0, 1);
+    const totals = [];
+    rotatedTable.forEach(monthlyCount => {
+      console.log(monthlyCount);
+      const monthlySum = arr => arr.reduce((a, b) => {
+        if ((typeof a == 'number') && (typeof b == 'number')) return a + b;
+        else if ((typeof a == 'number') && !(typeof b == 'number')) return a;
+        else if (!(typeof a == 'number') && (typeof b == 'number')) return b;
+        return 0;
+      });
+      totals.push(monthlySum(monthlyCount));
+    });
+    // Add a label and append the row to the end of CSVData [creating a new row in the process]
+    totals.splice(0, 0, 'Monthly Total Messages:');
+    CSVData.push(totals);
+
     fs.writeFile('./stats.csv', CSVData.join('\n'), function(err) {
       if (err) {
         return console.log(err);

@@ -37,10 +37,19 @@ const events = {
 // initialize invite cache
 const invites = {};
 
+// since the datalogger takes some time to cache messages, especially on larger servers, create a check digit to block unwanted processing of new messages during datalogging
+let dataLogLock = 0;
+
 // when the client is ready, run this code.
 client.on('ready', async () => {
   console.log('Ready!');
   client.user.setActivity(config.currentActivity.Name, { type: config.currentActivity.Type });
+  Counting.OnReady(config, client);
+  // Lock datalog while caching offline messages. When that finishes, the callback will unlock the log.
+  dataLogLock = 1;
+  dataLogger.OnReady(config, client, function() {
+    dataLogLock = 0;
+  });
   // wait 1000ms without holding up the rest of the script. This way we can ensure recieving all guild invite info.
   await wait(1000);
   client.guilds.forEach(g => {
@@ -48,8 +57,6 @@ client.on('ready', async () => {
       invites[g.id] = guildInvites;
     });
   });
-  Counting.OnReady(config, client);
-  dataLogger.OnReady(config, client);
 });
 
 // login to Discord with your app's token
@@ -57,9 +64,9 @@ client.login(config.authtoken);
 
 // command parser
 client.on('message', async message => {
-  // only do datalogging on non-DM text channels.
-  if (message.channel.type === 'text') { dataLogger.OnMessage(message); }
-  if(Counting.HandleMessage(message))  {
+  // only do datalogging on non-DM text channels. Don't process messages while offline retrieval is proceeding.
+  if (message.channel.type === 'text' && dataLogLock != 1) { dataLogger.OnMessage(message); }
+  if(Counting.HandleMessage(message)) {
     return;
   }
   // prevent parsing commands without correct prefix, from bots, and from non-staff non-comrades.
@@ -184,6 +191,11 @@ client.on('messageReactionAdd', (reaction, user, message) => {
 
 // whenever client completes session resume, run this code.
 client.on('Resumed', async () => {
+  // Lock datalog while caching offline messages. When that finishes, the callback will unlock the log.
+  dataLogLock = 1;
+  dataLogger.OnReady(config, client, function() {
+    dataLogLock = 0;
+  });
   await wait(1000);
   // cache invites from server.
   client.guilds.forEach(g => {
