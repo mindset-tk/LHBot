@@ -5,6 +5,7 @@ if(global.dataLog == null) {
   global.dataLog = require(dataLogPath);
 }
 const wait = require('util').promisify(setTimeout);
+/* global BigInt */
 
 // Function to take a timestamp and convert to YYYY-MM format.
 function formatDate(timestamp) {
@@ -13,6 +14,22 @@ function formatDate(timestamp) {
   const year = messageDate.getFullYear();
   const dateString = year + '-' + ((month < 10) ? ('0' + month) : month);
   return dateString;
+}
+
+// Function to take an YYYY-MM datestring and increment the month by 1.
+function monthPlusOne(dateString) {
+  const dateArray = dateString.split('-');
+  let year = parseInt(dateArray[0]);
+  let month = parseInt(dateArray[1]);
+  if (month != 12) {
+    month++;
+  }
+  else if (month == 12) {
+    year++;
+    month = 1;
+  }
+  const nextMonth = year + '-' + ((month < 10) ? ('0' + month) : month);
+  return nextMonth;
 }
 
 // Function to write to .json file for session persistence.
@@ -63,7 +80,7 @@ function publicOnMessage(message) {
 
 async function restoreMessages(client, callback) {
   let retrievedMessages = 0;
-  console.log('Fetching offline messages...');
+  // console.log('Fetching offline messages...');
   do {
     retrievedMessages = 0;
     for (let g of await client.guilds) {
@@ -153,12 +170,85 @@ async function restoreMessages(client, callback) {
     }
   }
   while (retrievedMessages > 0);
-  console.log('Offline message fetch complete!');
+  // console.log('Offline message fetch complete!');
+  // When bot.js calls this function, it sets a check var to prevent onMessage from being called mid fetch.
+  // the callback there unlocks the dataLog file so that future messages will continue incrementing the count.
   callback();
+}
+
+async function uniqueUserCounter(client) {
+  // get current month in YYYY-MM format
+  const nowString = formatDate(new Date());
+  for (const gID of Object.keys(global.dataLog)) {
+    const g = await client.guilds.get(gID);
+    for (const cID of Object.keys(global.dataLog[gID])) {
+      let skip = 0;
+      const gc = await g.channels.get(cID);
+      if (!global.dataLog[gID][cID].numMessages) { skip = 1;}
+      // create uniqueUsers arr if it doesn't exist
+      else if (!global.dataLog[gID][cID].uniqueUsers) {
+        global.dataLog[gID][cID].uniqueUsers = [];
+      }
+      if (!skip == 1) {
+        const msgMap = new Map(global.dataLog[gID][cID].numMessages);
+        const usrMap = new Map(global.dataLog[gID][cID].uniqueUsers);
+        // console.log(usrMap);
+        // delete the entry from numMessages for the current month since the month is not over.
+        msgMap.delete(nowString);
+        // then return if there's no more data in numMessages (ie, if the first time this channel has been used is this month)
+        if (!msgMap.size == 0) {
+          for (const monthData of msgMap) {
+            const month = monthData[0];
+            // iterate through the remainder of msgMap, and if there's already an entry in the unique user list, return.
+            if (!usrMap.has(month)) {
+              // otherwise, we will iterate through all the messages for that month and then cache them into an array.
+              // initialize the timestamps for the start of this month and the start of next month.
+              const startOfMonth = Date.parse(month + '-01');
+              // technically, endOfMonth is really the first ms in the start of the next month... but a collision here is highly unlikely due to how discord generates snowflakes.
+              const endOfMonth = Date.parse(monthPlusOne(month) + '-01');
+              // since the fetchMessages method only takes messageIDs, we have to generate fake message IDs for messages created in the first and last ms of the month.
+              const startOfMonthID = (BigInt(startOfMonth.valueOf()) - BigInt(1420070400000)) << BigInt(22);
+              const endOfMonthID = (BigInt(endOfMonth.valueOf()) - BigInt(1420070400000)) << BigInt(22);
+              // init loop variables
+              let lastSeenMessage = startOfMonthID;
+              let loopbreaker = 0;
+              let prevLastSeen;
+              let newestMsg = 0;
+              const userArr = [];
+              // fetch messages repeatedly, looping until the guild's last message ID matches our last message ID.
+              while (endOfMonthID > lastSeenMessage && loopbreaker < 2) {
+                prevLastSeen = lastSeenMessage;
+                await gc.fetchMessages({ limit: 100, after: lastSeenMessage }).then(messages => {
+                  if (messages.size > 0) {
+                    for (let message of messages) {
+                      message = message[1];
+                      if (!userArr.includes(message.author.id) && message.id < endOfMonthID) {userArr.push(message.author.id);}
+                      if (message.id > newestMsg) {newestMsg = message.id;}
+                    }
+                  }
+                  lastSeenMessage = newestMsg;
+                });
+                // if the channel hasn't been used since the month turned over, the loop would never break since it would never find a messageID later than the end of the month.
+                // if that happens, since lastSeenMessage isn't being changed, this conditional will break the loop after 2 tries.
+                if (prevLastSeen === lastSeenMessage) {
+                  loopbreaker++;
+                }
+                await wait(200);
+              }
+              usrMap.set(month, userArr.length);
+            }
+          }
+        }
+        global.dataLog[gID][cID].uniqueUsers = [...usrMap];
+      }
+    }
+    writeData();
+  }
 }
 
 function publicOnReady(config, client, callback) {
   restoreMessages(client, callback);
+  uniqueUserCounter (client);
 }
 
 exports.OnReady = publicOnReady;
