@@ -47,8 +47,10 @@ client.on('ready', async () => {
   Counting.OnReady(config, client);
   // Lock datalog while caching offline messages. When that finishes, the callback will unlock the log.
   dataLogLock = 1;
+  console.log('Fetching offline messages...');
   dataLogger.OnReady(config, client, function() {
     dataLogLock = 0;
+    console.log('Offline message fetch complete!');
   });
   // wait 1000ms without holding up the rest of the script. This way we can ensure recieving all guild invite info.
   await wait(1000);
