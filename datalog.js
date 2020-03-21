@@ -213,6 +213,7 @@ async function uniqueUserCounter(client) {
               let lastSeenMessage = startOfMonthID;
               let loopbreaker = 0;
               let prevLastSeen;
+              let newestMsg = 0;
               const userArr = [];
               // fetch messages repeatedly, looping until the guild's last message ID matches our last message ID.
               while (endOfMonthID > lastSeenMessage && loopbreaker < 2) {
@@ -222,9 +223,10 @@ async function uniqueUserCounter(client) {
                     for (let message of messages) {
                       message = message[1];
                       if (!userArr.includes(message.author.id) && message.id < endOfMonthID) {userArr.push(message.author.id);}
+                      if (message.id > newestMsg) {newestMsg = message.id;}
                     }
                   }
-                  lastSeenMessage = global.dataLog[g.id][gc.id].lastMessageID;
+                  lastSeenMessage = newestMsg;
                 });
                 // if the channel hasn't been used since the month turned over, the loop would never break since it would never find a messageID later than the end of the month.
                 // if that happens, since lastSeenMessage isn't being changed, this conditional will break the loop after 2 tries.
