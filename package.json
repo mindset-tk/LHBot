@@ -4,7 +4,7 @@
   "description": "bot for pinning",
   "main": "bot.js",
   "dependencies": {
-    "discord.js": "^11.5.1",
+    "discord.js": "^12.1.1",
     "fs": "0.0.1-security"
   },
   "devDependencies": {},

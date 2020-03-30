@@ -9,7 +9,7 @@ module.exports = {
       message.channel.send('Hello, I am ' + botguildmember.displayName + '.');
     }
     else {
-      message.channel.send('Hello, I am ' + client.user + '.');
+      message.channel.send(`Hello, I am ${client.user}`);
     }
   },
 };

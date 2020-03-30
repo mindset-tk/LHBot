@@ -22,7 +22,7 @@ module.exports = {
     args.shift();
     const banreason = args.join(' ');
     if (IDFormat.test(bantarget)) {
-      targetuser = await client.fetchUser(bantarget);
+      targetuser = await client.users.fetch(bantarget);
     }
     else {
       message.channel.send(targetstring + 'Does not appear to be a user ID or @mention. Please try again.');
@@ -30,15 +30,15 @@ module.exports = {
     }
     // Test if user is already banned. If so, report it and return.
     const banList = await message.guild.fetchBans();
-    const bannedUser = banList.find(user => user.id === bantarget);
+    const bannedUser = banList.get(bantarget);
     if (bannedUser) {
-      message.channel.send('User ' + targetuser.username + '#' + targetuser.discriminator + ' already appears on the ban list for this server!');
+      message.channel.send('User ' + targetuser.tag + ' already appears on the ban list for this server!');
       return;
     }
     // attempt to ban user. If an error is thrown while banning, log the error and send error text.
     let isBanned = false;
     try {
-      await message.guild.ban(targetuser, banreason);
+      await message.guild.members.ban(targetuser, { reason: banreason });
       isBanned = true;
     }
     catch(err) {
@@ -46,14 +46,14 @@ module.exports = {
       console.log(err);
     }
     if (!isBanned) {
-      message.channel.send('I was not able to ban ' + targetuser.username + '#' + targetuser.discriminator + '. \n Possible reasons for this: I do not have the right roles, or the target has roles I cannot ban.\nCheck the console log for details.');
+      message.channel.send('I was not able to ban ' + targetuser.tag + '. \n Possible reasons for this: I do not have the right roles, or the target has roles I cannot ban.\nCheck the console log for details.');
       return;
     }
     if (!banreason) {
-      message.channel.send('Banning ' + targetuser.username + '#' + targetuser.discriminator + '. No reason given.');
+      message.channel.send('Banning ' + targetuser.tag + '. No reason given.');
     }
     else {
-      message.channel.send('Banning ' + targetuser.username + '#' + targetuser.discriminator + ' with reason **' + banreason + '**.');
+      message.channel.send('Banning ' + targetuser.tag + ' with reason **' + banreason + '**.');
     }
   },
 };

@@ -92,7 +92,7 @@ module.exports = {
     rotatedTable.splice(0, 1);
     const totals = [];
     rotatedTable.forEach(monthlyCount => {
-      console.log(monthlyCount);
+      // console.log(monthlyCount);
       const monthlySum = arr => arr.reduce((a, b) => {
         if ((typeof a == 'number') && (typeof b == 'number')) return a + b;
         else if ((typeof a == 'number') && !(typeof b == 'number')) return a;

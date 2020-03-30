@@ -37,7 +37,7 @@ const events = {
 // initialize invite cache
 const invites = {};
 
-// since the datalogger takes some time to cache messages, especially on larger servers, create a check digit to block unwanted processing of new messages during datalogging
+// since the datalogger takes some time to cache messages, especially on larger servers, create a global check digit to block unwanted processing of new messages during datalogging
 let dataLogLock = 0;
 
 // when the client is ready, run this code.
@@ -54,7 +54,7 @@ client.on('ready', async () => {
   });
   // wait 1000ms without holding up the rest of the script. This way we can ensure recieving all guild invite info.
   await wait(1000);
-  client.guilds.forEach(g => {
+  client.guilds.cache.forEach(g => {
     g.fetchInvites().then(guildInvites => {
       invites[g.id] = guildInvites;
     });
@@ -73,7 +73,7 @@ client.on('message', async message => {
   }
   // prevent parsing commands without correct prefix, from bots, and from non-staff non-comrades.
   if (!message.content.startsWith(config.prefix) || message.author.bot) return;
-  if (message.channel.type == 'text' && !(message.member.roles.has(config.roleStaff) || message.member.roles.has(config.roleComrade))) return;
+  if (message.channel.type == 'text' && !(message.member.roles.cache.has(config.roleStaff) || message.member.roles.cache.has(config.roleComrade))) return;
 
   const args = message.content.slice(config.prefix.length).split(/ +/);
   let commandName = args.shift().toLowerCase();
@@ -93,7 +93,7 @@ client.on('message', async message => {
   if (command.guildOnly && message.channel.type !== 'text') { return await message.reply('I can\'t execute that command inside DMs!'); }
 
   // check permission level of command. Prevent staffonly commands from being run by non-staff.
-  if (command.staffOnly && !message.member.roles.has(config.roleStaff)) return;
+  if (command.staffOnly && !message.member.roles.cache.has(config.roleStaff)) return;
 
   // check if command requires arguments
   if (command.args && !args.length) {
@@ -147,18 +147,14 @@ client.on('raw', async packet => {
   else if (packet.t === 'MESSAGE_REACTION_ADD') {
 
     const { d: data } = packet;
-    const user = client.users.get(data.user_id);
-    const channel = client.channels.get(data.channel_id) || await user.createDM();
-
-    // prevent confusion between cached and uncached messages; ensure event only occurs once per message
-    // NOTE: I commented this out because it does not seem to work.
-    // if (channel.messages.has(data.message_id)) return;
+    const user = client.users.cache.get(data.user_id);
+    const channel = client.channels.cache.get(data.channel_id) || await user.createDM();
 
     // fetch info about the message the reaction was added to.
-    const message = await channel.fetchMessage(data.message_id);
+    const message = await channel.messages.fetch(data.message_id);
     // custom emojis reactions are keyed in a `name:ID` format, while unicode emojis are keyed by names
     const emojiKey = (data.emoji.id) ? `${data.emoji.name}:${data.emoji.id}` : data.emoji.name;
-    const reaction = message.reactions.get(emojiKey);
+    const reaction = message.reactions.cache.get(emojiKey);
 
     // If the message somehow doesn't have any reactions on it, or the channel type is not a guild text channel (like a DM for example),
     // do not emit a reaction add event.
@@ -172,21 +168,21 @@ client.on('raw', async packet => {
 client.on('messageReactionAdd', (reaction, user, message) => {
   if (message == null || message.system) return;
   if (reaction.emoji.name == '📌' && reaction.count >= config.pinsToPin && !message.pinned && !config.pinIgnoreChannels.includes(message.channel.id)) {
-    console.log('Attempting to pin a message in ' + message.channel);
+    console.log(`Attempting to pin a message in ${message.channel}`);
     message.pin();
     return;
   }
   if (reaction.emoji.name == '🔖') {
-    console.log('Attempting to PM a message from ' + message.channel + ' to ' + user);
+    console.log(`Attempting to PM a message from ${message.channel} to ${user}`);
     const messagesent = new Date(message.createdTimestamp).toLocaleString('en-US', { timeZone: 'UTC' });
     const guild = message.guild;
     const guildmember = guild.member(message.author);
-    const bookmarkEmbed = new Discord.RichEmbed()
+    const bookmarkEmbed = new Discord.MessageEmbed()
       .setColor('#0099ff')
       .setAuthor(guildmember.displayName, message.author.displayAvatarURL)
       .setDescription(message.content + '\n\n [jump to message](' + message.url + ')')
       .setFooter('Bookmarked message was sent at ' + messagesent + ' UTC');
-    user.send('🔖: - from ' + message.channel, bookmarkEmbed);
+    user.send(`🔖: - from ${message.channel}`, bookmarkEmbed);
     return;
   }
 });
@@ -200,34 +196,25 @@ client.on('Resumed', async () => {
   });
   await wait(1000);
   // cache invites from server.
-  client.guilds.forEach(g => {
+  client.guilds.cache.forEach(g => {
     g.fetchInvites().then(guildInvites => {
       invites[g.id] = guildInvites;
     });
   });
 });
 
-// very basic error handling.
-// console will log the error but take no further action.
-// if the error is not fatal the bot will continue running.
-client.on('error', err => {
+// Connection error logging
+client.on('shardError', err => {
   const date = new Date().toLocaleString();
-  const ErrTargetPrototype = Object.getPrototypeOf(err.target);
   // If the error is a network error, display error message.
-  if (ErrTargetPrototype.constructor.name == 'WebSocket') {
-    console.log('[' + date + ']: Connection Error! The error was: "' + err.message + '". Will automatically attempt to reconnect.');
-    return;
-  }
-  // Else, display full error object.
-  else {
-    console.error('[' + date + ']:' + err);
-    return;
-  }
+  console.log('[' + date + ']: Connection Error! The error was: "' + err.message + '". Will automatically attempt to reconnect.');
 });
+
+client.on('error', err => {console.error(err);});
 
 client.on('guildMemberAdd', member => {
   if (config.invLogToggle) {
-    const logChannel = client.channels.get(config.channelInvLogs);
+    const logChannel = client.channels.cache.get(config.channelInvLogs);
     // load the current invite list.
     member.guild.fetchInvites().then(guildInvites => {
       try {
@@ -242,7 +229,7 @@ client.on('guildMemberAdd', member => {
         // in this case, since invites are cached every time someone joins, the invite must be the uncached invite, that has exactly one use on it.
         catch {	invite = guildInvites.find(i => (!ei.get(i.code) && i.uses === 1));	}
         // This is just to simplify the message being sent below (inviter doesn't have a tag property)
-        const inviter = client.users.get(invite.inviter.id);
+        const inviter = client.users.cache.get(invite.inviter.id);
         // A real basic message with the information we need.
         logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined using invite code **${invite.code}** from ${inviter} (${inviter.tag}). This invite has been used **${invite.uses}** times since its creation.`);
       }
@@ -254,7 +241,7 @@ client.on('guildMemberAdd', member => {
 });
 
 client.on('guildMemberRemove', member => {
-  const logChannel = client.channels.get(config.channelInvLogs);
+  const logChannel = client.channels.cache.get(config.channelInvLogs);
   const data = [];
   logChannel.send(`${member} (${member.user.tag} / ${member.id}) left the server.`);
   Object.keys(gameList).forEach(sysname => {

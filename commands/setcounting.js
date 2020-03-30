@@ -15,14 +15,14 @@ function WriteState() {
 }
 
 module.exports = {
-	name: 'setcounting',
-	description: 'Sets the current count, so that it can be restored in cases where counting was failed because of a glitch or other non-user-fail reason.',
-	usage: '[new count]',
-	cooldown: 0,
-	guildOnly: true,
-	staffOnly: true,
-	args: true,
-	async execute(message, args, client, config) {
+  name: 'setcounting',
+  description: 'Sets the current count, so that it can be restored in cases where counting was failed because of a glitch or other non-user-fail reason.',
+  usage: '[new count]',
+  cooldown: 0,
+  guildOnly: true,
+  staffOnly: true,
+  args: true,
+  async execute(message, args, client, config) {
     if(args.length != 1)
     {
       message.channel.send("Try using my help command to learn how to set counting.");
@@ -46,7 +46,7 @@ module.exports = {
     while(countingChannel == null)
     {
       console.log('Trying to get Counting channel');
-      countingChannel = client.channels.get(config.countingChannelId);
+      countingChannel = client.channels.cache.get(config.countingChannelId);
     }
 
     countingChannel.send("I thought we'd counted to " + oldCount + " but " + message.author + " told me we're really at " + number + "!");
