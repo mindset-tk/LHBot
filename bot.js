@@ -195,7 +195,7 @@ client.on('Resumed', async () => {
     dataLogLock = 0;
   });
   await wait(1000);
-  // cache invites from server.
+  // update invite cache from server.
   client.guilds.cache.forEach(g => {
     g.fetchInvites().then(guildInvites => {
       invites[g.id] = guildInvites;

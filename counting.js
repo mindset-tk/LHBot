@@ -146,7 +146,7 @@ function RestoreCountingState(client) {
     .then(messages => CheckMessages(messages));
 }
 
-function InitConfig(lrConfig, client) {
+function InitConfig(lrConfig) {
   config = lrConfig;
   if(config.countingFailMessages == null) {
     config.countingFailMessages = ['I think $user broke counting!', 'That\'s not right, $user', 'Here\'s $user, ruining it for everyone', 'Oh dear, $user. Oh dear.', 'It\'s ok $user, I love you anyway'];
@@ -158,7 +158,7 @@ function InitConfig(lrConfig, client) {
     config.countingStartMessages = ['Time to start over', 'Back to the beginning!', 'Gimme a 1', 'What do we start with?', '0'];
   }
   if(config.repeatReacts == null) {
-    config.repeatReacts = ['😠','🤔','😡','🤨', '😑', '🙄', '😣', '😥', '🤐', '😫', '😒', '😓', '😔', '☹️', '🙁', '😖', '😞', '😟', '😢', '😭', '😦', '😧', '😨', '😩', '😬', '😱', '🤫', '👿', '😾', '🙅', '🤬'];
+    config.repeatReacts = ['😠', '🤔', '😡', '🤨', '😑', '🙄', '😣', '😥', '🤐', '😫', '😒', '😓', '😔', '☹️', '🙁', '😖', '😞', '😟', '😢', '😭', '😦', '😧', '😨', '😩', '😬', '😱', '🤫', '👿', '😾', '🙅', '🤬'];
   }
 }
 
@@ -170,7 +170,7 @@ function InitCountingData() {
 
 function PublicOnReady(lrConfig, client) {
   if (!lrConfig.countingToggle) {return;}
-  InitConfig(lrConfig, client);
+  InitConfig(lrConfig);
   InitCountingData();
   RestoreCountingState(client);
 }
