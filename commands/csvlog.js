@@ -24,7 +24,7 @@ module.exports = {
       const dateString = year + '-' + ((month < 10) ? ('0' + month) : month);
       return dateString;
     }
-
+    const thisMonth = formatDate(new Date());
     Object.keys(dataLog).forEach(gID => {
       Object.keys(dataLog[gID]).forEach(cID => {
         if (!dataLog[gID][cID].channelName) return;
@@ -110,6 +110,7 @@ module.exports = {
     CSVData.push(CSVData[0]);
     chanindex = CSVData.length;
     dataHolder.length = 0;
+    let guildUsrTotals;
     // Now we can add user counts to the bottom of this table.
     Object.keys(dataLog).forEach(gID => {
       Object.keys(dataLog[gID]).forEach(cID => {
@@ -127,6 +128,9 @@ module.exports = {
         creationArray[chanindex] = [formatDate(chanCreationDate)];
         chanindex++;
       });
+      guildUsrTotals = new Map(dataLog[gID].guildUniqueUsers);
+      guildUsrTotals = new Map([...guildUsrTotals.entries()].sort());
+      guildUsrTotals = Array.from(guildUsrTotals.values());
     });
     // set row index such that we'll be appending new items instead of messing with old.
     // Note: why the fuck didn't I make this using CSVData.push? I forget! Hell if I'm rewriting it tho.
@@ -145,17 +149,20 @@ module.exports = {
       CSVData[0].forEach(CSVdate => {
         CSVdate = CSVdate.toString();
         if (CSVdate == 'Channel') return;
-        if (CSVdate.localeCompare(creationArray[rowIndex]) >= 0) {
+        if (CSVdate.localeCompare(creationArray[rowIndex]) >= 0 && CSVdate != thisMonth) {
         // console.log(CSVdate + ' is on or after ' + creationArray[rowIndex]);
           if (!CSVData[rowIndex][CSVData[0].indexOf(CSVdate)]) CSVData[rowIndex][CSVData[0].indexOf(CSVdate)] = 0;
         }
-        else if (CSVdate.localeCompare(creationArray[rowIndex]) < 0) {
+        else if (CSVdate.localeCompare(creationArray[rowIndex]) < 0 || CSVdate == thisMonth) {
           if (!CSVData[rowIndex][CSVData[0].indexOf(CSVdate)]) CSVData[rowIndex][CSVData[0].indexOf(CSVdate)] = ' ';
         }
       });
       rowIndex++;
     });
+    guildUsrTotals.splice(0, 0, 'Server-wide Unique Users:');
+    CSVData.push(guildUsrTotals);
     CSVData.splice(0, 0, 'Message Data');
+
 
     fs.writeFile('./stats.csv', CSVData.join('\n'), function(err) {
       if (err) {
