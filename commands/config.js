@@ -103,8 +103,9 @@ __Pins:__
 **Pin reacts needed to pin a message:** ${config.pinsToPin}
 **Channel(s) to ignore for pinning:** ${(config.pinIgnoreChannels[0]) ? '#' + ignoreChans.join(', #') : 'None'}`);
     }
+    if (args[0].toLowerCase() === 'pins' && !args[1]) { return message.channel.send('I need more information to use that. Please refer to the help for this command.'); }
     // pins number management
-    if (args[0].toLowerCase() === 'pins' && args[1].toLowerCase() == 'count') {
+    else if (args[0].toLowerCase() === 'pins' && args[1].toLowerCase() == 'count') {
       if (args[3]) { return message.channel.send(`When using the ${config.prefix}config pins command, please only provide one numerical argument.`); }
       else if (!parseInt(args[2])) { return message.channel.send('I couldn\'t interpret a number from that!'); }
       else {
@@ -114,7 +115,7 @@ __Pins:__
       }
     }
     // for adding pin ignore channels.
-    if (args[1].toLowerCase() === 'ignore') {
+    else if (args[0].toLowerCase() === 'pins' && args[1].toLowerCase() === 'ignore') {
       const failed = [];
       const succeeded = [];
       const duplicate = [];
@@ -144,7 +145,7 @@ __Pins:__
       writeConfig();
     }
     // removing pin ignore channels.
-    else if (args[1].toLowerCase() === 'unignore') {
+    else if (args[0].toLowerCase() === 'pins' && args[1].toLowerCase() === 'unignore') {
       const failed = [];
       const succeeded = [];
       const notonlist = [];
@@ -172,7 +173,8 @@ __Pins:__
       writeConfig();
     }
     // Set invite log channel
-    if (args[0].toLowerCase() === 'invitelogs') {
+    else if (args[0].toLowerCase() === 'invitelogs') {
+      if (!args[1]) { return message.channel.send('I need more information to use that. Please refer to the help for this command.'); }
       if (args[2]) { return message.channel.send('Too many arguments!'); }
       if (args[1].toLowerCase() === 'off') {
         message.channel.send('Disabling leave/join information.');
@@ -187,7 +189,8 @@ __Pins:__
         writeConfig();
       }
     }
-    if (args[0].toLowerCase() === 'counting') {
+    else if (args[0].toLowerCase() === 'counting') {
+      if (!args[1]) { return message.channel.send('I need more information to use that. Please refer to the help for this command.'); }
       if (args[2]) { return message.channel.send('Too many arguments!'); }
       if (args[1].toLowerCase() === 'off') {
         message.channel.send('Disabling counting.');
@@ -206,5 +209,6 @@ __Pins:__
         writeConfig();
       }
     }
+    else { return message.channel.send('Hmm, that doesn\'t look right.  If you need assistance please try viewing the help for this command.'); }
   },
 };
