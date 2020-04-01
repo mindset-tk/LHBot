@@ -181,6 +181,12 @@ async function uniqueUserCounter(client) {
   const nowString = formatDate(new Date());
   for (const gID of Object.keys(global.dataLog)) {
     const g = await client.guilds.cache.get(gID);
+    if (!global.dataLog[gID].guildUniqueUsers) {
+      global.dataLog[gID].guildUniqueUsers = [];
+    }
+    const guildMap = new Map(global.dataLog[gID].guildUniqueUsers);
+    const guildUsrMap = new Map;
+    // we're gonna format guildusrMap like this [month, arrayofusrs]
     for (const cID of Object.keys(global.dataLog[gID])) {
       let skip = 0;
       const gc = await g.channels.cache.get(cID);
@@ -199,6 +205,10 @@ async function uniqueUserCounter(client) {
         if (!msgMap.size == 0) {
           for (const monthData of msgMap) {
             const month = monthData[0];
+            let guildUsrArr = [];
+            if (guildUsrMap.has(month)) {
+              guildUsrArr = guildUsrMap.get(month);
+            }
             // iterate through the remainder of msgMap, and if there's already an entry in the unique user list, return.
             if (!usrMap.has(month)) {
               // otherwise, we will iterate through all the messages for that month and then cache them into an array.
@@ -223,6 +233,7 @@ async function uniqueUserCounter(client) {
                     for (let message of messages) {
                       message = message[1];
                       if (!userArr.includes(message.author.id) && message.id < endOfMonthID) {userArr.push(message.author.id);}
+                      if (!guildUsrArr.includes(message.author.id) && message.id < endOfMonthID) { guildUsrArr.push(message.author.id);}
                       if (message.id > newestMsg) {newestMsg = message.id;}
                     }
                   }
@@ -235,6 +246,7 @@ async function uniqueUserCounter(client) {
                 }
                 await wait(200);
               }
+              guildUsrMap.set(month, guildUsrArr);
               usrMap.set(month, userArr.length);
             }
           }
@@ -242,6 +254,12 @@ async function uniqueUserCounter(client) {
         global.dataLog[gID][cID].uniqueUsers = [...usrMap];
       }
     }
+    for (const monthData of guildUsrMap) {
+      const month = monthData[0];
+      const monthUsrs = monthData[1];
+      guildMap.set(month, monthUsrs.length);
+    }
+    global.dataLog[gID].guildUniqueUsers = [...guildMap];
     writeData();
   }
 }
