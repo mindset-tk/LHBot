@@ -101,13 +101,15 @@ module.exports = {
       });
       totals.push(monthlySum(monthlyCount));
     });
-    // Add a label and append the row to the end of CSVData [creating a new row in the process]
+    // Add a label and append the totals row to the end of CSVData [creating a new row in the process]
     totals.splice(0, 0, 'Monthly Total Messages:');
     CSVData.push(totals);
+    // Initialize for a second table of user data
     CSVData.push('');
     CSVData.push('Unique User Data');
     CSVData.push(CSVData[0]);
-    chanindex = 0;
+    chanindex = CSVData.length;
+    dataHolder.length = 0;
     // Now we can add user counts to the bottom of this table.
     Object.keys(dataLog).forEach(gID => {
       Object.keys(dataLog[gID]).forEach(cID => {
