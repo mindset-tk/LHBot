@@ -92,7 +92,7 @@ module.exports = {
     rotatedTable.splice(0, 1);
     const totals = [];
     rotatedTable.forEach(monthlyCount => {
-      console.log(monthlyCount);
+      // Now each item in the rotatedTable array is one month of message counts for the entire month. So we can reduce that array to sum up monthly totals.
       const monthlySum = arr => arr.reduce((a, b) => {
         if ((typeof a == 'number') && (typeof b == 'number')) return a + b;
         else if ((typeof a == 'number') && !(typeof b == 'number')) return a;
@@ -104,6 +104,56 @@ module.exports = {
     // Add a label and append the row to the end of CSVData [creating a new row in the process]
     totals.splice(0, 0, 'Monthly Total Messages:');
     CSVData.push(totals);
+    CSVData.push('');
+    CSVData.push('Unique User Data');
+    CSVData.push(CSVData[0]);
+    chanindex = 0;
+    // Now we can add user counts to the bottom of this table.
+    Object.keys(dataLog).forEach(gID => {
+      Object.keys(dataLog[gID]).forEach(cID => {
+        if (!dataLog[gID][cID].channelName) return;
+        dataHolder[chanindex] = [];
+        if (dataLog[gID][cID].uniqueUsers) {
+        // get user data for each channel in the guild
+          let numUsrData = new Map(dataLog[gID][cID].uniqueUsers);
+          // ensure it's sorted by the map keys (months)
+          numUsrData = new Map([...numUsrData.entries()].sort());
+          dataHolder[chanindex] = [...numUsrData];
+        }
+        dataHolder[chanindex].splice(0, 0, ['Channel', dataLog[gID][cID].channelName]);
+        const chanCreationDate = new Date((parseInt(cID) / 4194304) + 1420070400000);
+        creationArray[chanindex] = [formatDate(chanCreationDate)];
+        chanindex++;
+      });
+    });
+    // set row index such that we'll be appending new items instead of messing with old.
+    // Note: why the fuck didn't I make this using CSVData.push? I forget! Hell if I'm rewriting it tho.
+    rowIndex = CSVData.length;
+    // loop through the dataholder - each item in dataholder looks like [Channel, %ChannelName], [%Month1, %uniqueUsers], [%Month2, %uniqueUsers]...
+    dataHolder.forEach(chandata => {
+      // initialise the row
+      CSVData[rowIndex] = [];
+      // Convert each dataholder item to a map
+      chandata = new Map(chandata);
+      // Assign each Map item to the correct index compared to the row
+      chandata.forEach((data, col) => {
+        CSVData[rowIndex][CSVData[0].indexOf(col)] = data;
+      });
+      // Go through all months there is data for, then fill months after channel creation with 0s in order to differentiate from months prior to channel creation.
+      CSVData[0].forEach(CSVdate => {
+        CSVdate = CSVdate.toString();
+        if (CSVdate == 'Channel') return;
+        if (CSVdate.localeCompare(creationArray[rowIndex]) >= 0) {
+        // console.log(CSVdate + ' is on or after ' + creationArray[rowIndex]);
+          if (!CSVData[rowIndex][CSVData[0].indexOf(CSVdate)]) CSVData[rowIndex][CSVData[0].indexOf(CSVdate)] = 0;
+        }
+        else if (CSVdate.localeCompare(creationArray[rowIndex]) < 0) {
+          if (!CSVData[rowIndex][CSVData[0].indexOf(CSVdate)]) CSVData[rowIndex][CSVData[0].indexOf(CSVdate)] = ' ';
+        }
+      });
+      rowIndex++;
+    });
+    CSVData.splice(0, 0, 'Message Data');
 
     fs.writeFile('./stats.csv', CSVData.join('\n'), function(err) {
       if (err) {

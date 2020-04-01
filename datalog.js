@@ -83,21 +83,21 @@ async function restoreMessages(client, callback) {
   // console.log('Fetching offline messages...');
   do {
     retrievedMessages = 0;
-    for (let g of await client.guilds) {
+    for (let g of await client.guilds.cache) {
       g = g[1];
       // check if log has the info for this guild. if not, create an entry that we'll push channel info into
       if (!global.dataLog[g.id]) {
         global.dataLog[g.id] = { guildName: g.name };
       }
-      for (let gc of g.channels) {
+      for (let gc of g.channels.cache) {
         gc = gc[1];
         // check if each channel has an entry in the log. if not, create a new property with info about the channel.
-        if (gc.type === 'text' && !global.dataLog[g.id][gc.id] && gc.memberPermissions(g.me).has('READ_MESSAGES') && gc.memberPermissions(g.me).has('READ_MESSAGE_HISTORY')) {
+        if (gc.type === 'text' && !global.dataLog[g.id][gc.id] && gc.permissionsFor(g.me).has(['VIEW_CHANNEL', 'READ_MESSAGE_HISTORY'])) {
         // initialize data for new channel
           global.dataLog[g.id][gc.id] = { channelName:gc.name, lastMessageID:null, numMessages:[] };
           writeData();
         }
-        if (gc.lastMessageID != null && gc.memberPermissions(g.me).has('READ_MESSAGES') && gc.memberPermissions(g.me).has('READ_MESSAGE_HISTORY')) {
+        if (gc.lastMessageID != null && gc.permissionsFor(g.me).has(['VIEW_CHANNEL', 'READ_MESSAGE_HISTORY'])) {
         // if the channel doesn't have a null lastMessage, we can just iterate back to the most recent seen message.
           if (global.dataLog[g.id][gc.id].lastMessageID) {
             let lastSeenMessage = global.dataLog[g.id][gc.id].lastMessageID;
@@ -107,7 +107,7 @@ async function restoreMessages(client, callback) {
             // fetch messages repeatedly, looping until the guild's last message ID matches our last message ID.
             while (gc.lastMessageID != lastSeenMessage && loopbreaker < 2) {
               prevLastSeen = lastSeenMessage;
-              await gc.fetchMessages({ limit: 100, after: lastSeenMessage }).then(messages => {
+              await gc.messages.fetch({ limit: 100, after: lastSeenMessage }).then(messages => {
                 if (messages.size > 0) {
                   for (let message of messages) {
                     message = message[1];
@@ -134,9 +134,9 @@ async function restoreMessages(client, callback) {
             let numMsgsFetched = 0;
             let prevOldest;
             // first, pull info for the most recent message in the channel.
-            // this is necessary because the "before:" param on fetchMessages will not include the message that is within that param.
+            // this is necessary because the "before:" param on messages.fetch will not include the message that is within that param.
             if (gc.lastMessageID != null) {
-              await gc.fetchMessage(gc.lastMessageID)
+              await gc.messages.fetch(gc.lastMessageID)
                 .then(lastmsg => publicOnMessage(lastmsg))
                 .catch(err => {
                   if (err.name == 'DiscordAPIError' && err.message == 'Unknown Message') {
@@ -145,11 +145,11 @@ async function restoreMessages(client, callback) {
                   else { console.log('Error Fetching Message!', err); }
                 });
             }
-            // then, using the "before:" param of fetchMessages,
+            // then, using the "before:" param of messages.fetch,
             // loop fetching messages until the oldest seen message no longer changes.
             do {
               prevOldest = oldestSeenMessageID;
-              await gc.fetchMessages({ limit: 100, before: oldestSeenMessageID }).then(messages => {
+              await gc.messages.fetch({ limit: 100, before: oldestSeenMessageID }).then(messages => {
                 if (messages.size > 0) {
                   for (let message of messages) {
                     message = message[1];
@@ -180,10 +180,10 @@ async function uniqueUserCounter(client) {
   // get current month in YYYY-MM format
   const nowString = formatDate(new Date());
   for (const gID of Object.keys(global.dataLog)) {
-    const g = await client.guilds.get(gID);
+    const g = await client.guilds.cache.get(gID);
     for (const cID of Object.keys(global.dataLog[gID])) {
       let skip = 0;
-      const gc = await g.channels.get(cID);
+      const gc = await g.channels.cache.get(cID);
       if (!global.dataLog[gID][cID].numMessages) { skip = 1;}
       // create uniqueUsers arr if it doesn't exist
       else if (!global.dataLog[gID][cID].uniqueUsers) {
@@ -206,7 +206,7 @@ async function uniqueUserCounter(client) {
               const startOfMonth = Date.parse(month + '-01');
               // technically, endOfMonth is really the first ms in the start of the next month... but a collision here is highly unlikely due to how discord generates snowflakes.
               const endOfMonth = Date.parse(monthPlusOne(month) + '-01');
-              // since the fetchMessages method only takes messageIDs, we have to generate fake message IDs for messages created in the first and last ms of the month.
+              // since the messages.fetch method only takes messageIDs, we have to generate fake message IDs for messages created in the first and last ms of the month.
               const startOfMonthID = (BigInt(startOfMonth.valueOf()) - BigInt(1420070400000)) << BigInt(22);
               const endOfMonthID = (BigInt(endOfMonth.valueOf()) - BigInt(1420070400000)) << BigInt(22);
               // init loop variables
@@ -218,7 +218,7 @@ async function uniqueUserCounter(client) {
               // fetch messages repeatedly, looping until the guild's last message ID matches our last message ID.
               while (endOfMonthID > lastSeenMessage && loopbreaker < 2) {
                 prevLastSeen = lastSeenMessage;
-                await gc.fetchMessages({ limit: 100, after: lastSeenMessage }).then(messages => {
+                await gc.messages.fetch({ limit: 100, after: lastSeenMessage }).then(messages => {
                   if (messages.size > 0) {
                     for (let message of messages) {
                       message = message[1];

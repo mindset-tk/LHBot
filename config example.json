@@ -2,9 +2,11 @@
 	"prefix": "!",
 	"authtoken": "",
 	"roleStaff": "",
-	"roleComrade": "",
-
-	"channelInvLogs": "",
+  "roleComrade": "",
+  "invLogToggle": false,
+  "channelInvLogs": "",
+  "countingToggle": false,
+  "countingChannelId": "",
 
 	"currentActivity": {
 		"Type": "",

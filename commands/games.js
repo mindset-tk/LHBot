@@ -35,16 +35,18 @@ module.exports = {
       });
     }
 
+    // function to get a user ID from an @mention
     function getUserFromMention(mention) {
       if (mention.startsWith('<@') && mention.endsWith('>')) {
         mention = mention.slice(2, -1);
         if (mention.startsWith('!')) {
           mention = mention.slice(1);
         }
-        return client.fetchUser(mention);
+        return client.users.fetch(mention);
       }
       else {return false;}
     }
+
     const IDFormat = new RegExp('^(\\d{16,})$');
     // Block for adding a user's data to a given roster
     const action = args[0].toLowerCase();
@@ -102,7 +104,7 @@ module.exports = {
           }
         });
         if (!column1[0]) { return message.channel.send('Nobody on this server is on that roster!');}
-        const gameListEmbed = new Discord.RichEmbed()
+        const gameListEmbed = new Discord.MessageEmbed()
           .setColor(gameList[system].embedColor)
           .setTitle(capitalize(system) + ' Roster')
           .setDescription('*Member Game Profiles for ' + capitalize(system) + '*')
@@ -147,7 +149,7 @@ module.exports = {
         return;
       }
     }
-    else if (action === 'purge' && message.member.roles.has(config.roleStaff)) {
+    else if (action === 'purge' && message.member.roles.cache.has(config.roleStaff)) {
       let targetUser;
       if (!args[1]) { return message.channel.send('Sorry, I need a user @mention or ID to purge them from the list');	}
       else if (IDFormat.test(args[1])) { targetUser = await client.fetchUser(args[1]); }
