@@ -232,8 +232,8 @@ async function uniqueUserCounter(client) {
                   if (messages.size > 0) {
                     for (let message of messages) {
                       message = message[1];
-                      if (!userArr.includes(message.author.id) && message.id < endOfMonthID) {userArr.push(message.author.id);}
-                      if (!guildUsrArr.includes(message.author.id) && message.id < endOfMonthID) { guildUsrArr.push(message.author.id);}
+                      if (!userArr.includes(message.author.id) && message.id < endOfMonthID && !message.author.bot) {userArr.push(message.author.id);}
+                      if (!guildUsrArr.includes(message.author.id) && message.id < endOfMonthID && !message.author.bot) { guildUsrArr.push(message.author.id);}
                       if (message.id > newestMsg) {newestMsg = message.id;}
                     }
                   }
