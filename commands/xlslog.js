@@ -157,7 +157,7 @@ module.exports = {
 
     usrRowData.sort((a, b) => a.Channels.localeCompare(b.Channels));
     usrLogSheet.addRows(usrRowData);
-    const totalUsrRow = { Channels: 'Serverwide Unique Users:' };
+    const totalUsrRow = { Channels: 'Serverwide Active Users:' };
     const guildUniques = new Map(dataLog[gID].guildUniqueUsers);
     usrLogSheet.columns.forEach((column) => {
       column.alignment = { horizontal:'center' };
