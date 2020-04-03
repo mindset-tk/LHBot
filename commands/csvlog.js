@@ -1,4 +1,4 @@
-const path = require('path');
+/* const path = require('path');
 const dataLogpath = path.resolve('./datalog.json');
 const dataLog = require(dataLogpath);
 const fs = require('fs');
@@ -171,4 +171,4 @@ module.exports = {
     });
     message.author.send({ files: ['./stats.csv'] });
   },
-};
+}; */
