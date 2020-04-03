@@ -32,6 +32,21 @@ function monthPlusOne(dateString) {
   return nextMonth;
 }
 
+function monthMinusOne(dateString) {
+  const dateArray = dateString.split('-');
+  let year = parseInt(dateArray[0]);
+  let month = parseInt(dateArray[1]);
+  if (month != 1) {
+    month--;
+  }
+  else if (month == 1) {
+    year--;
+    month = 12;
+  }
+  const lastMonth = year + '-' + ((month < 10) ? ('0' + month) : month);
+  return lastMonth;
+}
+
 // Function to write to .json file for session persistence.
 function writeData() {
   fs.writeFile(dataLogPath, JSON.stringify(global.dataLog, null, 2), function(err) {
@@ -264,9 +279,36 @@ async function uniqueUserCounter(client) {
   }
 }
 
+// Code to get count of users at end of month.
+// Assumes the bot is running 24/7 and is triggered each time the bot resumes
+// This is a semiregular occurence that occurs multiple times a day, and this
+// function will kick off each time and check if there's a total server users
+// for last month at the moment it kicks off. If there's no data for last month
+// it then sets the "total users at EOM" for last month to the current total user count.
+// Obviously if the bot is off for multiple days this is not going to work.
+// TODO: investigate a cron-like tool to do this on a more regular basis.
+async function getTotalServerUsers(client) {
+  const nowString = formatDate(new Date());
+  const lastMonth = monthMinusOne(nowString);
+  for (const gID of Object.keys(global.dataLog)) {
+    const g = await client.guilds.cache.get(gID);
+    const srvrUsrCount = await g.members.cache.filter(member => !member.user.bot).size;
+    if (!global.dataLog[gID].guildTotalUsers) {
+      global.dataLog[gID].guildTotalUsers = [];
+    }
+    const totUsrMap = new Map(global.dataLog[gID].guildTotalUsers);
+    if (!totUsrMap.has(lastMonth)) {
+      totUsrMap.set(lastMonth, srvrUsrCount);
+    }
+    global.dataLog[gID].guildTotalUsers = [...totUsrMap];
+    writeData();
+  }
+}
+
 function publicOnReady(config, client, callback) {
   restoreMessages(client, callback);
   uniqueUserCounter (client);
+  getTotalServerUsers (client);
 }
 
 exports.OnReady = publicOnReady;

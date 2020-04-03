@@ -6,3 +6,4 @@ counting.json
 datalog.json
 *.csv
 .editorconfig
+*.xlsx
