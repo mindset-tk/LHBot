@@ -199,7 +199,6 @@ module.exports = {
     totRowArr.shift();
     let accumulator = 0;
     let daysSinceFirstMonth = 0;
-    console.log(totRowArr);
     totRowArr.forEach((val, idx) => {
       if (idx == 0) { return; }
       else if (msgLogSheet.getColumn(idx + 1).key != thisMonth) {
@@ -217,8 +216,7 @@ module.exports = {
     msgLogSheet.addRow(cumAvgMonthlyRow);
     msgLogSheet.getRow(msgLogSheet.rowCount).getCell(1).font = { bold: true };
 
-    xlsLog.xlsx.writeFile('D:\\share\\stats.xlsx');
-    // xlsLog.xlsx.writeFile('./stats.xlsx');
-    // message.author.send({ files: ['./stats.xlsx'] });
+    xlsLog.xlsx.writeFile('./stats.xlsx');
+    message.author.send({ files: ['./stats.xlsx'] });
   },
 };
