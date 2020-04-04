@@ -22,7 +22,7 @@ module.exports = {
       const dateString = year + '-' + ((month < 10) ? ('0' + month) : month);
       return dateString;
     }
-
+    const thisMonth = formatDate(new Date());
     function friendlyDate(dateString) {
       const months = [ 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec' ];
       const dateArray = dateString.split('-');
@@ -30,6 +30,13 @@ module.exports = {
       const month = parseInt(dateArray[1]) - 1;
       const niceDate = months[month] + ' ' + year;
       return niceDate;
+    }
+
+    function getDaysInMonth(dateString) {
+      const dateArray = dateString.split('-');
+      const year = parseInt(dateArray[0]);
+      const month = parseInt(dateArray[1]);
+      return new Date(year, month, 0).getDate();
     }
 
     function formatSheet(worksheet) {
@@ -143,6 +150,7 @@ module.exports = {
     msgRowData.sort((a, b) => a.Channels.localeCompare(b.Channels));
     msgLogSheet.addRows(msgRowData);
     const totalMsgRow = { Channels: 'Monthly Total Messages:' };
+    const avgMonthlyRow = { Channels: 'Avg Daily Messages:' };
     msgLogSheet.columns.forEach((column) => {
       column.alignment = { horizontal:'center' };
       let colTot = 0;
@@ -152,6 +160,8 @@ module.exports = {
         else colTot += cell.value;
       });
       totalMsgRow[column.key] = colTot;
+      if (column.key != thisMonth) { avgMonthlyRow[column.key] = Math.round(colTot / getDaysInMonth(column.key)); }
+      else { avgMonthlyRow[column.key] = Math.round(colTot / (new Date().getDate())); }
     });
     msgLogSheet.addRow(totalMsgRow);
 
@@ -178,7 +188,37 @@ module.exports = {
     usrLogSheet.addRow(guildTotUsrRow);
     usrLogSheet.getRow(usrLogSheet.rowCount).getCell(1).font = { bold: true };
 
-    xlsLog.xlsx.writeFile('./stats.xlsx');
-    message.author.send({ files: ['./stats.xlsx'] });
+    msgLogSheet.addRow(avgMonthlyRow);
+    msgLogSheet.getRow(msgLogSheet.rowCount).getCell(1).font = { bold: true };
+
+    // now to create the running average row
+    const cumAvgMonthlyRow = { Channels: 'Aggregate Daily Average Since Creation:' };
+    // getting the row values this way instead of using the totalMsgRow object ensures they are ordered as we expect.
+    const totRowArr = msgLogSheet.getRow(msgLogSheet.rowCount - 1).values;
+    // when getting row data, excelJS adds an extra empty element at arr[0] - eliminate it.
+    totRowArr.shift();
+    let accumulator = 0;
+    let daysSinceFirstMonth = 0;
+    console.log(totRowArr);
+    totRowArr.forEach((val, idx) => {
+      if (idx == 0) { return; }
+      else if (msgLogSheet.getColumn(idx + 1).key != thisMonth) {
+        daysSinceFirstMonth += getDaysInMonth(msgLogSheet.getColumn(idx + 1).key);
+        accumulator += val;
+      }
+      else if (msgLogSheet.getColumn(idx + 1).key == thisMonth) {
+        daysSinceFirstMonth += new Date().getDate();
+        accumulator += val;
+      }
+      const colkey = msgLogSheet.getColumn(idx + 1).key;
+      cumAvgMonthlyRow[colkey] = Math.round(accumulator / daysSinceFirstMonth);
+    });
+    console.log(cumAvgMonthlyRow);
+    msgLogSheet.addRow(cumAvgMonthlyRow);
+    msgLogSheet.getRow(msgLogSheet.rowCount).getCell(1).font = { bold: true };
+
+    xlsLog.xlsx.writeFile('D:\\share\\stats.xlsx');
+    // xlsLog.xlsx.writeFile('./stats.xlsx');
+    // message.author.send({ files: ['./stats.xlsx'] });
   },
 };
