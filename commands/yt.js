@@ -32,7 +32,7 @@ __Notes on use:__
 If the bot is not currently playing in a different voice channel, adding a video to the playlist will automatically summon the bot to the voice channel you are in.
 Since the bot can only play in one channel at a time, you must **${config.prefix}yt stop** before you can summon the bot to your channel. *Abuse of the ${config.prefix}yt stop command is expressly forbidden.*
 The bot will not allow users who aren't in the same voice channel to edit the playlist.
-If the bot is the only user in a voice channel when it finishes playback of the current song, it will automatically leave. Otherwise it will wait 1 minute before leaving.`,
+If the bot is the only user in a voice channel when it finishes playback of the current song, it will automatically leave. Otherwise, if the playlist is empty, it will wait 1 minute before leaving.`,
   guildOnly: true,
   cooldown: 0.1,
   async execute(message, args, client) {
