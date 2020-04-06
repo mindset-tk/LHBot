@@ -23,6 +23,9 @@ module.exports = {
 **${config.prefix}yt list clear** will clear the current playlist completely, but finish playback of the current song.
 **${config.prefix}yt stop** will stop playback and clear the current playlist completely.
 
+**${config.prefix}yt timeout #** is a staff only command to lock the ${config.prefix}yt command for # of minutes, server wide.
+**${config.prefix}yt timeout stop** or 0 will both allow staff to unlock the ${config.prefix}yt command.
+
 Volume can be set with the **${config.prefix}volume #** command, where # is a number between 1 and 100.
 
 If the bot is not currently playing in a different channel, adding a video to the playlist will automatically summon the bot to the voice channel you are in.
@@ -30,7 +33,52 @@ The bot will not allow users who aren't in the same voice channel to edit the pl
 If the bot is the only user in a voice channel, or finishes playback, it will automatically leave.`,
   guildOnly: true,
   cooldown: 0.1,
-  async execute(message, args) {
+  async execute(message, args, client) {
+    function minsAndSeconds(ms) {
+      const minutes = Math.floor(ms / 60000);
+      const seconds = ((ms % 60000) / 1000).toFixed(0);
+      return minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+    }
+
+    // timeout checking
+    let waitTime;
+    const now = Date.now();
+    if (args[0].toLowerCase() == 'timeout' && message.member.roles.cache.has(config.roleStaff)) {
+      if (args[1] == 0) {
+        args[1] = 'stop';
+      }
+      if ((!args[1] || !parseInt(args[1]) || args[1] < 0) && args[1] != 'stop') {
+        return message.channel.send('Please include a time out duration in minutes to lock out the .yt command');
+      }
+      if (parseInt(args[1]) > 0) {
+        waitTime = parseInt(args[1]) * 60000;
+        message.channel.send(`Locking out ${config.prefix}yt commands for ${minsAndSeconds(waitTime)}. Use ${config.prefix}yt timeout stop or ${config.prefix}yt timeout 0 will clear the time out early.`);
+        message.guild.musicData.timeOutExp = now + waitTime;
+        setTimeout(() => {
+          if (message.guild.musicData.timeOutExp != 0) {
+            message.guild.musicData.timeOutExp = 0;
+            message.channel.send(`${config.prefix}yt command unlocked.`);
+          }
+        }, waitTime);
+        message.guild.musicData.volume = 1;
+        message.guild.musicData.songDispatcher = null;
+        message.guild.musicData.nowPlaying = null;
+        message.guild.musicData.isPlaying = false;
+        if (message.guild.musicData.voiceChannel) {
+          return message.guild.musicData.voiceChannel.leave();
+        }
+        return;
+      }
+      if (args[1].toLowerCase() == 'stop' || parseInt(args[1]) == 0) {
+        message.guild.musicData.timeOutExp = 0;
+        return message.channel.send(`${config.prefix}yt command unlocked.`);
+      }
+    }
+
+    if (message.guild.musicData.timeOutExp > now && args[0].toLowerCase() != 'timeout' && !message.member.roles.cache.has(config.roleStaff)) {
+      const timeLeft = (message.guild.musicData.timeOutExp - now);
+      return message.channel.send(`Sorry, the ${config.prefix}yt command is locked out for ${minsAndSeconds(timeLeft)} more minutes.`);
+    }
 
     function formatDuration(APIDuration) {
       const duration = `${APIDuration.hours ? APIDuration.hours + ':' : ''}${
@@ -48,12 +96,12 @@ If the bot is the only user in a voice channel, or finishes playback, it will au
     // Commands that can be permissibly used by a user that is in a different voice channel.
     const safeCommands = ['stop', 'list'];
 
-    if (!config.voiceTextChannelIds.includes(message.channel.id)) {
+    if (!config.voiceTextChannelIds.includes(message.channel.id) && !message.member.roles.cache.has(config.roleStaff)) {
       return message.channel.send('Please use this command only in the #voice-chat channels.');
     }
     const voiceChannel = message.member.voice.channel;
     if (!voiceChannel && args[0] != 'list') return message.channel.send('Please join a voice channel and try again!');
-    if (message.guild.musicData.isPlaying == true && voiceChannel != message.guild.musicData.voiceChannel) {
+    if ((message.guild.musicData.isPlaying == true && voiceChannel != message.guild.musicData.voiceChannel) && !message.member.roles.cache.has(config.roleStaff)) {
       if (!safeCommands.includes(args[0])) {
         return message.channel.send(`Sorry, I'm already playing in another voice channel! I can only be in one voice channel at a time. The **${config.prefix}yt stop** command will forcibly end playback, but please be conscientious of other users!`);
       }
@@ -88,7 +136,13 @@ If the bot is the only user in a voice channel, or finishes playback, it will au
           })
           .on('finish', async () => {
             // if there are more songs in queue, continue playing
-            if (queue.length >= 1) {
+            const VCUsersNotMe = [];
+            message.guild.musicData.voiceChannel.members.forEach((value, key) => {
+              if (key != client.user.id) {
+                VCUsersNotMe.push(key);
+              }
+            });
+            if (queue.length >= 1 && VCUsersNotMe.length > 0) {
               return playSong(queue);
             }
             // else if there are no more songs in queue, leave the voice channel after 60 seconds.
@@ -97,8 +151,14 @@ If the bot is the only user in a voice channel, or finishes playback, it will au
               message.guild.musicData.songDispatcher = null;
               message.guild.musicData.nowPlaying = null;
               message.guild.musicData.isPlaying = false;
+              if (VCUsersNotMe.length == 0) {
+                message.guild.musicData.voiceTextChannel.send('Seems like nobody is listening. Goodbye!');
+                message.guild.musicData.voiceChannel.leave();
+              }
               await wait(60000);
-              if (!message.guild.musicData.isPlaying) { return voiceChannel.leave(); }
+              if (!message.guild.musicData.isPlaying) {
+                return message.guild.musicData.voiceChannel.leave();
+              }
             }
           })
           .on('error', e => {
@@ -110,7 +170,7 @@ If the bot is the only user in a voice channel, or finishes playback, it will au
             }
             else {
               message.guild.musicData.isPlaying = false;
-              return voiceChannel.leave();
+              return message.guild.musicData.voiceChannel.leave();
             }
           });
       }).catch(err => console.log(err));
@@ -148,10 +208,15 @@ If the bot is the only user in a voice channel, or finishes playback, it will au
       // let playlist = null;
       // if (query.match(isVideo)[2]) { playlist = await YT.getPlaylistByID(query.match(isVideo)[2]); }
       // message.channel.send(`Video title: ${video.title} ${playlist ? `\n Playlist title: ${playlist.title}` : ''}`);
+
       // if nothing is playing yet
       if (!message.guild.musicData.isPlaying) {
         message.guild.musicData.volume = 1;
-        message.guild.musicData.voiceTextChannel = message.channel;
+        // edge case if staff initiated video play from outside of the #voice-chat channels, bot will default to the first voice chat channel.
+        if (!config.voiceTextChannelIds.includes(message.channel.id)) {
+          message.guild.musicData.voiceTextChannel = config.voiceTextChannelIds[0];
+        }
+        else { message.guild.musicData.voiceTextChannel = message.channel; }
         message.guild.musicData.voiceChannel = voiceChannel;
         message.guild.musicData.isPlaying = true;
         return playSong(message.guild.musicData.queue);
@@ -247,7 +312,7 @@ If the bot is the only user in a voice channel, or finishes playback, it will au
           message.guild.musicData.songDispatcher = null;
           message.guild.musicData.nowPlaying = null;
           message.guild.musicData.isPlaying = false;
-          return voiceChannel.leave();
+          return message.guild.musicData.voiceChannel.leave();
         }
       }
       return playSong(message.guild.musicData.queue);
