@@ -23,7 +23,7 @@ module.exports = {
 **${config.prefix}yt list clear** will clear the current playlist completely, but finish playback of the current song.
 **${config.prefix}yt stop** will stop playback and clear the current playlist completely.
 
-Volume can be set with the **${config.prefix}volume #** command, where # is a number between 1 and 200.
+Volume can be set with the **${config.prefix}volume #** command, where # is a number between 1 and 100.
 
 If the bot is not currently playing in a different channel, adding a video to the playlist will automatically summon the bot to the voice channel you are in.
 The bot will not allow users who aren't in the same voice channel to edit the playlist.

@@ -2,7 +2,7 @@ module.exports = {
   name: 'volume',
   description: 'Adjust voice channel song volume.',
   aliases: [],
-  usage: '[number between 1 and 200]',
+  usage: '[number between 1 and 100]',
   guildOnly: true,
   cooldown: 0.1,
   async execute(message, args) {
