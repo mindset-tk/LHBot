@@ -9,6 +9,24 @@ const listPath = './gamelist.json';
 const gameList = require(listPath);
 const dataLogger = require('./datalog.js');
 
+Discord.Structures.extend('Guild', Guild => {
+  class MusicGuild extends Guild {
+    constructor(client, data) {
+      super(client, data);
+      this.musicData = {
+        queue: [],
+        isPlaying: false,
+        volume: 1,
+        songDispatcher: null,
+        voiceChannel: null,
+        voiceTextChannel: null,
+        nowPlaying: null,
+      };
+    }
+  }
+  return MusicGuild;
+});
+
 // initialize client, commands, command cooldown collections
 const client = new Discord.Client();
 client.commands = new Discord.Collection();
@@ -66,7 +84,8 @@ client.login(config.authtoken);
 
 // command parser
 client.on('message', async message => {
-  // only do datalogging on non-DM text channels. Don't process messages while offline retrieval is proceeding.
+  // only do datalogging on non-DM text channels. Don't log messages while offline retrieval is proceeding.
+  // (offline logging will loop and catch new messages on the fly.)
   if (message.channel.type === 'text' && dataLogLock != 1) { dataLogger.OnMessage(message); }
   if(Counting.HandleMessage(message)) {
     return;

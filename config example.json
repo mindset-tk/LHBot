@@ -7,9 +7,10 @@
   "channelInvLogs": "",
   "countingToggle": false,
   "countingChannelId": "",
-
+  "voiceTextChannelIds": [""],
 	"currentActivity": {
 		"Type": "",
 		"Name": ""
-	   }
+    },
+  "youTubeAPIKey": ""
 }
