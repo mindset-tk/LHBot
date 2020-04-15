@@ -1,6 +1,6 @@
 module.exports = {
   name: 'volume',
-  description: 'Adjust voice channel song volume.',
+  description: 'Adjust voice channel song volume. Default volume is 20.',
   aliases: [],
   usage: '[number between 1 and 100]',
   guildOnly: true,

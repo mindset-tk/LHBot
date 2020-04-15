@@ -16,7 +16,7 @@ Discord.Structures.extend('Guild', Guild => {
       this.musicData = {
         queue: [],
         isPlaying: false,
-        volume: 1,
+        volume: 0.2,
         songDispatcher: null,
         voiceChannel: null,
         voiceTextChannel: null,
@@ -237,6 +237,7 @@ client.on('guildMemberAdd', member => {
     // load the current invite list.
     member.guild.fetchInvites().then(guildInvites => {
       try {
+        const knownInvites = new Map(config.knownInvites);
         let invite = new Discord.Collection();
         // This is the *existing* invites for the guild.
         const ei = invites[member.guild.id];
@@ -249,8 +250,12 @@ client.on('guildMemberAdd', member => {
         catch {	invite = guildInvites.find(i => (!ei.get(i.code) && i.uses === 1));	}
         // This is just to simplify the message being sent below (inviter doesn't have a tag property)
         const inviter = client.users.cache.get(invite.inviter.id);
+        let knownInvString = false;
+        if (knownInvites.has(invite.code)) {
+          knownInvString = knownInvites.get(invite.code);
+        }
         // A real basic message with the information we need.
-        logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined using invite code **${invite.code}** from ${inviter} (${inviter.tag}). This invite has been used **${invite.uses}** times since its creation.`);
+        logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined using invite code **${invite.code}** ${knownInvString ? `(${knownInvString})` : `from ${inviter} (${inviter.tag})`}. This invite has been used **${invite.uses}** times since its creation.`);
       }
       catch {
         logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined the server, but no invite information was available.`);
