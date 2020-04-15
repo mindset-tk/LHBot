@@ -45,6 +45,9 @@ If the bot is the only user in a voice channel when it finishes playback of the 
     // timeout checking
     let waitTime;
     const now = Date.now();
+    if (args.length < 1) {
+      return 'You didn\'t provide any arguments!';
+    }
     if (args[0].toLowerCase() == 'timeout' && message.member.roles.cache.has(config.roleStaff)) {
       if (args[1] == 0) {
         args[1] = 'stop';
