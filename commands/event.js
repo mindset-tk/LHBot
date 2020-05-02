@@ -29,7 +29,7 @@ if (global.eventData == null) {
 // We make writing state async because I found in testing
 // that it was fairly common when events were removed that the
 // JSON would get clobbered by multiple asynchronous writeFile commands,
-// especially when
+// especially when completing events
 async function writeEventState() {
     return fsp.writeFile(eventDataPath, JSON.stringify(global.eventData, null, 2));
 }
@@ -273,7 +273,7 @@ let eventManager;
 function embedEvent(event, options = {}) {
     const {title, description, forUser} = options;
 
-    const eventEmbed = new Discord.RichEmbed()
+    const eventEmbed = new Discord.MessageEmbed()
         .setTitle(title)
         .setDescription(
             description || `A message will be posted in <#${event.channel}> when this event starts.`
@@ -438,7 +438,7 @@ async function listCommand(message, client, timeZone) {
         )
         .join("\n");
 
-    const embed = new Discord.RichEmbed()
+    const embed = new Discord.MessageEmbed()
         .setTitle(`Upcoming events in ${message.guild.name}`)
         .setDescription(
             `
