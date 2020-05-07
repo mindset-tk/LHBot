@@ -191,6 +191,9 @@ async function restoreMessages(client, callback) {
   callback();
 }
 
+// This function actually only tabulates unique data for the previous month and earlier.
+// TODO: write a version within xlslog that will tabulate the current month *without* writing to json
+// (Writing to JSON would interfere with some data validation within this func.)
 async function uniqueUserCounter(client) {
   // get current month in YYYY-MM format
   const nowString = formatDate(new Date());
@@ -272,7 +275,10 @@ async function uniqueUserCounter(client) {
     for (const monthData of guildUsrMap) {
       const month = monthData[0];
       const monthUsrs = monthData[1];
-      guildMap.set(month, monthUsrs.length);
+      // this if statement guarantees that the bot won't overwrite previous month data if it somehow gains access to a channel after-the-fact.
+      if (!guildMap.has(month)) {
+        guildMap.set(month, monthUsrs.length);
+      }
     }
     global.dataLog[gID].guildUniqueUsers = [...guildMap];
     writeData();
