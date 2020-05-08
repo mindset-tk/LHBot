@@ -212,11 +212,12 @@ module.exports = {
       const colkey = msgLogSheet.getColumn(idx + 1).key;
       cumAvgMonthlyRow[colkey] = Math.round(accumulator / daysSinceFirstMonth);
     });
-    console.log(cumAvgMonthlyRow);
+    // console.log(cumAvgMonthlyRow);
     msgLogSheet.addRow(cumAvgMonthlyRow);
     msgLogSheet.getRow(msgLogSheet.rowCount).getCell(1).font = { bold: true };
 
-    xlsLog.xlsx.writeFile('./stats.xlsx');
+    // add 200ms wait if 0kb issues continue.
+    await xlsLog.xlsx.writeFile('./stats.xlsx');
     message.author.send({ files: ['./stats.xlsx'] });
   },
 };
