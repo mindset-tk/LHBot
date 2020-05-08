@@ -216,8 +216,8 @@ module.exports = {
     msgLogSheet.addRow(cumAvgMonthlyRow);
     msgLogSheet.getRow(msgLogSheet.rowCount).getCell(1).font = { bold: true };
 
-    // Make await/asyncable if 0kb upload issues recur.
-    xlsLog.xlsx.writeFile('./stats.xlsx');
+    // add 200ms wait if 0kb issues continue.
+    await xlsLog.xlsx.writeFile('./stats.xlsx');
     message.author.send({ files: ['./stats.xlsx'] });
   },
 };
