@@ -12,16 +12,19 @@ module.exports = {
   staffOnly: true,
   args: false,
   async execute(msg, args, client) {
+    if (global.currentlyCaching == 1) {return msg.channel.send('Sorry! I\'m busy with someone else\'s request. Please try again in a few minutes.'); }
+    global.currentlyCaching = 1;
     msg.author.send('Please wait a moment while I cache user data...');
     const now = new Date();
     const fakeMsgIdNow = (BigInt(now) - BigInt(1420070400000)) << BigInt(22);
     const usrMap = new Map;
     for (let g of await client.guilds.cache) {
       g = g[1];
+      const currentGuildUsrs = await g.members.cache;
       for (let gc of g.channels.cache) {
         gc = gc[1];
         if (gc.type === 'text' && gc.permissionsFor(g.me).has(['VIEW_CHANNEL', 'READ_MESSAGE_HISTORY'])) {
-          console.log(gc.name);
+          // console.log(gc.name);
           let oldestSeenMessage = fakeMsgIdNow;
           let prevLastSeen;
           let oldestMsg = fakeMsgIdNow;
@@ -32,8 +35,8 @@ module.exports = {
               if (messages.size > 0) {
                 for (let message of messages) {
                   message = message[1];
-                  // if the usrmap doesn't have the author at all, add them with value = message ID
-                  if (!usrMap.has(message.author.id) && !message.author.bot) {usrMap.set(message.author.id, message.id);}
+                  // if the usrmap doesn't have the author at all, add them with value = message ID, so long as they are still currently in the guild
+                  if (!usrMap.has(message.author.id) && !message.author.bot && currentGuildUsrs.has(message.author.id)) {usrMap.set(message.author.id, message.id);}
                   // if the usrmap has the author and the msgID stored is less than (older than) the one we're looking at, replace it.
                   if (!message.author.bot && (usrMap.get(message.author.id) < message.id)) {usrMap.set(message.author.id, message.id);}
                   if (message.id < oldestMsg) {oldestMsg = message.id;}
@@ -80,5 +83,6 @@ module.exports = {
     // await wait(200);
     msg.author.send({ files: ['./usrs.xlsx'] });
     // msg.channel.send(data.join('\n'));
+    global.currentlyCaching = 0;
   },
 };
