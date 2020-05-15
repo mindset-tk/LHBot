@@ -5,6 +5,7 @@
   "main": "bot.js",
   "dependencies": {
     "@discordjs/opus": "^0.1.0",
+    "console-stamp": "^0.2.9",
     "discord.js": "^12.1.1",
     "exceljs": "^3.8.2",
     "ffmpeg-static": "^4.0.1",
