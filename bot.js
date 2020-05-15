@@ -231,11 +231,10 @@ client.on('Resumed', async () => {
 
 // Connection error logging
 client.on('shardError', err => {
-  const date = new Date().toLocaleString();
-  // If the error is a network error, display error message.
-  console.log('[' + date + ']: Connection Error! The error was: "' + err.message + '". Will automatically attempt to reconnect.');
+  console.log('Connection Error! The error was: "' + err.message + '". Will automatically attempt to reconnect.');
 });
 
+// all other error logging
 client.on('error', err => {console.error(err);});
 
 client.on('guildMemberAdd', member => {
