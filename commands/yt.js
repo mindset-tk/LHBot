@@ -120,74 +120,91 @@ If the bot is the only user in a voice channel when it finishes playback of the 
     }
 
     function playSong(queue) {
-      message.guild.musicData.voiceChannel.join().then(connection =>{
-        const dispatcher = connection
-          .play(
-            ytdl(queue[0].url, {
+      message.guild.musicData.voiceChannel.join().then(connection => {
+        try {
+          const dispatcher = connection
+            .play(
+              ytdl(queue[0].url, {
               // pass the url to .ytdl()
-              quality: 'highestaudio',
-              // download part of the song before playing it
-              // helps reduces stuttering
-              highWaterMark: 1024 * 1024 * 10,
-            }),
-          )
-          .on('start', () => {
-            message.guild.musicData.songDispatcher = dispatcher;
-            message.guild.musicData.songDispatcher.pausedTime = null;
-            dispatcher.setVolume(message.guild.musicData.volume);
-            const videoEmbed = new Discord.MessageEmbed()
-              .setThumbnail(queue[0].thumbnail)
-              .setColor('#e9f931')
-              .addField('Now Playing:', queue[0].title)
-              .addField('Duration:', queue[0].duration);
-            // also display next song title, if there is one in queue
-            if (queue[1]) videoEmbed.addField('Next Song:', queue[1].title);
-            message.guild.musicData.voiceTextChannel.send(videoEmbed);
-            // dequeue the song.
-            return message.guild.musicData.nowPlaying = queue.shift();
-          })
-          .on('finish', async () => {
+                quality: 'highestaudio',
+                // download 10MB of the song before playing it
+                // helps reduces stuttering
+                highWaterMark: 1024 * 1024 * 10,
+              }),
+            )
+            .on('start', () => {
+              message.guild.musicData.songDispatcher = dispatcher;
+              message.guild.musicData.songDispatcher.pausedTime = null;
+              dispatcher.setVolume(message.guild.musicData.volume);
+              const videoEmbed = new Discord.MessageEmbed()
+                .setThumbnail(queue[0].thumbnail)
+                .setColor('#e9f931')
+                .addField('Now Playing:', queue[0].title)
+                .addField('Duration:', queue[0].duration);
+              // also display next song title, if there is one in queue
+              if (queue[1]) videoEmbed.addField('Next Song:', queue[1].title);
+              message.guild.musicData.voiceTextChannel.send(videoEmbed);
+              // dequeue the song.
+              return message.guild.musicData.nowPlaying = queue.shift();
+            })
+            .on('finish', async () => {
             // if there are more songs in queue, continue playing
-            const VCUsersNotMe = [];
-            message.guild.musicData.voiceChannel.members.forEach((value, key) => {
-              if (key != client.user.id) {
-                VCUsersNotMe.push(key);
+              const VCUsersNotMe = [];
+              message.guild.musicData.voiceChannel.members.forEach((value, key) => {
+                if (key != client.user.id) {
+                  VCUsersNotMe.push(key);
+                }
+              });
+              if (queue.length >= 1 && VCUsersNotMe.length > 0) {
+                return playSong(queue);
               }
-            });
-            if (queue.length >= 1 && VCUsersNotMe.length > 0) {
-              return playSong(queue);
-            }
-            // else if there are no more songs in queue, leave the voice channel after 60 seconds.
-            else {
-              message.guild.musicData.volume = 0.2;
-              message.guild.musicData.songDispatcher = null;
-              message.guild.musicData.nowPlaying = null;
-              message.guild.musicData.isPlaying = false;
-              if (VCUsersNotMe.length == 0) {
-                message.guild.musicData.voiceTextChannel.send('Seems like nobody is listening. Goodbye!');
-                message.guild.musicData.voiceChannel.leave();
+              // else if there are no more songs in queue, leave the voice channel after 60 seconds.
+              else {
+                message.guild.musicData.songDispatcher = null;
+                message.guild.musicData.nowPlaying = null;
+                message.guild.musicData.isPlaying = false;
+                if (VCUsersNotMe.length == 0) {
+                  message.guild.musicData.volume = 0.2;
+                  message.guild.musicData.voiceTextChannel.send('Seems like nobody is listening. Goodbye!');
+                  message.guild.musicData.voiceChannel.leave();
+                }
+                await wait(60000);
+                if (!message.guild.musicData.isPlaying) {
+                  message.guild.musicData.volume = 0.2;
+                  return message.guild.musicData.voiceChannel.leave();
+                }
               }
-              await wait(60000);
-              if (!message.guild.musicData.isPlaying) {
+            })
+            .on('error', e => {
+              if (queue[0].title) {
+                message.guild.musicData.voiceTextChannel.send(`Could not play ${queue[0].title}. See console log for details. Skipping to next song...`);
+              }
+              console.error('Error Details: ', e);
+              if (message.guild.musicData.nowPlaying) console.error('Song playing at time of error: ', message.guild.musicData.nowPlaying);
+              if (queue[0]) console.error('Video at top of queue: ', queue[0]);
+              queue.shift();
+              if (queue.length >= 1) {
+                return playSong(queue);
+              }
+              else {
+                message.guild.musicData.isPlaying = false;
+                message.guild.musicData.volume = 0.2;
+                message.guild.musicData.songDispatcher = null;
+                message.guild.musicData.nowPlaying = null;
                 return message.guild.musicData.voiceChannel.leave();
               }
-            }
-          })
-          .on('error', e => {
-            if (queue[0].title) {
-              message.guild.musicData.voiceTextChannel.send(`Could not play ${queue[0].title}. See console log for details. Skipping to next song...`);
-            }
-            queue.shift();
-            console.error(e);
-            if (queue.length >= 1) {
-              return playSong(queue);
-            }
-            else {
-              message.guild.musicData.isPlaying = false;
-              return message.guild.musicData.voiceChannel.leave();
-            }
-          });
-      }).catch(err => console.log(err));
+            });
+        }
+        catch(err) {
+          message.guild.musicData.voiceTextChannel.send('Whoops, there was an error in playback. Check console log for details.  Resetting youtube queue.');
+          console.log('Video playback error!', err);
+          message.guild.musicData.volume = 0.2;
+          message.guild.musicData.songDispatcher = null;
+          message.guild.musicData.nowPlaying = null;
+          message.guild.musicData.isPlaying = false;
+          return message.guild.musicData.voiceChannel.leave();
+        }
+      });
     }
 
     const query = args.join(' ');
@@ -203,8 +220,14 @@ If the bot is the only user in a voice channel when it finishes playback of the 
     if (query.match(isVideo) && args.length == 1) {
       // Setting up song info object.
       // First, get the video data and insert it into a new song object
-      const video = await YT.getVideoByID(query.match(isVideo)[1]);
-      const url = video.url;
+      let video;
+      try { video = await YT.getVideoByID(query.match(isVideo)[1]); }
+      catch { return message.channel.send('I couldn\'t find a video at that URL. Perhaps there is a typo, or the video is private or deleted.'); }
+      if (!video.id) {
+        console.log('Error parsing video. Video object:\n', video);
+        return message.channel.send('Something went wrong retrieving that video, but if you try again it may work. See console log for details.');
+      }
+      const url = `https://www.youtube.com/watch?v=${video.id}`;
       const title = video.title;
       let duration = formatDuration(video.duration);
       const thumbnail = video.thumbnails.high.url;
