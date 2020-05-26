@@ -8,12 +8,12 @@
     "console-stamp": "^0.2.9",
     "discord.js": "^12.1.1",
     "exceljs": "^3.8.2",
-    "ffmpeg-static": "^4.0.1",
+    "ffmpeg-static": "^4.2.2",
     "fs": "0.0.1-security",
+    "moment-timezone": "^0.5.28",
     "simple-youtube-api": "^5.2.1",
     "ytdl": "^1.2.0",
-    "ytdl-core": "^2.0.1",
-    "moment-timezone": "^0.5.28"
+    "ytdl-core": "^2.1.5"
   },
   "devDependencies": {},
   "scripts": {
