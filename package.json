@@ -12,11 +12,14 @@
     "fs": "0.0.1-security",
     "simple-youtube-api": "^5.2.1",
     "ytdl": "^1.2.0",
-    "ytdl-core": "^2.0.1"
+    "ytdl-core": "^2.0.1",
+    "moment-timezone": "^0.5.28"
   },
   "devDependencies": {},
   "scripts": {
-    "test": "ping"
+    "test": "ping",
+    "watch": "nodemon -e js . bot.js",
+    "debug": "nodemon --inspect -e js . bot.js"
   },
   "author": "Mindset",
   "license": "ISC",

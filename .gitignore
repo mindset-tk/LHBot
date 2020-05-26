@@ -4,6 +4,7 @@ config.json
 gamelist.json
 counting.json
 datalog.json
-*.csv
+events.json
+*CSV*
 .editorconfig
 *.xlsx
