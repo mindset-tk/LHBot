@@ -11,6 +11,7 @@
     "ffmpeg-static": "^4.2.2",
     "fs": "0.0.1-security",
     "moment-timezone": "^0.5.28",
+    "node-fetch": "^2.6.0",
     "simple-youtube-api": "^5.2.1",
     "ytdl": "^1.2.0",
     "ytdl-core": "^2.1.5"

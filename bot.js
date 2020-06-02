@@ -9,6 +9,7 @@ const wait = require('util').promisify(setTimeout);
 const listPath = './gamelist.json';
 const gameList = require(listPath);
 const dataLogger = require('./datalog.js');
+const fetch = require('node-fetch');
 
 Discord.Structures.extend('Guild', Guild => {
   class MusicGuild extends Guild {
@@ -85,11 +86,32 @@ client.login(config.authtoken);
 
 // command parser
 client.on('message', async message => {
+
+  // console.log(message.author);
   // only do datalogging on non-DM text channels. Don't log messages while offline retrieval is proceeding.
   // (offline logging will loop and catch new messages on the fly.)
   if (message.channel.type === 'text' && dataLogLock != 1) { dataLogger.OnMessage(message); }
   if(Counting.HandleMessage(message)) {
     return;
+  }
+  // handler for PK user messages, so they can use bot commands.
+  if (message.author.bot) {
+    const pkAPIurl = 'https://api.pluralkit.me/v1/msg/' + message.id;
+    let pkResponse = await fetch(pkAPIurl);
+    if (pkResponse.headers.get('content-type').includes('application/json')) {
+      // normally message.member isn't writeable (for good reason), so we have to change that
+      Object.defineProperty(message, 'member', {
+        writable: true,
+      });
+      pkResponse = await pkResponse.json();
+      // set message author to NOT be a bot.
+      message.author.bot = false;
+      console.log(await message.guild.members.fetch(pkResponse.sender));
+      await message.guild.members.fetch(pkResponse.sender).then(pkMbrData => message.member = pkMbrData);
+      // now the message object doesn't look like a bot, and the message.member property holds data for the discord account
+      // that caused the PK request to occur.
+      // message.author will still contain the PK webhook username, so we'll use that for @mentions in commands when possible.
+    }
   }
   // prevent parsing commands without correct prefix, from bots, and from non-staff non-comrades.
   if (!message.content.startsWith(config.prefix) || message.author.bot) return;
