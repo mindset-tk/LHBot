@@ -7,6 +7,7 @@ if(global.countingData == null) {
 }
 const validCountRegex = /^[0-9]+$/;
 let countingChannel = null;
+let offlineCheckComplete = false;
 
 function WriteState() {
   fs.writeFile(countingDataPath, JSON.stringify(global.countingData, null, 2), function(err) {
@@ -47,10 +48,10 @@ function CheckNextMessage(message) {
 
   const lastCountersSize = global.countingData.lastCounters.length;
 
-  if(lastCountersSize > 0 && global.countingData.lastCounters[lastCountersSize - 1] == message.author.id) {
-    FailCounting(message, `Counting failed because user counted twice: ${message.author}`);
-    return BuildBotMessage(message.author, config.countingFailRepeatMessages);
-  }
+//  if(lastCountersSize > 0 && global.countingData.lastCounters[lastCountersSize - 1] == message.author.id) {
+//    FailCounting(message, `Counting failed because user counted twice: ${message.author}`);
+//    return BuildBotMessage(message.author, config.countingFailRepeatMessages);
+//  }
 
   global.countingData.lastCount = nextNumber;
   global.countingData.lastMessage = message.id;
@@ -114,7 +115,10 @@ function CheckMessages(messages) {
     }
     countingChannel.send(outputMessages);
   }
-  console.log(`Resuming counting from ${global.countingData.lastCount}`);
+  if(messages.size == 0) {
+    console.log(`Resuming counting from ${global.countingData.lastCount}`);
+    offlineCheckComplete = true;
+  }
   WriteState();
 }
 
@@ -135,15 +139,21 @@ function RestoreCountingState(client) {
 
   var queryOptions = {};
 
-  if (global.countingData.lastMessage == null) {
-    queryOptions.limit = 100;
-  }
-  else {
-    queryOptions.after = global.countingData.lastMessage;
-  }
+  while(offlineCheckComplete == false) {
 
-  countingChannel.messages.fetch(queryOptions)
-    .then(messages => CheckMessages(messages));
+    console.log('Checking offline messages');
+
+    if (global.countingData.lastMessage == null) {
+      queryOptions.limit = 100;
+    }
+    else {
+      queryOptions.after = global.countingData.lastMessage;
+    }
+
+    countingChannel.messages.fetch(queryOptions)
+      .then(messages => CheckMessages(messages))
+      .catch(offlineCheckComplete = true);
+  }
 }
 
 function InitConfig(lrConfig) {
