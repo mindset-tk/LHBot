@@ -176,10 +176,8 @@ If the bot is the only user in a voice channel when it finishes playback of the 
               }
             })
             .on('error', e => {
-              if (queue[0].title) {
-                message.guild.musicData.voiceTextChannel.send(`Could not play ${queue[0].title}. See console log for details. Skipping to next song...`);
-              }
-              console.error('Error Details: ', e);
+              message.guild.musicData.voiceTextChannel.send('Error playing a song. See console log for details. Skipping to next song...');
+              console.error('Youtube playback error! Error Details: ', e);
               if (message.guild.musicData.nowPlaying) console.error('Song playing at time of error: ', message.guild.musicData.nowPlaying);
               if (queue[0]) console.error('Video at top of queue: ', queue[0]);
               queue.shift();
