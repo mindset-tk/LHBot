@@ -48,10 +48,10 @@ function CheckNextMessage(message) {
 
   const lastCountersSize = global.countingData.lastCounters.length;
 
-//  if(lastCountersSize > 0 && global.countingData.lastCounters[lastCountersSize - 1] == message.author.id) {
-//    FailCounting(message, `Counting failed because user counted twice: ${message.author}`);
-//    return BuildBotMessage(message.author, config.countingFailRepeatMessages);
-//  }
+  if(lastCountersSize > 0 && global.countingData.lastCounters[lastCountersSize - 1] == message.author.id) {
+    FailCounting(message, `Counting failed because user counted twice: ${message.author}`);
+    return BuildBotMessage(message.author, config.countingFailRepeatMessages);
+  }
 
   global.countingData.lastCount = nextNumber;
   global.countingData.lastMessage = message.id;
