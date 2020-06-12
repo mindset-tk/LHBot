@@ -17,9 +17,7 @@ function writeCounting() {
 
 module.exports = {
   name: 'config',
-  description: `Access configuration options for this bot.
-**${config.prefix}config** - initiate a chat process to update the bot's configurable settings.
-**${config.prefix}config list** - review current settings.`,
+  description: 'Access configuration options for this bot.',
   usage: '',
   cooldown: 3,
   guildOnly: true,
@@ -111,35 +109,45 @@ module.exports = {
         // this method creates a collection; since there is only one entry we get the data from collected.first
         .then(collected => reply = collected.first())
         .catch(collected => message.channel.send('Sorry, I waited 30 seconds with no response, please run the command again.'));
-      console.log('Reply processed...');
+      // console.log('Reply processed...');
       return reply;
     }
 
+    function outputConfig() {
+      const ignoreChans = [];
+      config.pinIgnoreChannels.forEach(chanID => ignoreChans.push(getChannelName(chanID)));
+      return `Here's my current configuration:
+__General settings__
+Command prefix: **${config.prefix}**
+Staff role: **@${getRoleName(config.roleStaff)}**
+Member role: **@${getRoleName(config.roleComrade)}**
+
+__Special Channels:__
+User join/exit notifications: **${config.invLogToggle ? ('#' + getChannelName(config.channelInvLogs)) : 'off.'}**
+Counting: **${config.countingToggle ? ('#' + getChannelName(config.countingChannelId)) : 'off.'}**
+Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}**
+
+__Pins:__
+Pin reacts needed to pin a message: **${config.pinsToPin}**
+Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + ignoreChans.join(', #') : 'None'}**`;
+    }
     // initialize disallowed prefix characters. None of these will be permitted in any part of the command prefix.
     const disallowedPrefix = ['@', '#', '/', '\\', '\\\\', '*', '~', '_'];
 
     if (args[0] && args[0].toLowerCase() == 'list' && args.length == 1) {
-      const ignoreChans = [];
-      config.pinIgnoreChannels.forEach(chanID => ignoreChans.push(getChannelName(chanID)));
-      return message.channel.send(`Here's my current configuration:
-__General settings__
-**Command prefix:** ${config.prefix}
-**Staff role:** @${getRoleName(config.roleStaff)}
-**Member role:** @${getRoleName(config.roleComrade)}
-
-__Special Channels:__
-**User join/exit notifications:** ${config.invLogToggle ? ('#' + getChannelName(config.channelInvLogs)) : 'off.'}
-**Counting:** ${config.countingToggle ? ('#' + getChannelName(config.countingChannelId)) : 'off.'}
-**Bot channel:** ${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}
-
-__Pins:__
-**Pin reacts needed to pin a message:** ${config.pinsToPin}
-**Channel(s) to ignore for pinning:** ${(config.pinIgnoreChannels[0]) ? '#' + ignoreChans.join(', #') : 'None'}
-To change these settings, staff can type  ${config.prefix}config.`);
+      return message.channel.send(outputConfig());
     }
     else if (args[0]) { return message.channel.send('I\'m sorry but I couldn\'t parse `' + args.join(' ') + '`');}
     // if command has no args, start the chat wizard to modify commands.
     else {
+      message.channel.send(outputConfig() + '\n\n**Would you like to change any of these settings? (Y/N)**');
+      let reply = await msgCollector();
+      if (reply.content.toLowerCase() == 'n' || reply.content.toLowerCase() == 'no') {
+        return message.channel.send('OK!');
+      }
+      else if (reply.content.toLowerCase() != 'y' && reply.content.toLowerCase() != 'yes') {
+        return message.channel.send(`Sorry, please answer Y or N. Type ${config.prefix}config to try again.`);
+      }
       // new iterator
       let i = 0;
       const msgData = [];
@@ -150,7 +158,7 @@ To change these settings, staff can type  ${config.prefix}config.`);
         msgData.push(`${i}. ${prop[1]}`);
       });
       message.channel.send(`Which item would you like to change?\n${msgData.join('\n')}\nType 0 to cancel.`);
-      let reply = await msgCollector();
+      reply = await msgCollector();
       if (!reply) { return; }
       else if (reply.content == 0) { return message.channel.send('Canceling!');}
       else if (!parseInt(reply.content)) { return message.channel.send('Sorry, I couldn\'t parse that. Please answer with only the number of your response.'); }
