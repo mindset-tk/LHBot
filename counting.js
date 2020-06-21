@@ -37,19 +37,19 @@ function CheckNextMessage(message) {
   const numberString = Number(nextNumber).toString();
   // console.log(message);
   if(!validCountRegex.test(message.content)) {
-    FailCounting(message, `Counting failed because invalid attempt: ${message} expected ${numberString}`);
+    FailCounting(message, `Counting failed because invalid attempt: ${message} expected ${numberString}. MsgID: ${message.id}, Author: ${message.author.tag}`);
     return BuildBotMessage(message.author, config.countingFailMessages);
   }
 
   if(global.countingData.lastCount != null && message.content.localeCompare(numberString) != 0) {
-    FailCounting(message, `Counting failed because out of order: ${message} expected ${numberString}`);
+    FailCounting(message, `Counting failed because out of order: ${message} expected ${numberString}. MsgID: ${message.id}, Author: ${message.author.tag}`);
     return BuildBotMessage(message.author, config.countingFailMessages);
   }
 
   const lastCountersSize = global.countingData.lastCounters.length;
 
   if(lastCountersSize > 0 && global.countingData.lastCounters[lastCountersSize - 1] == message.author.id) {
-    FailCounting(message, `Counting failed because user counted twice: ${message.author}`);
+    FailCounting(message, `Counting failed because user counted twice: ${message.author.tag}`);
     return BuildBotMessage(message.author, config.countingFailRepeatMessages);
   }
 
