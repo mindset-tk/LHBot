@@ -609,8 +609,10 @@ async function createCommand(message, args, client) {
     role = await message.guild.roles.create({
       data: {
         name: `Event - ${name}`,
-        permissions: 0, // Event roles shouldn't grant any inherent permissions
-        mentionable: true, // Roles should definitely be mentionable
+        // Event roles shouldn't grant any inherent permissions
+        permissions: 0,
+        // Event roles should definitely be mentionable
+        mentionable: true,
       },
       reason: `Event role created on behalf of <@${message.author.id}>`,
     });
@@ -932,7 +934,7 @@ async function updateInfoPostCommand(message, client, retry = false) {
 }
 
 module.exports = {
-  name: 'event',
+  name: 'eventswiz',
   description: 'Allows people on a server to participate in events',
   usage: `create [YYYY/MM/DD|MM/DD|today|tomorrow] [HH:mm] [name] to create a new event
 ${config.prefix}event join [name] to join an event
@@ -947,7 +949,8 @@ ${config.prefix}event tz [name] to get/set your default timezone`,
   staffOnly: false,
   args: true,
   async execute(message, args, client) {
-    let [subcommand, ...cmdArgs] = args;
+    // this is the segment that is being replaced by a wizard.
+    /* let [subcommand, ...cmdArgs] = args;
     subcommand = subcommand.toLowerCase();
     switch (subcommand) {
     case 'add':
@@ -980,7 +983,7 @@ ${config.prefix}event tz [name] to get/set your default timezone`,
       return message.channel.send(
         `Unknown subcommand '${subcommand}'. See help for usage.`,
       );
-    }
+    } */
   },
   init(client) {
     // Ensure the client is ready so that event catch-up doesn't fail

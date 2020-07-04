@@ -41,7 +41,8 @@ module.exports = {
       ['voiceTextChannelIds', 'Text channel(s) for voice commands', 'channelArray'],
       ['pinsToPin', 'Number of pin reacts to pin a message', 'integer'],
       ['pinIgnoreChannels', 'Channel(s) to ignore for pinning', 'channelArray'],
-      ['botChannelId', 'Bot stuff channel', 'channel']];
+      ['botChannelId', 'Bot stuff channel', 'channel'],
+      ['eventInfoChannelId', 'Event announce channel', 'channel']];
     // declaring some useful functions.
     // function to pretty print the config data so that arrays show on one line, so it's easier to visually parse the config file when hand opening it. Purely cosmetic.
     function prettyPrintConfig() {
@@ -125,7 +126,8 @@ Member role: **@${getRoleName(config.roleComrade)}**
 __Special Channels:__
 User join/exit notifications: **${config.invLogToggle ? ('#' + getChannelName(config.channelInvLogs)) : 'off.'}**
 Counting: **${config.countingToggle ? ('#' + getChannelName(config.countingChannelId)) : 'off.'}**
-Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}**
+Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}** (Note: does nothing at this time)
+Event announcement channel: **${config.eventInfoChannelId ? ('#' + getChannelName(config.eventInfoChannelId)) : 'not set.'}**
 
 __Pins:__
 Pin reacts needed to pin a message: **${config.pinsToPin}**
