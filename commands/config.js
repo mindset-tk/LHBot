@@ -208,7 +208,7 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
           replyContent += ' Please #mention the channel you would like it changed to, or copy/paste the channel ID.';
           message.channel.send(replyContent);
           reply = await msgCollector();
-          const newChannel = getChannel(reply.content);
+          const newChannel = await getChannel(reply.content);
           if (newChannel) {
             config[changeName] = newChannel.id;
             writeConfig();
