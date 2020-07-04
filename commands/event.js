@@ -18,6 +18,7 @@ const DEFAULT_EVENT_DATA = {
   events: {},
   userTimeZones: {},
   finishedRoles: [],
+  eventInfoMessage: {},
 };
 
 // Events that finished more than this time ago will have their roles deleted
@@ -442,7 +443,19 @@ async function createCommand(message, args, client) {
   }
 
   // Process date and time separately for better error handling
-  const datePart = moment.tz(date, dateInputFormats, true, timeZone);
+
+  // Handle 'special' date values
+  let datePart
+  switch (date.toLowerCase()) {
+    case 'today':
+      datePart = moment.tz(moment(), dateInputFormats, true, timeZone);
+      break;
+    case 'tomorrow':
+      datePart = moment.tz(moment().add(1, 'd'), dateInputFormats, true, timeZone);
+      break;
+    default:
+      datePart = moment.tz(date, dateInputFormats, true, timeZone);
+  }
 
   if (!datePart.isValid()) {
     return message.channel.send(
