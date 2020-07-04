@@ -125,13 +125,13 @@ If the bot is the only user in a voice channel when it finishes playback of the 
           const dispatcher = connection
             .play(
               ytdl(queue[0].url, {
-              // pass the url to .ytdl()
+                // pass the url to .ytdl()
                 quality: 'highestaudio',
-                // download 10MB of the song before playing it
-                // helps reduces stuttering
-                highWaterMark: 1024 * 1024 * 10,
+                // buffer 32MB prior to playing.
+                highWaterMark: 1024 * 1024 * 32,
               }),
-            )
+              // set the discord.js highWaterMark to 1; it's not needed versus ytdl's and seems to cause some stutter issues.
+              { highWaterMark: 1 })
             .on('start', () => {
               message.guild.musicData.songDispatcher = dispatcher;
               message.guild.musicData.songDispatcher.pausedTime = null;
@@ -140,7 +140,9 @@ If the bot is the only user in a voice channel when it finishes playback of the 
                 .setThumbnail(queue[0].thumbnail)
                 .setColor('#e9f931')
                 .addField('Now Playing:', queue[0].title)
-                .addField('Duration:', queue[0].duration);
+                .addField('Duration:', queue[0].duration)
+                .addField('Added by:', queue[0].addedBy)
+                .addField('Link:', queue[0].url);
               // also display next song title, if there is one in queue
               if (queue[1]) videoEmbed.addField('Next Song:', queue[1].title);
               message.guild.musicData.voiceTextChannel.send(videoEmbed);
@@ -176,10 +178,8 @@ If the bot is the only user in a voice channel when it finishes playback of the 
               }
             })
             .on('error', e => {
-              if (queue[0].title) {
-                message.guild.musicData.voiceTextChannel.send(`Could not play ${queue[0].title}. See console log for details. Skipping to next song...`);
-              }
-              console.error('Error Details: ', e);
+              message.guild.musicData.voiceTextChannel.send('Error playing a song. See console log for details. Skipping to next song...');
+              console.error('Youtube playback error! Error Details: ', e);
               if (message.guild.musicData.nowPlaying) console.error('Song playing at time of error: ', message.guild.musicData.nowPlaying);
               if (queue[0]) console.error('Video at top of queue: ', queue[0]);
               queue.shift();
@@ -229,6 +229,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
       }
       const url = `https://www.youtube.com/watch?v=${video.id}`;
       const title = video.title;
+      const addedBy = message.member.nickname ? message.member.nickname : message.author.username;
       let duration = formatDuration(video.duration);
       const thumbnail = video.thumbnails.high.url;
       if (duration == '00:00') duration = 'Live Stream';
@@ -237,10 +238,12 @@ If the bot is the only user in a voice channel when it finishes playback of the 
         title,
         duration,
         thumbnail,
+        addedBy,
       };
       // push the song into the queue.
       message.guild.musicData.queue.push(song);
-
+      // delete the original message to save space.
+      message.delete();
       // not using YT playlists so this is debug stuff for now.
       // let playlist = null;
       // if (query.match(isVideo)[2]) { playlist = await YT.getPlaylistByID(query.match(isVideo)[2]); }
@@ -260,7 +263,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
       }
       // if something is already playing
       else if (message.guild.musicData.isPlaying == true) {
-        return message.channel.send(`:musical_note:  ${song.title} :musical_note: has been added to queue!`);
+        return message.channel.send(`${addedBy} added :musical_note: ${song.title} :musical_note: to the queue!`);
       }
     }
     if ((query.match(isPlaylist) || query.match(isPlaylist)) && args.length > 1) { return message.channel.send(`Too many arguments! Please try **${config.prefix}help yt** for help.`); }

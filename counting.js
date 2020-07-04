@@ -7,6 +7,7 @@ if(global.countingData == null) {
 }
 const validCountRegex = /^[0-9]+$/;
 let countingChannel = null;
+let offlineCheckComplete = false;
 
 function WriteState() {
   fs.writeFile(countingDataPath, JSON.stringify(global.countingData, null, 2), function(err) {
@@ -36,19 +37,19 @@ function CheckNextMessage(message) {
   const numberString = Number(nextNumber).toString();
   // console.log(message);
   if(!validCountRegex.test(message.content)) {
-    FailCounting(message, `Counting failed because invalid attempt: ${message} expected ${numberString}`);
+    FailCounting(message, `Counting failed because invalid attempt: ${message} expected ${numberString}. MsgID: ${message.id}, Author: ${message.author.tag}`);
     return BuildBotMessage(message.author, config.countingFailMessages);
   }
 
   if(global.countingData.lastCount != null && message.content.localeCompare(numberString) != 0) {
-    FailCounting(message, `Counting failed because out of order: ${message} expected ${numberString}`);
+    FailCounting(message, `Counting failed because out of order: ${message} expected ${numberString}. MsgID: ${message.id}, Author: ${message.author.tag}`);
     return BuildBotMessage(message.author, config.countingFailMessages);
   }
 
   const lastCountersSize = global.countingData.lastCounters.length;
 
   if(lastCountersSize > 0 && global.countingData.lastCounters[lastCountersSize - 1] == message.author.id) {
-    FailCounting(message, `Counting failed because user counted twice: ${message.author}`);
+    FailCounting(message, `Counting failed because user counted twice: ${message.author.tag}`);
     return BuildBotMessage(message.author, config.countingFailRepeatMessages);
   }
 
@@ -114,7 +115,10 @@ function CheckMessages(messages) {
     }
     countingChannel.send(outputMessages);
   }
-  console.log(`Resuming counting from ${global.countingData.lastCount}`);
+  if(messages.size == 0) {
+    console.log(`Resuming counting from ${global.countingData.lastCount}`);
+    offlineCheckComplete = true;
+  }
   WriteState();
 }
 
@@ -135,15 +139,21 @@ function RestoreCountingState(client) {
 
   var queryOptions = {};
 
-  if (global.countingData.lastMessage == null) {
-    queryOptions.limit = 100;
-  }
-  else {
-    queryOptions.after = global.countingData.lastMessage;
-  }
+  while(offlineCheckComplete == false) {
 
-  countingChannel.messages.fetch(queryOptions)
-    .then(messages => CheckMessages(messages));
+    console.log('Checking offline messages');
+
+    if (global.countingData.lastMessage == null) {
+      queryOptions.limit = 100;
+    }
+    else {
+      queryOptions.after = global.countingData.lastMessage;
+    }
+
+    countingChannel.messages.fetch(queryOptions)
+      .then(messages => CheckMessages(messages))
+      .catch(offlineCheckComplete = true);
+  }
 }
 
 function InitConfig(lrConfig) {
