@@ -120,7 +120,7 @@ client.on('message', async message => {
   const args = message.content.slice(config.prefix.length).split(/ +/);
   let commandName = args.shift().toLowerCase();
 
-  // handle using help as an argument
+  // handle using help as an argument - transpose '!command help' to !help command
   if (args[0] && args[0].toLowerCase() === 'help') {
     args.length = 1;
     args[0] = commandName;
