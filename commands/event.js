@@ -73,7 +73,7 @@ function getTimeZoneFromUserInput(timeZone) {
 }
 
 function formatDateCalendar(date, timeZone) {
-  return date.tz(getTimeZoneFromUserInput(timeZone)).calendar();
+  return date.tz(getTimeZoneFromUserInput(timeZone)).format('llll');
 }
 
 function isValidTimeZone(timeZone) {
@@ -87,9 +87,14 @@ function getGuildTimeZone(guild) {
   return getTimeZoneFromUserInput(guildZone) || moment.tz.guess();
 }
 
-function getUserTimeZone(message) {
+function getAuthorTimeZone(message) {
   const userZone = global.eventData.userTimeZones[message.author.id];
   return getTimeZoneFromUserInput(userZone) || getGuildTimeZone(message.guild);
+}
+
+function getUserTimeZone(user, guild) {
+  const userZone = global.eventData.userTimeZones[user.id];
+  return getTimeZoneFromUserInput(userZone) || getGuildTimeZone(guild);
 }
 
 async function setGuildTimeZone(guild, timeZone) {
@@ -515,6 +520,9 @@ function embedEvent(event, guild, options = {}) {
     .addField('Channel', `<#${event.channel}>`)
     .addField('Event role', `<@&${event.role}>`)
     .setTimestamp(event.due);
+  if (event.description) {
+    eventEmbed.addField('Description', event.description);
+  }
 
   if (role) {
     eventEmbed.addField('Participants', `${role.members.keyArray().length}`);
@@ -532,14 +540,40 @@ function embedEvent(event, guild, options = {}) {
   return eventEmbed;
 }
 
+// version of embedEvent modified for the DM session during event creation.
+function DMembedEvent(event, guild, options = {}) {
+  // formatDateCalendar(moment(event.due), timeZone)
+  const { title, description, forUser } = options;
+  // const owner = ;
+  const timeZone = getUserTimeZone(forUser, guild);
+  const eventEmbed = new Discord.MessageEmbed()
+    .setTitle(title)
+    .setDescription(
+      description ||
+        `A message will be posted in <#${event.channel}> when this event starts. ` +
+          `Users can join this event with '${config.prefix}event join ${event.name}'.`,
+    )
+    .addField('Event name', event.name)
+    .addField('Event time', `${formatDateCalendar(moment(event.due), timeZone)} ${getTimeZoneCanonicalDisplayName(timeZone)}`)
+    .addField('Creator', `<@${event.owner}>`)
+    .addField('Channel', `<#${event.channel}>`)
+    .setFooter('Event')
+    .setTimestamp(event.due.toISOString());
+  if (event.description) {
+    eventEmbed.addField('Description', event.description);
+  }
+  eventEmbed.addField('Event role', `@Event - ${event.name}`);
+  return eventEmbed;
+}
+
 async function createCommand(message, args, client) {
   const [date, time, ...nameParts] = args;
   const name = nameParts.join(' ');
   // 1 minute from now
-  const timeZone = getUserTimeZone(message);
+  const timeZone = getAuthorTimeZone(message);
   const minimumDate = moment.tz(timeZone).add('1', 'minutes');
 
-  if (eventManager.getByName(message.guild, name)) {
+  if (eventManager.getByName(message.guild.id, name)) {
     return message.channel.send(`An event called '${name}' already exists.`);
   }
 
@@ -609,8 +643,10 @@ async function createCommand(message, args, client) {
     role = await message.guild.roles.create({
       data: {
         name: `Event - ${name}`,
-        permissions: 0, // Event roles shouldn't grant any inherent permissions
-        mentionable: true, // Roles should definitely be mentionable
+        // Event roles shouldn't grant any inherent permissions
+        permissions: 0,
+        // Event roles should definitely be mentionable
+        mentionable: true,
       },
       reason: `Event role created on behalf of <@${message.author.id}>`,
     });
@@ -714,7 +750,7 @@ async function infoCommand(message, client, name) {
 }
 
 async function listCommand(message, client, timeZone) {
-  timeZone = getTimeZoneFromUserInput(timeZone) || getUserTimeZone(message);
+  timeZone = getTimeZoneFromUserInput(timeZone) || getAuthorTimeZone(message);
 
   if (!isValidTimeZone(timeZone)) {
     return message.channel.send(
@@ -802,7 +838,7 @@ async function servertzCommand(message, client, timeZone) {
 
 async function tzCommand(message, client, timeZone) {
   if (!timeZone) {
-    const defaultTimeZone = getUserTimeZone(message);
+    const defaultTimeZone = getAuthorTimeZone(message);
     return message.channel.send(
       `<@${
         message.author.id
@@ -931,28 +967,341 @@ async function updateInfoPostCommand(message, client, retry = false) {
   }
 }
 
+// function to create a message collector after recieving a message.
+async function msgCollector(message) {
+  // let responses = 0;
+  let reply = false;
+  // create a filter to ensure output is only accepted from the author who initiated the command.
+  const filter = input => (input.author.id === message.author.id);
+  await message.channel.awaitMessages(filter, { max: 1, time: 30000, errors: ['time'] })
+    // this method creates a collection; since there is only one entry we get the data from collected.first
+    .then(collected => reply = collected.first())
+    .catch(collected => message.channel.send('Sorry, I waited 30 seconds with no response, please run the command again.'));
+  // console.log('Reply processed...');
+  return reply;
+}
+
+async function DMCollector(DMChannel) {
+  // let responses = 0;
+  let reply = false;
+  // awaitmessages needs a filter but we're just going to accept the first reply it gets.
+  const filter = m => (m.author.id === DMChannel.recipient.id);
+  await DMChannel.awaitMessages(filter, { max: 1, time: 60000, errors: ['time'] })
+    // this method creates a collection; since there is only one entry we get the data from collected.first
+    .then(collected => reply = collected.first())
+    .catch(collected => DMChannel.send('Sorry, I waited 60 seconds with no response. You will need to start over.'));
+  // console.log('Reply processed...');
+  return reply;
+}
+
+async function createWizard(message) {
+  let eventData = {};
+  let reply;
+  const DMChannel = await message.author.createDM();
+  const timeZone = getAuthorTimeZone(message);
+  const minimumDate = moment.tz(timeZone).add('1', 'minutes');
+  DMChannel.send(`Before we get started, all times and dates will be set for the **${timeZone}** locale.  This is either set by you, or is the server's time zone. If you would like to set or change your time zone, you may do so by cancelling this command and typing ${config.prefix}event tz [timezone].\n**PLEASE NOTE** that using that command will store your userID and timezone in the bot. If you are not comfortable with this, you will need to convert the date and time by hand to match the server time zone.`);
+  DMChannel.send('First, I\'ll need a name for the event. What would you like to call it?\n *You can reply \'cancel\' without quotes at any time to end this wizard without creating an event.');
+  let awaitingAnswer = true;
+  while (awaitingAnswer) {
+    reply = await DMCollector(DMChannel);
+    if (!reply) {
+      awaitingAnswer = false;
+      return false;
+    }
+    if (reply.content.toLowerCase() == 'cancel') {
+      awaitingAnswer = false;
+      DMChannel.send(`Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`);
+      return false;
+    }
+    eventData.name = reply.content;
+    if (eventManager.getByName(message.guild.id, eventData.name)) {
+      DMChannel.send(`An event called '${eventData.name}' already exists. Please enter a different name.`);
+    }
+    else {awaitingAnswer = false;}
+  }
+  DMChannel.send(`ok, an event called **${eventData.name}**.\nNext, I need a date and time for the event, like so: [Date] [HH:mm] [AM/PM] (AM/PM are optional).\nValid date formats are: YYYY/MM/DD, MM/DD, today, or tomorrow.`);
+  awaitingAnswer = true;
+  let resolvedDate;
+  let datePart;
+  let timePart;
+  while (awaitingAnswer) {
+    reply = await DMCollector(DMChannel);
+    if (!reply) {
+      awaitingAnswer = false;
+      return false;
+    }
+    if (reply.content.toLowerCase() == 'cancel') {
+      awaitingAnswer = false;
+      DMChannel.send(`Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`);
+      return false;
+    }
+    let [date, time, ampm] = reply.content.split(' ');
+    // handle special date formats.
+    if (!time) {
+      DMChannel.send('Please include a time, separated by a space from the date.  You can enter the time in 24 hour format, or with AM/PM separated by a space.\nPlease try again or type cancel to end event creation.');
+    }
+    else {
+      switch (date.toLowerCase()) {
+      case 'today':
+        datePart = moment.tz(moment(), dateInputFormats, true, timeZone);
+        break;
+      case 'tomorrow':
+        datePart = moment.tz(
+          moment().add(1, 'd'),
+          dateInputFormats,
+          true,
+          timeZone,
+        );
+        break;
+      default:
+        datePart = moment.tz(date, dateInputFormats, true, timeZone);
+      }
+      let [hours, minutes] = time.split(':');
+      if (parseInt(hours) < 10) {
+        hours = '0' + parseInt(hours);
+      }
+      time = hours + ':' + minutes;
+      timePart = moment.tz(time, timeInputFormat, true, timeZone);
+
+      if (!datePart.isValid()) {
+        DMChannel.send(
+          `The date format used wasn't recognized, or you entered an invalid date. Supported date formats are: ${dateInputFormats
+            .map(d => `\`${d}\``)
+            .join(', ')}.\n Please try again or type cancel to end event creation.`,
+        );
+      }
+      else if (!timePart.isValid()) {
+        DMChannel.send(
+          'The time format used wasn\'t recognized. Examples of properly formatted time:\n1:00\n01:00\n13:00\n1:00 AM\n1:00 PM\n Please try enter the date and time again or type cancel to end event creation.',
+        );
+      }
+      else if (ampm && !['am', 'pm'].includes(ampm.toLowerCase())) {
+        DMChannel.send('Please either use 24 hour time or include AM/PM after the time. Please try again or type cancel to end event creation.');
+      }
+      else if (ampm) {
+        if (hours != 12 && ampm.toLowerCase() == 'pm') {
+          timePart.add(12, 'h');
+        }
+        if (hours == 12 && ampm.toLowerCase() == 'am') {
+          timePart.subtract(12, 'h');
+        }
+      }
+
+      if (datePart.isValid() && timePart.isValid()) {
+        resolvedDate = datePart.set({
+          hour: timePart.hour(),
+          minute: timePart.minute(),
+          second: 0,
+          millisecond: 0,
+        });
+      }
+      // Ensure the event is in the future.
+      if (resolvedDate && resolvedDate.diff(minimumDate) < 0) {
+        DMChannel.send('The event must start in the future. Please try again or type cancel to end event creation.');
+      }
+      else {
+        eventData.due = resolvedDate.utc();
+        const d = new Date(resolvedDate);
+        const options = { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', timeZone: timeZone, timeZoneName: 'short' };
+        DMChannel.send(`Great, **${eventData.name}** will happen on ${d.toLocaleString('en-US', options)}. Is this ok? **Y/N**`);
+        let awaitYN = true;
+        while (awaitYN == true) {
+          reply = await DMCollector(DMChannel);
+          switch (reply.content.toLowerCase()) {
+          case 'n':
+          case 'no':
+            DMChannel.send('OK, please type a new date and time for the event.');
+            awaitingAnswer = true;
+            awaitYN = false;
+            break;
+          case 'y':
+          case 'yes':
+            DMChannel.send('OK! Would you like to set a description for this event? **Y/N**');
+            awaitingAnswer = false;
+            awaitYN = false;
+            break;
+          case 'cancel':
+            DMChannel.send(`Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`);
+            return;
+          case false:
+            return;
+          default:
+            DMChannel.send('Reply not recognized! Please answer Y or N. Would you like to set a description for this event? **Y/N**');
+            break;
+          }
+        }
+        awaitingAnswer = false;
+      }
+    }
+  }
+  eventData.due = resolvedDate.utc();
+  let needsDesc = false;
+  awaitingAnswer = true;
+  while (awaitingAnswer) {
+    reply = await DMCollector(DMChannel);
+    switch (reply.content.toLowerCase()) {
+    case 'n':
+    case 'no':
+      DMChannel.send('OK, no description. Does this all look ok? **Y/N**');
+      awaitingAnswer = false;
+      break;
+    case 'y':
+    case 'yes':
+      DMChannel.send('Great! Please enter a description for the event.  It\'s best to keep this short, 2-3 sentences max. You can type \'none\' if you decide you do no want a description after all');
+      awaitingAnswer = false;
+      needsDesc = true;
+      break;
+    case 'cancel':
+      DMChannel.send(`Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`);
+      return;
+    case false:
+      return;
+    default:
+      DMChannel.send('Reply not recognized! Please answer Y or N. Would you like to set a description for this event? **Y/N**');
+      break;
+    }
+  }
+  let description;
+  while(needsDesc == true) {
+    reply = await DMCollector(DMChannel);
+    description = reply.content.toLowerCase();
+    switch (description) {
+    case 'cancel':
+      DMChannel.send(`Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`);
+      return;
+    case 'none':
+      DMChannel.send('OK, no description. Does this all look ok? **Y/N**');
+      needsDesc = false;
+      break;
+    case false:
+      return;
+    default:
+      DMChannel.send(`Great,\n> *${description}* will be the description of your event. Is this OK? **Y/N**`);
+      awaitingAnswer = true;
+      while (awaitingAnswer) {
+        reply = await DMCollector(DMChannel);
+        switch (reply.content.toLowerCase()) {
+        case 'n':
+        case 'no':
+          DMChannel.send('OK, please type a new description, or \'none\' for no description.');
+          awaitingAnswer = false;
+          break;
+        case 'y':
+        case 'yes':
+          eventData.description = description;
+          awaitingAnswer = false;
+          needsDesc = false;
+          break;
+        case 'cancel':
+          DMChannel.send(`Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`);
+          return;
+        case false:
+          return;
+        default:
+          DMChannel.send(`Reply not recognized! Please answer Y or N. Would you like to change the description for this event from *${description}*? **Y/N**`);
+          break;
+        }
+      }
+    }
+  }
+  eventData.channel = message.channel.id;
+  eventData.owner = message.author.id;
+  eventData.guild = message.guild.id;
+
+  DMChannel.send(
+    DMembedEvent(eventData, message.guild, {
+      title: `New event: ${eventData.name}`,
+      forUser: message.author.id,
+    }),
+  );
+  DMChannel.send('Great! Does this look ok? **Y/N**');
+  let awaitYN = true;
+  while (awaitYN == true) {
+    reply = await DMCollector(DMChannel);
+    switch (reply.content.toLowerCase()) {
+    case 'n':
+    case 'no':
+      DMChannel.send('OK. For now you will have to re-run the command in the server to re-create the event.');
+      awaitYN = false;
+      return;
+    case 'y':
+    case 'yes':
+      DMChannel.send(`Perfect. I'll notify <#${eventData.channel}> now`);
+      awaitYN = false;
+      break;
+    case 'cancel':
+      DMChannel.send(`Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`);
+      return;
+    case false:
+      return;
+    default:
+      DMChannel.send('Reply not recognized! Please answer Y or N. Is the event data I posted above acceptable? **Y/N**');
+      break;
+    }
+  }
+  let role;
+  try {
+    role = await message.guild.roles.create({
+      data: {
+        name: `Event - ${eventData.name}`,
+        // Event roles shouldn't grant any inherent permissions
+        permissions: 0,
+        // Event roles should definitely be mentionable
+        mentionable: true,
+      },
+      reason: `Event role created on behalf of ${message.author.tag}`,
+    });
+
+    // Add the role to the owner.
+    const sendingMember = message.guild.members.cache.get(message.author.id);
+    await sendingMember.roles.add(role.id, 'Created the event for this role');
+  }
+  catch (e) {
+    console.log('Error creating event role:', e);
+    return message.channel.send(
+      'There was an error creating the role for this event, contact the bot owner.',
+    );
+  }
+
+  eventData.role = role.id;
+
+  await eventManager.add(eventData);
+
+  return message.channel.send(
+    'Your event has been created.',
+    embedEvent(eventData, null, {
+      title: `New event: ${eventData.name}`,
+      forUser: message.author.id,
+    }),
+  );
+}
+
 module.exports = {
   name: 'event',
   description: 'Allows people on a server to participate in events',
-  usage: `create [YYYY/MM/DD|MM/DD|today|tomorrow] [HH:mm] [name] to create a new event
+  usage: `create to start a DM session to create a new event
 ${config.prefix}event join [name] to join an event
 ${config.prefix}event leave [name] to leave an event
 ${config.prefix}event list [timezone] to list events (optionally in a chosen timezone)
 ${config.prefix}event info [name] for info on an event
 ${config.prefix}event delete [name] to delete an event
 ${config.prefix}event servertz [name] to get/set the server's default timezone (staff only)
-${config.prefix}event tz [name] to get/set your default timezone`,
+${config.prefix}event tz [name] to get/set your default timezone*
+*This data is stored in the bot. If you exit the server it is wiped. If you'd like to wipe it yourself please use [time zone wipe command not yet implemented]`,
   cooldown: 3,
   guildOnly: true,
   staffOnly: false,
   args: true,
   async execute(message, args, client) {
+    // this is the segment that is being replaced by a wizard.
     let [subcommand, ...cmdArgs] = args;
     subcommand = subcommand.toLowerCase();
     switch (subcommand) {
     case 'add':
     case 'create':
-      return createCommand(message, cmdArgs, client);
+      message.channel.send('I\'ve opened a DM with you for event management.');
+      return await createWizard(message);
     case 'delete':
     case 'remove':
       return deleteCommand(message, client, cmdArgs.join(' ') || undefined);
