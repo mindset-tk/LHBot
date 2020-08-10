@@ -10,6 +10,8 @@ const listPath = './gamelist.json';
 const gameList = require(listPath);
 const dataLogger = require('./datalog.js');
 const fetch = require('node-fetch');
+const eventDataPath = './events.json';
+if (fs.existsSync(eventDataPath)) { global.eventData = require(eventDataPath);}
 
 Discord.Structures.extend('Guild', Guild => {
   class MusicGuild extends Guild {
@@ -296,6 +298,7 @@ client.on('guildMemberRemove', member => {
   const logChannel = client.channels.cache.get(config.channelInvLogs);
   const data = [];
   logChannel.send(`${member} (${member.user.tag} / ${member.id}) left the server.`);
+  let exitConLog = `${member.user.tag} exited.`;
   Object.keys(gameList).forEach(sysname => {
     if (!gameList[sysname].accounts[0]) return;
     const accountInfo = gameList[sysname].accounts.filter(info => info.userID === member.id);
@@ -305,13 +308,24 @@ client.on('guildMemberRemove', member => {
       data.push(sysname);
     }
   });
+  if (data.length > 0) {exitConLog += ` removing from the following game rosters: ${data.join(', ')}.`;}
   fs.writeFile(listPath, JSON.stringify(gameList, null, 2), function(err) {
     if (err) {
       logChannel.send('There was an error updating games list information for exited user!');
       return console.log(err);
     }
   });
-  console.log(`User exited - removed ${member.user.tag} from the following game rosters: ${data.join(', ')}`);
+  if(global.eventData.userTimeZones[member.id]) {
+    delete global.eventData.userTimeZones[member.id];
+    fs.writeFile(eventDataPath, JSON.stringify(global.eventData, null, 2, function(err) {
+      if (err) {
+        logChannel.send('There was an error removing exited user from events.json!');
+        return console.log(err);
+      }
+    }));
+    exitConLog += ' Removed userdata from events.json.';
+  }
+  console.log(exitConLog);
 });
 
 process.on('unhandledRejection', error => console.error('Uncaught Promise Rejection! Error details:\n', error));

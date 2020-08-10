@@ -42,8 +42,8 @@ ${events}
 
 // Edit this to alter how individual events in the above message
 // are displayed.
-const EVENT_INFO_TEMPLATE = ({ name, owner, channel, due }) => `\
-${name} - created by <@${owner}> in <#${channel}>, starts at ${due.format(DATE_OUTPUT_FORMAT)}\
+const EVENT_INFO_TEMPLATE = ({ name, owner, channel, description, due }) => `\
+${name} - created by <@${owner}> in <#${channel}>, starts at ${due.format(DATE_OUTPUT_FORMAT)}${(description) ? `\n\xa0\xa0\xa0\xa0\xa0Event description: **${description}**` : ''}\
 `;
 
 if (global.eventData == null) {
@@ -88,12 +88,14 @@ function getGuildTimeZone(guild) {
 }
 
 function getAuthorTimeZone(message) {
-  const userZone = global.eventData.userTimeZones[message.author.id];
+  let userZone = global.eventData.userTimeZones[message.author.id];
+  if (userZone == 'server') { userZone = undefined; }
   return getTimeZoneFromUserInput(userZone) || getGuildTimeZone(message.guild);
 }
 
 function getUserTimeZone(user, guild) {
-  const userZone = global.eventData.userTimeZones[user.id];
+  let userZone = global.eventData.userTimeZones[user.id];
+  if (userZone == 'server') { userZone = undefined; }
   return getTimeZoneFromUserInput(userZone) || getGuildTimeZone(guild);
 }
 
@@ -104,6 +106,11 @@ async function setGuildTimeZone(guild, timeZone) {
 
 async function setUserTimeZone(user, timeZone) {
   global.eventData.userTimeZones[user.id] = timeZone;
+  return writeEventState();
+}
+
+async function deleteUserTimeZone(user) {
+  delete global.eventData.userTimeZones[user.id];
   return writeEventState();
 }
 
@@ -382,7 +389,7 @@ class EventManager {
     }
 
     this.upcomingEvents[guildId].splice(index);
-    await this.updateUpcomingEventsPost(guild);
+    await this.updateUpcomingEventsPost(guildId);
     await this.saveState();
     return true;
   }
@@ -505,6 +512,7 @@ let eventManager;
  */
 function embedEvent(event, guild, options = {}) {
   const { title, description, forUser } = options;
+  const timeZone = getUserTimeZone(forUser, guild);
 
   const role = guild && guild.roles.cache.get(event.role);
 
@@ -516,6 +524,7 @@ function embedEvent(event, guild, options = {}) {
           `You can join this event with '${config.prefix}event join ${event.name}'.`,
     )
     .addField('Event name', event.name)
+    .addField('Event time', `${formatDateCalendar(moment(event.due), timeZone)} ${getTimeZoneCanonicalDisplayName(timeZone)}`)
     .addField('Creator', `<@${event.owner}>`)
     .addField('Channel', `<#${event.channel}>`)
     .addField('Event role', `<@&${event.role}>`)
@@ -529,7 +538,7 @@ function embedEvent(event, guild, options = {}) {
     if (forUser) {
       const member = guild.members.cache.get(forUser);
       eventEmbed.addField(
-        'Participating?',
+        `Have you (${member.nickname}) RSVPed?`,
         forUser === event.owner || member.roles.cache.has(event.role)
           ? 'Yes'
           : 'No',
@@ -564,122 +573,6 @@ function DMembedEvent(event, guild, options = {}) {
   }
   eventEmbed.addField('Event role', `@Event - ${event.name}`);
   return eventEmbed;
-}
-
-async function createCommand(message, args, client) {
-  const [date, time, ...nameParts] = args;
-  const name = nameParts.join(' ');
-  // 1 minute from now
-  const timeZone = getAuthorTimeZone(message);
-  const minimumDate = moment.tz(timeZone).add('1', 'minutes');
-
-  if (eventManager.getByName(message.guild.id, name)) {
-    return message.channel.send(`An event called '${name}' already exists.`);
-  }
-
-  if (!date) {
-    return message.channel.send('You must specify a date for the event.');
-  }
-
-  if (!time) {
-    return message.channel.send('You must specify a time for the event.');
-  }
-
-  if (!name) {
-    return message.channel.send('You must specify a name for the event.');
-  }
-
-  // Process date and time separately for better error handling
-
-  // Handle 'special' date values
-  let datePart;
-  switch (date.toLowerCase()) {
-  case 'today':
-    datePart = moment.tz(moment(), dateInputFormats, true, timeZone);
-    break;
-  case 'tomorrow':
-    datePart = moment.tz(
-      moment().add(1, 'd'),
-      dateInputFormats,
-      true,
-      timeZone,
-    );
-    break;
-  default:
-    datePart = moment.tz(date, dateInputFormats, true, timeZone);
-  }
-
-  if (!datePart.isValid()) {
-    return message.channel.send(
-      `The date format used wasn't recognized, or you entered an invalid date. Supported date formats are: ${dateInputFormats
-        .map(date => `\`${date}\``)
-        .join(', ')}.`,
-    );
-  }
-
-  const timePart = moment.tz(time, timeInputFormat, true, timeZone);
-
-  if (!timePart.isValid()) {
-    return message.channel.send(
-      `The time format used wasn't recognized. The supported format is \`${timeInputFormat}\`.`,
-    );
-  }
-
-  const resolvedDate = datePart.set({
-    hour: timePart.hour(),
-    minute: timePart.minute(),
-    second: 0,
-    millisecond: 0,
-  });
-
-  // Ensure the event is in the future.
-  if (resolvedDate.diff(minimumDate) < 0) {
-    return message.channel.send('The event must start in the future.');
-  }
-
-  // Create a new role for this event
-  let role;
-  try {
-    role = await message.guild.roles.create({
-      data: {
-        name: `Event - ${name}`,
-        // Event roles shouldn't grant any inherent permissions
-        permissions: 0,
-        // Event roles should definitely be mentionable
-        mentionable: true,
-      },
-      reason: `Event role created on behalf of <@${message.author.id}>`,
-    });
-
-    // Add the role to the owner.
-    const sendingMember = message.guild.members.cache.get(message.author.id);
-    await sendingMember.roles.add(role.id, 'Created the event for this role');
-  }
-  catch (e) {
-    console.log('Error creating event role:', e);
-    return message.channel.send(
-      'There was an error creating the role for this event, contact the bot owner.',
-    );
-  }
-
-  const newEvent = {
-    due: resolvedDate.utc(),
-    name,
-    channel: message.channel.id,
-    owner: message.author.id,
-    guild: message.guild.id,
-    role: role.id,
-  };
-
-  await eventManager.add(newEvent);
-
-  return message.channel.send(
-    'Your event has been created.',
-    embedEvent(newEvent, null, {
-      title: `New event: ${name}`,
-      forUser: message.author.id,
-    }),
-  );
 }
 
 async function deleteCommand(message, client, name) {
@@ -793,7 +686,7 @@ async function listCommand(message, client, timeZone) {
       `All event times are in ${getTimeZoneCanonicalDisplayName(timeZone)}.` +
         (timeZone
           ? ''
-          : ' Use !event list [timezone] to show in your time zone.'),
+          : ` Use ${config.prefix}event list [timezone] to show in a different time zone.`),
     );
   return message.channel.send('Here are the upcoming events:', embed);
 }
@@ -839,7 +732,7 @@ async function servertzCommand(message, client, timeZone) {
 async function tzCommand(message, client, timeZone) {
   if (!timeZone) {
     const defaultTimeZone = getAuthorTimeZone(message);
-    return message.channel.send(
+    return message.author.send(
       `<@${
         message.author.id
       }>, your default time zone is **${getTimeZoneCanonicalDisplayName(
@@ -850,24 +743,27 @@ async function tzCommand(message, client, timeZone) {
     );
   }
 
+  if (timeZone.toLowerCase() == 'delete' || timeZone.toLowerCase() == 'remove') {
+    await deleteUserTimeZone(message.author);
+    return message.author.send('Your time zone data has been purged.');
+  }
+
   timeZone = getTimeZoneFromUserInput(timeZone);
 
   if (!isValidTimeZone(timeZone)) {
-    return message.channel.send(
-      `'${timeZone}' is an invalid or unknown time zone.`,
+    return message.author.send(
+      `'${timeZone}' is an invalid or unknown time zone. You may safely delete your message calling this command.`,
     );
   }
 
   await setUserTimeZone(message.author, timeZone);
 
-  return message.channel.send(
-    `<@${
-      message.author.id
-    }>, your default time zone is now set to **${getTimeZoneCanonicalDisplayName(
+  return message.author.send(
+    `Your default time zone is now set to **${getTimeZoneCanonicalDisplayName(
       timeZone,
     )}** (UTC${moment()
       .tz(timeZone)
-      .format('Z')}).`,
+      .format('Z')}). You may safely delete your message calling this command.`,
   );
 }
 
@@ -973,36 +869,92 @@ async function msgCollector(message) {
   let reply = false;
   // create a filter to ensure output is only accepted from the author who initiated the command.
   const filter = input => (input.author.id === message.author.id);
-  await message.channel.awaitMessages(filter, { max: 1, time: 30000, errors: ['time'] })
+  await message.channel.awaitMessages(filter, { max: 1, time: 180000, errors: ['time'] })
     // this method creates a collection; since there is only one entry we get the data from collected.first
     .then(collected => reply = collected.first())
-    .catch(collected => message.channel.send('Sorry, I waited 30 seconds with no response, please run the command again.'));
+    .catch(collected => message.channel.send('Sorry, I waited 3 minutes with no response, please run the command again.'));
   // console.log('Reply processed...');
   return reply;
 }
 
+// function to create a message collector in a DM. Timeout is 3 minutes.
 async function DMCollector(DMChannel) {
   // let responses = 0;
   let reply = false;
   // awaitmessages needs a filter but we're just going to accept the first reply it gets.
   const filter = m => (m.author.id === DMChannel.recipient.id);
-  await DMChannel.awaitMessages(filter, { max: 1, time: 60000, errors: ['time'] })
+  await DMChannel.awaitMessages(filter, { max: 1, time: 180000, errors: ['time'] })
     // this method creates a collection; since there is only one entry we get the data from collected.first
     .then(collected => reply = collected.first())
-    .catch(collected => DMChannel.send('Sorry, I waited 60 seconds with no response. You will need to start over.'));
+    .catch(collected => DMChannel.send('Sorry, I waited 3 minutes with no response. You will need to start over.'));
   // console.log('Reply processed...');
   return reply;
 }
 
 async function createWizard(message) {
   let eventData = {};
+  let awaitingAnswer = true;
   let reply;
   const DMChannel = await message.author.createDM();
+  // TODO if/then statement to check if it's the first time the user has done this (global.eventData.userTimeZones[message.author.id]) then run the user through setting their time zone or just using the server zone.
+  // Note to self: setting the user's timeZone to "server" should tell this routine to use the server time zone without storing any time zone in the system.
+  if (!global.eventData.userTimeZones[message.author.id]) {
+    let needTZ = false;
+    DMChannel.send(`Before we get started, it looks like you don't have a time zone set on file. Would you like to add one now? **Y/N**\n\n**PLEASE NOTE** this will store your userID and time zone on file (this data will be deleted if you leave the server). If you are not comfortable with this, say **N** and you will not be asked again, but all events you create will be in the server time zone (currently **${getTimeZoneCanonicalDisplayName(getGuildTimeZone(message.guild))}**, but staff can change this setting at any time.) No matter what you elect to do, you can still change it at a later date with the ${config.prefix}event tz command. You may also type 'cancel' to quit event creation entirely; no data is stored in this case.`);
+    while (awaitingAnswer) {
+      reply = await DMCollector(DMChannel);
+      switch (reply.content.toLowerCase()) {
+      case 'n':
+      case 'no':
+        DMChannel.send(`OK, no problem. Going forward, all time zones will use the server time zone. Again, this is currently **${getTimeZoneCanonicalDisplayName(getGuildTimeZone(message.guild))}**`);
+        await setUserTimeZone(message.author, 'server');
+        awaitingAnswer = false;
+        break;
+      case 'y':
+      case 'yes':
+        DMChannel.send('OK. Please provide a time zone.');
+        awaitingAnswer = false;
+        needTZ = true;
+        break;
+      case 'cancel':
+        DMChannel.send(`Event creation cancelled. Please run ${config.prefix}event create again to initiate event creation again.`);
+        return;
+      case false:
+        return;
+      default:
+        DMChannel.send('Reply not recognized! Please answer Y or N.');
+        break;
+      }
+    }
+    while (needTZ) {
+      reply = await DMCollector(DMChannel);
+      if (reply.content.toLowerCase() == 'cancel') {
+        await setUserTimeZone(message.author, 'server');
+        needTZ = false;
+      }
+      else {
+        const usrTZ = getTimeZoneFromUserInput(reply.content);
+        if (!isValidTimeZone(usrTZ)) {
+          message.author.send(
+            `'${usrTZ}' is an invalid or unknown time zone. Please try again, or type 'cancel' to set your time zone to match the server's time zone.`,
+          );
+        }
+        else {
+          await setUserTimeZone(message.author, usrTZ);
+          DMChannel.send(`OK, your time zone is now set to **${getTimeZoneCanonicalDisplayName(usrTZ)}**.`);
+          needTZ = false;
+        }
+      }
+    }
+  }
+  else {
+    const usrTZ = getAuthorTimeZone(message);
+    DMChannel.send(`Just a reminder that all dates and times are set for the **${getTimeZoneCanonicalDisplayName(usrTZ)}** time zone. This is ${(global.eventData.userTimeZones[message.author.id] == 'server') ? 'the server time zone, and not set by you.' : 'the time zone you set.'}`);
+  }
   const timeZone = getAuthorTimeZone(message);
   const minimumDate = moment.tz(timeZone).add('1', 'minutes');
-  DMChannel.send(`Before we get started, all times and dates will be set for the **${timeZone}** locale.  This is either set by you, or is the server's time zone. If you would like to set or change your time zone, you may do so by cancelling this command and typing ${config.prefix}event tz [timezone].\n**PLEASE NOTE** that using that command will store your userID and timezone in the bot. If you are not comfortable with this, you will need to convert the date and time by hand to match the server time zone.`);
-  DMChannel.send('First, I\'ll need a name for the event. What would you like to call it?\n *You can reply \'cancel\' without quotes at any time to end this wizard without creating an event.');
-  let awaitingAnswer = true;
+  DMChannel.send('First, I\'ll need a name for the event. What would you like to call it?\n *You can reply \'cancel\' without quotes at any time to end this wizard without creating an event.\nPlease note that you have 3 minutes to answer each of these questions; The timer resets for each question.');
+  awaitingAnswer = true;
   while (awaitingAnswer) {
     reply = await DMCollector(DMChannel);
     if (!reply) {
@@ -1104,7 +1056,7 @@ async function createWizard(message) {
         eventData.due = resolvedDate.utc();
         const d = new Date(resolvedDate);
         const options = { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', timeZone: timeZone, timeZoneName: 'short' };
-        DMChannel.send(`Great, **${eventData.name}** will happen on ${d.toLocaleString('en-US', options)}. Is this ok? **Y/N**`);
+        DMChannel.send(`Great, **${eventData.name}** will happen on ${d.toLocaleString('en-US', options)}. Is this OK? **Y/N**`);
         let awaitYN = true;
         while (awaitYN == true) {
           reply = await DMCollector(DMChannel);
@@ -1143,7 +1095,7 @@ async function createWizard(message) {
     switch (reply.content.toLowerCase()) {
     case 'n':
     case 'no':
-      DMChannel.send('OK, no description. Does this all look ok? **Y/N**');
+      DMChannel.send('OK, no description. Does this all look good? **Y/N**');
       awaitingAnswer = false;
       break;
     case 'y':
@@ -1171,7 +1123,7 @@ async function createWizard(message) {
       DMChannel.send(`Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`);
       return;
     case 'none':
-      DMChannel.send('OK, no description. Does this all look ok? **Y/N**');
+      DMChannel.send('OK, no description. Does this all look good? **Y/N**');
       needsDesc = false;
       break;
     case false:
@@ -1215,7 +1167,7 @@ async function createWizard(message) {
       forUser: message.author.id,
     }),
   );
-  DMChannel.send('Great! Does this look ok? **Y/N**');
+  DMChannel.send('Great! Does this look OK? **Y/N**');
   let awaitYN = true;
   while (awaitYN == true) {
     reply = await DMCollector(DMChannel);
@@ -1269,13 +1221,13 @@ async function createWizard(message) {
   await eventManager.add(eventData);
 
   return message.channel.send(
-    'Your event has been created.',
     embedEvent(eventData, null, {
       title: `New event: ${eventData.name}`,
       forUser: message.author.id,
     }),
   );
 }
+
 
 module.exports = {
   name: 'event',
@@ -1288,7 +1240,8 @@ ${config.prefix}event info [name] for info on an event
 ${config.prefix}event delete [name] to delete an event
 ${config.prefix}event servertz [name] to get/set the server's default timezone (staff only)
 ${config.prefix}event tz [name] to get/set your default timezone*
-*This data is stored in the bot. If you exit the server it is wiped. If you'd like to wipe it yourself please use [time zone wipe command not yet implemented]`,
+*This data is stored in the bot. If you exit the server it is wiped. If you'd like to wipe it yourself please use ${config.prefix}event tz delete.
+Staff can add users to the event by hand simply by giving any user the associated event role.`,
   cooldown: 3,
   guildOnly: true,
   staffOnly: false,
@@ -1301,11 +1254,13 @@ ${config.prefix}event tz [name] to get/set your default timezone*
     case 'add':
     case 'create':
       message.channel.send('I\'ve opened a DM with you for event management.');
-      return await createWizard(message);
+      await createWizard(message);
+      return;
     case 'delete':
     case 'remove':
       return deleteCommand(message, client, cmdArgs.join(' ') || undefined);
     case 'join':
+    case 'rsvp':
       return joinCommand(message, client, cmdArgs.join(' ') || undefined);
     case 'leave':
       return leaveCommand(message, client, cmdArgs.join(' ') || undefined);
