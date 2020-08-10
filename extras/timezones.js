@@ -1,37 +1,141 @@
 // very incomplete!!!
-const TIMEZONE_CODES = {
-  'ACDT': 'Australia/Adelaide',
-  'ACST': 'Australia/Adelaide',
-  'AEDT': 'Australia/Sydney',
-  'AEST': 'Australia/Sydney',
-  'AKDT': 'America/Anchorage',
-  'AKST': 'America/Anchorage',
-  'BRT': 'America/Sao_Paolo',
-  'BRST': 'America/Sao_Paolo',
-  'CAT': 'Africa/Khartoum',
-  'CDT': 'America/Chicago',
-  'CST': 'America/Chicago',
-  'CET': 'Europe/Paris',
-  'CEST': 'Europe/Paris',
-  'CHINA': 'Asia/Shanghai',
-  'EDT': 'America/New_York',
-  'EST': 'America/New_York',
-  'EET': 'Europe/Athens',
-  'EEST': 'Europe/Athens',
-  'BST': 'Europe/London',
-  'GMT': 'Europe/London',
-  'HKT': 'Asia/Hong_Kong',
-  'HST': 'America/Honolulu',
-  'HDT': 'America/Honolulu',
-  'IST': 'Asia/Delhi',
-  'ISRAEL': 'Asia/Tel_Aviv',
-  'MDT': 'America/Denver',
-  'MSK': 'Europe/Moscow',
-  'JST': 'Asia/Tokyo',
-  'MST': 'America/Denver',
-  'PDT': 'America/Los_Angeles',
-  'PST': 'America/Los_Angeles',
-  'WAT': 'Africa/Lagos',
+const LOCAL_TIMEZONES = [
+  {
+    name: 'Alaska Time',
+    abbr: 'AKST',
+    dstAbbr: 'AKDT',
+    locale: 'America/Anchorage',
+  },
+  {
+    name: 'Amazon Time',
+    abbr: 'AMT',
+    locale: 'America/Porto_Velho',
+  },
+  {
+    name: 'Australian Central Time',
+    abbr: 'ACST',
+    dstAbbr: 'ACDT',
+    locale: 'Australia/Adelaide',
+  },
+  {
+    name: 'Australian Eastern Time',
+    abbr: 'AEST',
+    dstAbbr: 'AEDT',
+    locale: 'Australia/Sydney',
+  },
+  {
+    name: 'Australian Western Time',
+    abbr: 'AWST',
+    dstAbbr: 'AWDT',
+    locale: 'Australia/Perth',
+  },
+  {
+    name: 'Brasília Time',
+    abbr: 'BRT',
+    locale: 'America/Sao_Paolo',
+  },
+  {
+    name: 'Central Africa Time',
+    abbr: 'CAT',
+    locale: 'Africa/Khartoum',
+  },
+  {
+    name: 'Central Time',
+    abbr: 'CST',
+    dstAbbr: 'CDT',
+    locale: 'America/Chicago'
+  },
+  {
+    name: 'Central European Time',
+    abbr: 'CET',
+    dstAbbr: 'CEST',
+    locale: 'Europe/Paris',
+  },
+  {
+    name: 'China Standard Time',
+    abbr: 'CHINA',
+    locale: 'Asia/Shanghai',
+  },
+  {
+    name: 'Eastern Time',
+    abbr: 'EST',
+    dstAbbr: 'EDT',
+    locale: 'America/New_York',
+  },
+  {
+    name: 'Eastern Africa Time',
+    abbr: 'EAT',
+    locale: 'Africa/Nairobi',
+  },
+  {
+    name: 'Eastern European Time',
+    abbr: 'EET',
+    dstAbbr: 'EEST',
+    locale: 'Europe/Athens',
+  },
+  {
+    name: 'Greenwich Mean Time/British Summer Time',
+    abbr: 'GMT',
+    dstAbbr: 'BST',
+    locale: 'Europe/London',
+  },
+  {
+    name: 'Hong Kong Time',
+    abbr: 'HKT',
+    locale: 'Asia/Hong_Kong',
+  },
+  {
+    name: 'Hawaii Time',
+    abbr: 'HST',
+    dstAbbr: 'HDT',
+    locale: 'America/Honolulu',
+  },
+  {
+    name: 'Indian Standard Time',
+    abbr: 'INDIA',
+    locale: 'Asia/Delhi',
+  },
+  {
+    name: 'Israel Standard Time',
+    abbr: 'IST',
+    local: 'Asia/Tel_Aviv',
+  },
+  {
+    name: 'Japan Standard Time',
+    abbr: 'JST',
+    locale: 'Asia/Tokyo',
+  },
+  {
+    name: 'Mountain Time',
+    abbr: 'MST',
+    dstAbbr: 'MDT',
+    locale: 'America/Denver',
+  },
+  {
+    name: 'Moscow Time',
+    abbr: 'MSK',
+    locale: 'Europe/Moscow',
+  },
+  {
+    name: 'New Zealand Time',
+    abbr: 'NZST',
+    dstAbbr: 'NZDT',
+    locale: 'Pacific/Auckland',
+  },
+  {
+    name: 'Pacific Time',
+    abbr: 'PST',
+    dstAbbr: 'PDT',
+    locale: 'America/Los_Angeles',
+  },
+  {
+    name: 'Western Africa Time',
+    abbr: 'WAT',
+    locale: 'Africa/Lagos'
+  },
+];
+
+const EXTRA_TIMEZONES = {
   'GMT+12': 'Etc/GMT+12',
   'GMT+11': 'Etc/GMT+11',
   'GMT+10': 'Etc/GMT+10',
@@ -84,8 +188,27 @@ const TIMEZONE_CODES = {
   'UTC-12': 'Etc/GMT-12',
   'UTC-13': 'Etc/GMT-13',
   'UTC-14': 'Etc/GMT-14',
-};
+}
+
+const TIMEZONE_CODES = {
+  ...makeTimezoneMapping(LOCAL_TIMEZONES),
+  ...EXTRA_TIMEZONES
+}
 
 module.exports = {
+  LOCAL_TIMEZONES,
   TIMEZONE_CODES,
 };
+
+function makeTimezoneMapping(timezoneList) {
+  const mapping = {}
+
+  timezoneList.forEach(({abbr, dstAbbr, locale}) => {
+      mapping[abbr] = locale
+      if (dstAbbr) {
+        mapping[dstAbbr] = locale
+      }
+  })
+
+  return mapping
+}

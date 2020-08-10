@@ -32,6 +32,8 @@ const DATE_OUTPUT_FORMAT = 'dddd, MMMM Do YYYY, h:mm A';
 // Edit this to alter the text of the upcoming events message in the
 // event info channel.
 const EVENT_MESSAGE_TEMPLATE = ({ events, serverName, timeZone, prefix }) => `\
+**UPCOMING EVENTS**
+
 The upcoming events for ${serverName} are listed below, with the next upcoming event listed first. \
 All times are listed in **${timeZone}**, the default timezone for this server. \
 Use \`${prefix}event info event name\` to view the event time in your local timezone, and \
@@ -41,9 +43,18 @@ ${events}
 `;
 
 const TZ_MESSAGE_TEMPLATE = ({ tzlist }) => `\
+**TIME ZONES**
 The current list of time zones for use in the ${config.prefix}event command is as follows. Each maps to a specific locale.  \
-Time zone commands such as ${config.prefix}event tz [time zone] can accept either a time zone short code or a locale name.
+Time zone commands such as ${config.prefix}event tz [time zone] can accept either a time zone short code or a locale name - \
+Using these will automatically adapt to Daylight Savings Time in your area. You can also use fixed timezones like \`UTC+1\` \
+and \`GMT-4\`, but they won't be adjusted for DST. Some time zones have multiple accepted abbreviations separated by \`/\`. \
+Additional locale timezones can be found on <https://en.wikipedia.org/wiki/List_of_tz_database_time_zones> under 'TZ database name'.
+
+The supported time zone abbreviations are:
+
 ${tzlist}
+
+Please contact staff if your preferred time zone doesn't have an abbreviation on this list!
 `;
 
 // Edit this to alter how individual events in the above message
@@ -504,7 +515,12 @@ class EventManager {
     const tzMessage = this.timeZoneInfoMessage[guildId];
 
     const tzTemplateParams = {
-      tzlist: Object.getOwnPropertyNames(tz.TIMEZONE_CODES).join(', '),
+      tzlist: tz.LOCAL_TIMEZONES.map(({name, abbr, dstAbbr}) => {
+        // Show DST and standard abbreviation together, where needed
+        const tzAbbrs = dstAbbr ? `${abbr}/${dstAbbr}` : abbr;
+
+        return `${tzAbbrs} - ${name}`
+      }).join('\n'),
     };
 
     if (eventInfoChannel) {
