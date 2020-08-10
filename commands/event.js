@@ -33,17 +33,23 @@ const DATE_OUTPUT_FORMAT = 'dddd, MMMM Do YYYY, h:mm A';
 // event info channel.
 const EVENT_MESSAGE_TEMPLATE = ({ events, serverName, timeZone, prefix }) => `\
 The upcoming events for ${serverName} are listed below, with the next upcoming event listed first. \
-All times are listed in ${timeZone}, the default timezone for this server. \
+All times are listed in **${timeZone}**, the default timezone for this server. \
 Use \`${prefix}event info event name\` to view the event time in your local timezone, and \
 \`${prefix}event join event name\` to be reminded about the event.
 
 ${events}
 `;
 
+const TZ_MESSAGE_TEMPLATE = ({ tzlist }) => `\
+The current list of time zones for use in the ${config.prefix}event command is as follows. Each maps to a specific locale.  \
+Time zone commands such as ${config.prefix}event tz [time zone] can accept either a time zone short code or a locale name.
+${tzlist}
+`;
+
 // Edit this to alter how individual events in the above message
 // are displayed.
 const EVENT_INFO_TEMPLATE = ({ name, owner, channel, description, due }) => `\
-${name} - created by <@${owner}> in <#${channel}>, starts at ${due.format(DATE_OUTPUT_FORMAT)}${(description) ? `\n\xa0\xa0\xa0\xa0\xa0Event description: **${description}**` : ''}\
+**${name}** - created by <@${owner}> in <#${channel}>, starts at ${due.format(DATE_OUTPUT_FORMAT)}${(description) ? `\n\xa0\xa0\xa0\xa0\xa0Event description: **${description}**` : ''}\
 `;
 
 if (global.eventData == null) {
@@ -130,6 +136,7 @@ class EventManager {
     this.timer = null;
     this.upcomingEvents = {};
     this.rolesPendingPrune = [];
+    this.timeZoneInfoMessage = {};
     this.eventInfoMessage = {};
   }
 
@@ -151,6 +158,31 @@ class EventManager {
         ...role,
         startedAt: moment.utc(role.startedAt, moment.ISO_8601, true),
       }));
+    }
+    if (global.eventData.timeZoneInfoMessage) {
+      await Promise.all(
+        Object.entries(global.eventData.timeZoneInfoMessage).map(
+          async ([guild, messageId]) => {
+            if (eventInfoChannel) {
+              const message = await eventInfoChannel.messages
+                .fetch(messageId)
+                .catch(e =>
+                  console.error('Failed to load time zone info message', e),
+                );
+
+              if (message) {
+                this.timeZoneInfoMessage[guild] = message;
+                console.log('Loaded time zone message', message.id);
+              }
+              else {
+                console.log(
+                  `Time zone info message ${messageId} could not be found for guild ${guild}`,
+                );
+              }
+            }
+          },
+        ),
+      );
     }
     if (global.eventData.eventInfoMessage) {
       await Promise.all(
@@ -206,6 +238,13 @@ class EventManager {
       global.eventData.eventInfoMessage[guild] = message.id;
     });
 
+    if (global.eventData.timeZoneInfoMessage === undefined) {
+      global.eventData.timeZoneInfoMessage = {};
+    }
+    Object.entries(this.timeZoneInfoMessage).forEach(([guild, message]) => {
+      global.eventData.timeZoneInfoMessage[guild] = message.id;
+    });
+
     return writeEventState();
   }
 
@@ -221,6 +260,10 @@ class EventManager {
         this.timer = this.client.setInterval(() => this.tick(), 60000);
         this.tick();
       }, topOfMinute);
+    });
+    // update time zone posts in case list of time zones has changed.
+    this.client.guilds.cache.forEach(g => {
+      this.updateTZPost(g.id);
     });
   }
 
@@ -450,6 +493,41 @@ class EventManager {
   }
 
   /**
+   * Updates the guild's time zone post. Only runs at start, in case any time zones have been added.
+   *
+   * @param guildId Snowflake of the Guild to update the event post for
+   * @returns {Promise<void>} Resolves when post update complete.
+   */
+
+  async updateTZPost(guildId) {
+    const guild = this.client.guilds.cache.get(guildId);
+    const tzMessage = this.timeZoneInfoMessage[guildId];
+
+    const tzTemplateParams = {
+      tzlist: Object.getOwnPropertyNames(tz.TIMEZONE_CODES).join(', '),
+    };
+
+    if (eventInfoChannel) {
+      if (!guild.channels.cache.has(eventInfoChannel.id)) { return; }
+    }
+
+    if (tzMessage) {
+      console.log('found time zone message', tzMessage.id);
+      await tzMessage.edit(TZ_MESSAGE_TEMPLATE(tzTemplateParams));
+    }
+    else {
+      console.log(
+        `No time zone info message found for guild ${guildId}, send a new one.`,
+      );
+      const newMessage = await eventInfoChannel.send(
+        TZ_MESSAGE_TEMPLATE(tzTemplateParams),
+      );
+      this.timeZoneInfoMessage[guildId] = newMessage;
+      await this.saveState();
+    }
+  }
+
+  /**
    * Updates the guild's post for upcoming event if applicable.
    *
    * @param guildId Snowflake of the Guild to update the event post for
@@ -538,7 +616,7 @@ function embedEvent(event, guild, options = {}) {
     if (forUser) {
       const member = guild.members.cache.get(forUser);
       eventEmbed.addField(
-        `Have you (${member.nickname}) RSVPed?`,
+        `Have you (${(member.nickname) ? member.nickname : member.user.username}) RSVPed?`,
         forUser === event.owner || member.roles.cache.has(event.role)
           ? 'Yes'
           : 'No',
@@ -573,6 +651,156 @@ function DMembedEvent(event, guild, options = {}) {
   }
   eventEmbed.addField('Event role', `@Event - ${event.name}`);
   return eventEmbed;
+}
+
+async function editCommand(message, client, name) {
+  const guildmember = message.guild.member(message.author);
+  if (!name) {
+    return message.channel.send(
+      'You must specify which event you want to edit.',
+    );
+  }
+
+  const event = eventManager.getByName(message.guild.id, name);
+  if (event) {
+    if (
+      event.owner !== message.author.id &&
+      !guildmember.roles.cache.has(config.roleStaff)
+    ) {
+      return message.channel.send(
+        'Only staff and the event creator can edit an event.',
+      );
+    }
+    const timeZone = getAuthorTimeZone(message);
+    const DMChannel = await message.author.createDM();
+    DMChannel.send(`Just a reminder that all dates and times are set for the **${getTimeZoneCanonicalDisplayName(timeZone)}** time zone. This is ${(global.eventData.userTimeZones[message.author.id] == 'server' || !global.eventData.userTimeZones[message.author.id]) ? 'the server time zone, and not set by you.' : 'the time zone you set.'}`);
+    const minimumDate = moment.tz(timeZone).add('1', 'minutes');
+    DMChannel.send(`What date and time would you like to change the event to? Please use the format: [Date] [HH:mm] [AM/PM] (AM/PM are optional).\nValid date formats are: YYYY/MM/DD, MM/DD, today, or tomorrow.\n Currently, ${event.name} is set to occur at ${formatDateCalendar(moment(event.due), timeZone)} ${getTimeZoneCanonicalDisplayName(timeZone)}`);
+    let awaitingAnswer = true;
+    let reply;
+    let resolvedDate;
+    let datePart;
+    let timePart;
+    while (awaitingAnswer) {
+      reply = await DMCollector(DMChannel);
+      if (!reply) {
+        awaitingAnswer = false;
+        return false;
+      }
+      if (reply.content.toLowerCase() == 'cancel') {
+        awaitingAnswer = false;
+        DMChannel.send('Event edit cancelled. Please run the command again to edit an event.');
+        return false;
+      }
+      let [date, time, ampm] = reply.content.split(' ');
+      // handle special date formats.
+      if (!time) {
+        DMChannel.send('Please include a time, separated by a space from the date.  You can enter the time in 24 hour format, or with AM/PM separated by a space.\nPlease try again or type cancel to end event edit.');
+      }
+      else {
+        switch (date.toLowerCase()) {
+        case 'today':
+          datePart = moment.tz(moment(), dateInputFormats, true, timeZone);
+          break;
+        case 'tomorrow':
+          datePart = moment.tz(
+            moment().add(1, 'd'),
+            dateInputFormats,
+            true,
+            timeZone,
+          );
+          break;
+        default:
+          datePart = moment.tz(date, dateInputFormats, true, timeZone);
+        }
+        let [hours, minutes] = time.split(':');
+        if (parseInt(hours) < 10) {
+          hours = '0' + parseInt(hours);
+        }
+        time = hours + ':' + minutes;
+        timePart = moment.tz(time, timeInputFormat, true, timeZone);
+
+        if (!datePart.isValid()) {
+          DMChannel.send(
+            `The date format used wasn't recognized, or you entered an invalid date. Supported date formats are: ${dateInputFormats
+              .map(d => `\`${d}\``)
+              .join(', ')}.\n Please try again or type cancel to end event creation.`,
+          );
+        }
+        else if (!timePart.isValid()) {
+          DMChannel.send(
+            'The time format used wasn\'t recognized. Examples of properly formatted time:\n1:00\n01:00\n13:00\n1:00 AM\n1:00 PM\n Please try enter the date and time again or type cancel to end event time editing.',
+          );
+        }
+        else if (ampm && !['am', 'pm'].includes(ampm.toLowerCase())) {
+          DMChannel.send('Please either use 24 hour time or include AM/PM after the time. Please try again or type cancel to end event time editing.');
+        }
+        else if (ampm) {
+          if (hours != 12 && ampm.toLowerCase() == 'pm') {
+            timePart.add(12, 'h');
+          }
+          if (hours == 12 && ampm.toLowerCase() == 'am') {
+            timePart.subtract(12, 'h');
+          }
+        }
+
+        if (datePart.isValid() && timePart.isValid()) {
+          resolvedDate = datePart.set({
+            hour: timePart.hour(),
+            minute: timePart.minute(),
+            second: 0,
+            millisecond: 0,
+          });
+        }
+        // Ensure the event is in the future.
+        if (resolvedDate && resolvedDate.diff(minimumDate) < 0) {
+          DMChannel.send('The event must start in the future. Please try again or type cancel to end.');
+        }
+        else {
+          const d = resolvedDate.utc();
+          DMChannel.send(`Great, **${event.name}** will be updated to occur at ${formatDateCalendar(moment(d), timeZone)} ${getTimeZoneCanonicalDisplayName(timeZone)}. Is this OK? **Y/N**`);
+          let awaitYN = true;
+          while (awaitYN == true) {
+            reply = await DMCollector(DMChannel);
+            switch (reply.content.toLowerCase()) {
+            case 'n':
+            case 'no':
+              DMChannel.send('OK, please type a new date and time for the event.');
+              awaitingAnswer = true;
+              awaitYN = false;
+              break;
+            case 'y':
+            case 'yes':
+              DMChannel.send('Perfect. I\'ll notify the channel.');
+              event.due = d;
+              writeEventState();
+              await eventManager.updateUpcomingEventsPost(message.guild.id);
+              awaitingAnswer = false;
+              awaitYN = false;
+              return message.channel.send(
+                embedEvent(event, null, {
+                  title: `Event has changed: ${event.name}`,
+                  forUser: message.author.id,
+                }),
+              );
+            case 'cancel':
+              DMChannel.send('Event edit cancelled. Please run the command again to edit an event.');
+              return;
+            case false:
+              return;
+            default:
+              DMChannel.send(`Reply not recognized! Please answer Y or N. is ${formatDateCalendar(moment(d), timeZone)} ${getTimeZoneCanonicalDisplayName(timeZone)} an acceptable date and time for the event? **Y/N**`);
+              break;
+            }
+          }
+          awaitingAnswer = false;
+        }
+      }
+    }
+  }
+  else {
+    return message.channel.send(`The event '${name}' does not exist.`);
+  }
 }
 
 async function deleteCommand(message, client, name) {
@@ -1235,6 +1463,7 @@ module.exports = {
   usage: `create to start a DM session to create a new event
 ${config.prefix}event join [name] to join an event
 ${config.prefix}event leave [name] to leave an event
+${config.prefix}event edit [name] to edit the time of an event you created (staff can edit any event)
 ${config.prefix}event list [timezone] to list events (optionally in a chosen timezone)
 ${config.prefix}event info [name] for info on an event
 ${config.prefix}event delete [name] to delete an event
@@ -1259,6 +1488,8 @@ Staff can add users to the event by hand simply by giving any user the associate
     case 'delete':
     case 'remove':
       return deleteCommand(message, client, cmdArgs.join(' ') || undefined);
+    case 'edit':
+      return editCommand(message, client, cmdArgs.join(' ') || undefined);
     case 'join':
     case 'rsvp':
       return joinCommand(message, client, cmdArgs.join(' ') || undefined);
