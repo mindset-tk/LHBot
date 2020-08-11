@@ -273,9 +273,11 @@ class EventManager {
       }, topOfMinute);
     });
     // update time zone posts in case list of time zones has changed.
-    this.client.guilds.cache.forEach(g => {
-      this.updateTZPost(g.id);
-    });
+    if (config.eventInfoChannelId) {
+      this.client.guilds.cache.forEach(g => {
+        this.updateTZPost(g.id);
+      });
+    }
   }
 
   /**
