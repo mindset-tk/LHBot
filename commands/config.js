@@ -6,6 +6,8 @@ const countingDataPath = path.resolve('./counting.json');
 if(global.countingData == null) {
   global.countingData = require(countingDataPath);
 }
+const eventPath = path.resolve('./commands/event.js');
+const event = require(eventPath);
 
 function writeCounting() {
   fs.writeFile(countingDataPath, JSON.stringify(global.countingData, null, 2), function(err) {
@@ -209,6 +211,7 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
           message.channel.send(replyContent);
           reply = await msgCollector();
           const newChannel = await getChannel(reply.content);
+          const oldChannelID = config[changeName] || null;
           if (newChannel) {
             config[changeName] = newChannel.id;
             writeConfig();
@@ -218,7 +221,11 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
               writeCounting();
               return message.channel.send(`${changeDesc} is now ${newChannel}. Count has been reset to 0.`);
             }
-            return message.channel.send(`${changeDesc} is now ${newChannel}`);
+            if (changeName == 'eventInfoChannelId') {
+              await event.regenMsgs(oldChannelID, newChannel.id, message.guild);
+              return message.channel.send(`${changeDesc} is now ${newChannel}. Deleting info messages from old channel (if applicable) and recreating.`);
+            }
+            return message.channel.send(`${changeDesc} is now ${newChannel}.`);
           }
           else {return message.channel.send(`Sorry, I couldn't parse '${reply.content}' into a channel. Please #mention the channel or copy/paste the channel ID.`);}
         }

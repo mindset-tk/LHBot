@@ -1478,6 +1478,42 @@ async function createWizard(message) {
   );
 }
 
+/**
+ * Delete and recreate the event messages. Typically this function is called when the config command modifies the event info channel.
+ * @param oldChanID
+ * @param newChanID
+ */
+async function deleteAndCreateMsgs(oldChanID, newChanID, guild) {
+  eventInfoChannel = guild.channels.cache.get(newChanID);
+  if (oldChanID) {
+    if (guild.channels.cache.has(oldChanID)) {
+      const oldChan = guild.channels.cache.get(oldChanID);
+      if (global.eventData.timeZoneInfoMessage[guild.id]) {
+        const message = await oldChan.messages
+          .fetch(global.eventData.timeZoneInfoMessage[guild.id])
+          .catch(e =>
+            console.error('Failed to load time zone info message', e),
+          );
+        await message.delete();
+        delete global.eventData.timeZoneInfoMessage[guild.id];
+        delete eventManager.timeZoneInfoMessage[guild.id];
+      }
+      if (global.eventData.eventInfoMessage[guild.id]) {
+        const message = await oldChan.messages
+          .fetch(global.eventData.eventInfoMessage[guild.id])
+          .catch(e =>
+            console.error('Failed to load event info message', e),
+          );
+        await message.delete();
+        delete global.eventData.eventInfoMessage[guild.id];
+        delete eventManager.eventInfoMessage[guild.id];
+      }
+    }
+  }
+  eventManager.updateTZPost(guild.id);
+  eventManager.updateUpcomingEventsPost(guild.id);
+}
+
 
 module.exports = {
   name: 'event',
@@ -1576,5 +1612,8 @@ Staff can add users to the event by hand simply by giving any user the associate
     else {
       onReady();
     }
+  },
+  regenMsgs(oldChanID, newChanID, guild) {
+    deleteAndCreateMsgs(oldChanID, newChanID, guild);
   },
 };
