@@ -111,8 +111,11 @@ function getAuthorTimeZone(message) {
 }
 
 function getUserTimeZone(user, guild) {
-  let userZone = global.eventData.userTimeZones[user.id];
-  if (userZone == 'server') { userZone = undefined; }
+  let userZone = null;
+  if (user) {
+    userZone = global.eventData.userTimeZones[user.id];
+    if (userZone == 'server') { userZone = undefined; }
+  }
   return getTimeZoneFromUserInput(userZone) || getGuildTimeZone(guild);
 }
 
@@ -579,7 +582,7 @@ class EventManager {
       }
 
       if (message) {
-        console.log('found message', message.id);
+        console.log('Updating events message ', message.id);
         await message.edit(EVENT_MESSAGE_TEMPLATE(templateParams));
       }
       else {
@@ -1220,7 +1223,7 @@ async function createWizard(message) {
   }
   DMChannel.send(`ok, an event called **${eventData.name}**.\nNext, I need a date and time for the event, like so: [Date] [HH:mm] [AM/PM] (AM/PM are optional).\nValid date formats are: YYYY/MM/DD, MM/DD, today, or tomorrow.`);
   awaitingAnswer = true;
-  let resolvedDate;
+  let resolvedDate = null;
   let datePart;
   let timePart;
   while (awaitingAnswer) {
@@ -1294,11 +1297,12 @@ async function createWizard(message) {
           millisecond: 0,
         });
       }
+
       // Ensure the event is in the future.
       if (resolvedDate && resolvedDate.diff(minimumDate) < 0) {
         DMChannel.send('The event must start in the future. Please try again or type cancel to end event creation.');
       }
-      else {
+      else if (resolvedDate) {
         eventData.due = resolvedDate.utc();
         const d = new Date(resolvedDate);
         const options = { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', timeZone: timeZone, timeZoneName: 'short' };
