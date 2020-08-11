@@ -60,7 +60,7 @@ Please contact staff if your preferred time zone doesn't have an abbreviation on
 // Edit this to alter how individual events in the above message
 // are displayed.
 const EVENT_INFO_TEMPLATE = ({ name, owner, channel, description, due }) => `\
-**${name}** - created by <@${owner}> in <#${channel}>, starts at ${due.format(DATE_OUTPUT_FORMAT)}${(description) ? `\n\xa0\xa0\xa0\xa0\xa0Event description: **${description}**` : ''}\
+**${name}** - created by <@${owner}> in <#${channel}>, starts at ${due.format(DATE_OUTPUT_FORMAT)}${(description) ? `\n\xa0\xa0\xa0\xa0\xa0*Event description:* ${description}` : ''}\
 `;
 
 if (global.eventData == null) {
