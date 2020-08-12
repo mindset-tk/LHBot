@@ -6,6 +6,8 @@ const countingDataPath = path.resolve('./counting.json');
 if(global.countingData == null) {
   global.countingData = require(countingDataPath);
 }
+const eventPath = path.resolve('./commands/event.js');
+const event = require(eventPath);
 
 function writeCounting() {
   fs.writeFile(countingDataPath, JSON.stringify(global.countingData, null, 2), function(err) {
@@ -41,7 +43,8 @@ module.exports = {
       ['voiceTextChannelIds', 'Text channel(s) for voice commands', 'channelArray'],
       ['pinsToPin', 'Number of pin reacts to pin a message', 'integer'],
       ['pinIgnoreChannels', 'Channel(s) to ignore for pinning', 'channelArray'],
-      ['botChannelId', 'Bot stuff channel', 'channel']];
+      ['botChannelId', 'Bot stuff channel', 'channel'],
+      ['eventInfoChannelId', 'Event announce channel', 'channel']];
     // declaring some useful functions.
     // function to pretty print the config data so that arrays show on one line, so it's easier to visually parse the config file when hand opening it. Purely cosmetic.
     function prettyPrintConfig() {
@@ -125,7 +128,8 @@ Member role: **@${getRoleName(config.roleComrade)}**
 __Special Channels:__
 User join/exit notifications: **${config.invLogToggle ? ('#' + getChannelName(config.channelInvLogs)) : 'off.'}**
 Counting: **${config.countingToggle ? ('#' + getChannelName(config.countingChannelId)) : 'off.'}**
-Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}**
+Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}** (Note: does nothing at this time)
+Event announcement channel: **${config.eventInfoChannelId ? ('#' + getChannelName(config.eventInfoChannelId)) : 'not set.'}**
 
 __Pins:__
 Pin reacts needed to pin a message: **${config.pinsToPin}**
@@ -173,6 +177,7 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
           replyContent += ' What would you like to change it to? (case sensitive)';
           message.channel.send(replyContent);
           reply = await msgCollector();
+          if(!reply) {return;}
           if (reply.content.includes(' ')) { return message.channel.send('Sorry, I am unable to utilize prefixes that include a space.'); }
           else if (disallowedPrefix.some(noPrefix => reply.content.toLowerCase().includes(noPrefix.toLowerCase()))) { return message.channel.send('Sorry, the characters ' + disallowedPrefix.join('') + ' cannot be used in a prefix as each will conflict with some functionality of Discord.'); }
           else {
@@ -206,7 +211,9 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
           replyContent += ' Please #mention the channel you would like it changed to, or copy/paste the channel ID.';
           message.channel.send(replyContent);
           reply = await msgCollector();
-          const newChannel = getChannel(reply.content);
+          if(!reply) {return;}
+          const newChannel = await getChannel(reply.content);
+          const oldChannelID = config[changeName] || null;
           if (newChannel) {
             config[changeName] = newChannel.id;
             writeConfig();
@@ -216,7 +223,11 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
               writeCounting();
               return message.channel.send(`${changeDesc} is now ${newChannel}. Count has been reset to 0.`);
             }
-            return message.channel.send(`${changeDesc} is now ${newChannel}`);
+            if (changeName == 'eventInfoChannelId') {
+              await event.regenMsgs(oldChannelID, newChannel.id, message.guild);
+              return message.channel.send(`${changeDesc} is now ${newChannel}. Deleting info messages from old channel (if applicable) and recreating.`);
+            }
+            return message.channel.send(`${changeDesc} is now ${newChannel}.`);
           }
           else {return message.channel.send(`Sorry, I couldn't parse '${reply.content}' into a channel. Please #mention the channel or copy/paste the channel ID.`);}
         }
@@ -224,6 +235,7 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
           replyContent += ' Please @mention the role you would like it changed to, or copy/paste the role ID.';
           message.channel.send(replyContent);
           reply = await msgCollector();
+          if(!reply) {return;}
           const newRole = await getRole(reply.content);
           if (newRole) {
             config[changeName] = newRole.id;
@@ -236,6 +248,7 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
           replyContent += ' What would you like to change it to?';
           message.channel.send(replyContent);
           reply = await msgCollector();
+          if(!reply) {return;}
           if (!reply.content.includes('.') && parseInt(reply.content)) {
             config[changeName] = parseInt(reply.content);
             writeConfig();
@@ -247,9 +260,11 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
           replyContent += ' Would you like to add or remove a channel from the list?';
           message.channel.send(replyContent);
           reply = await msgCollector();
+          if(!reply) {return;}
           if (reply.content.toLowerCase() == 'add') {
             message.channel.send('Please #mention the channel you would like to add to the list, or copy/paste the channel ID.');
             reply = await msgCollector();
+            if(!reply) {return;}
             const newChannel = await getChannel(reply.content);
             if (!config[changeName].includes(newChannel.id)) {
               config[changeName].push(newChannel.id);
