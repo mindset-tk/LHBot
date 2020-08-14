@@ -12,6 +12,12 @@ const LOCAL_TIMEZONES = [
     locale: 'America/Porto_Velho',
   },
   {
+    name: 'Atlantic Time',
+    abbr: 'AST',
+    dstAbbr: 'ADT',
+    locale: 'America/Moncton',
+  },
+  {
     name: 'Australian Central Time',
     abbr: 'ACST',
     dstAbbr: 'ACDT',
@@ -121,6 +127,12 @@ const LOCAL_TIMEZONES = [
     abbr: 'NZST',
     dstAbbr: 'NZDT',
     locale: 'Pacific/Auckland',
+  },
+  {
+    name: 'Newfoundland Time',
+    abbr: 'NST',
+    dstAbbr: 'NDT',
+    locale: 'America/St_Johns',
   },
   {
     name: 'Pacific Time',
