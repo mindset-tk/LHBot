@@ -25,6 +25,18 @@ module.exports = {
       return message.channel.send(`Sorry, I don't have permission to set the limit in that channel.`);
     }
 
+    if (voiceChannel.userLimit == 0) {
+      return message.channel.send(`Sorry, I can only set the user limit on channels that already have a limit.`);
+    }
+
+    if (!Number.isInteger(args[0])) {
+      return message.channel.send(`You'll need to give me a number to set the user limit to`);
+    }
+
+    if (args[0] == 0) {
+      return message.channel.send(`Sorry, I cannot remove the limit from a channel.`);
+    }
+
     voiceChannel.setUserLimit(args[0]);
 
     return message.channel.send(`Set the user limit in ${voiceChannel.name} to ${args[0]}.`);
