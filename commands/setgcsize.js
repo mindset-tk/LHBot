@@ -9,7 +9,7 @@ module.exports = {
   usage: '[new size]',
   cooldown: 3,
   guildOnly: true,
-  staffOnly: true,
+  staffOnly: false,
   args: true,
   execute(message, args, client) {
     if (!config.vcSizeChannelIds.includes(message.channel.id)) {
