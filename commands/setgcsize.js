@@ -12,7 +12,9 @@ module.exports = {
   staffOnly: false,
   args: true,
   execute(message, args, client) {
-    if (!config.vcSizeChannelIds.includes(message.channel.id)) {
+    var isStaff = message.member.roles.cache.has(config.roleStaff);
+
+    if (!isStaff && !config.vcSizeChannelIds.includes(message.channel.id)) {
       var outMsg = 'Please use this command only in these channels:';
       config.vcSizeChannelIds.forEach(channelId => outMsg += ' <#' + message.guild.channels.resolve(channelId).id + '>'); 
       return message.channel.send(outMsg);
@@ -30,16 +32,13 @@ module.exports = {
 
     //Find the channel
     var voiceChannel;
-    if(args.length > 1)
+    if(args.length > 1 && isStaff)
     {
-      if(message.member.roles.cache.has(config.roleStaff))
+      //Check for second argument
+      var vcArg = message.guild.channels.resolve(args[1])
+      if(vcArg && vcArg.type == "voice")
       {
-        //Check for second argument
-        var vcArg = message.guild.channels.resolve(args[1])
-        if(vcArg && vcArg.type == "voice")
-        {
-          voiceChannel = vcArg;
-        }
+        voiceChannel = vcArg;
       }
     }
 
