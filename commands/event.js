@@ -520,11 +520,11 @@ class EventManager {
     const tzMessage = this.timeZoneInfoMessage[guildId];
 
     const tzTemplateParams = {
-      tzlist: tz.LOCAL_TIMEZONES.map(({name, abbr, dstAbbr}) => {
+      tzlist: tz.LOCAL_TIMEZONES.map(({ name, abbr, dstAbbr }) => {
         // Show DST and standard abbreviation together, where needed
         const tzAbbrs = dstAbbr ? `${abbr}/${dstAbbr}` : abbr;
 
-        return `${tzAbbrs} - ${name}`
+        return `${tzAbbrs} - ${name}`;
       }).join('\n'),
     };
 
@@ -783,6 +783,7 @@ async function editCommand(message, client, name) {
           let awaitYN = true;
           while (awaitYN == true) {
             reply = await DMCollector(DMChannel);
+            if (!reply) {return;}
             switch (reply.content.toLowerCase()) {
             case 'n':
             case 'no':
@@ -1152,6 +1153,7 @@ async function createWizard(message) {
     DMChannel.send(`Before we get started, it looks like you don't have a time zone set on file. Would you like to add one now? **Y/N**\n\n**PLEASE NOTE** this will store your userID and time zone on file (this data will be deleted if you leave the server). If you are not comfortable with this, say **N** and you will not be asked again, but all events you create will be in the server time zone (currently **${getTimeZoneCanonicalDisplayName(getGuildTimeZone(message.guild))}**, but staff can change this setting at any time.) No matter what you elect to do, you can still change it at a later date with the ${config.prefix}event tz command. You may also type 'cancel' to quit event creation entirely; no data is stored in this case.`);
     while (awaitingAnswer) {
       reply = await DMCollector(DMChannel);
+      if (!reply) {return;}
       switch (reply.content.toLowerCase()) {
       case 'n':
       case 'no':
@@ -1177,6 +1179,7 @@ async function createWizard(message) {
     }
     while (needTZ) {
       reply = await DMCollector(DMChannel);
+      if (!reply) {return;}
       if (reply.content.toLowerCase() == 'cancel') {
         await setUserTimeZone(message.author, 'server');
         needTZ = false;
@@ -1310,6 +1313,7 @@ async function createWizard(message) {
         let awaitYN = true;
         while (awaitYN == true) {
           reply = await DMCollector(DMChannel);
+          if (!reply) {return;}
           switch (reply.content.toLowerCase()) {
           case 'n':
           case 'no':
@@ -1342,6 +1346,7 @@ async function createWizard(message) {
   awaitingAnswer = true;
   while (awaitingAnswer) {
     reply = await DMCollector(DMChannel);
+    if (!reply) {return;}
     switch (reply.content.toLowerCase()) {
     case 'n':
     case 'no':
@@ -1367,6 +1372,7 @@ async function createWizard(message) {
   let description;
   while(needsDesc == true) {
     reply = await DMCollector(DMChannel);
+    if (!reply) {return;}
     description = reply.content.toLowerCase();
     switch (description) {
     case 'cancel':
@@ -1383,6 +1389,7 @@ async function createWizard(message) {
       awaitingAnswer = true;
       while (awaitingAnswer) {
         reply = await DMCollector(DMChannel);
+        if (!reply) {return;}
         switch (reply.content.toLowerCase()) {
         case 'n':
         case 'no':
@@ -1421,6 +1428,7 @@ async function createWizard(message) {
   let awaitYN = true;
   while (awaitYN == true) {
     reply = await DMCollector(DMChannel);
+    if (!reply) {return;}
     switch (reply.content.toLowerCase()) {
     case 'n':
     case 'no':
