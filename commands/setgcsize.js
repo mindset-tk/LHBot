@@ -4,7 +4,7 @@ const configPath = path.resolve('./config.json');
 const config = require(configPath);
 
 module.exports = {
-  name: 'setuserlimit',
+  name: 'vcsize',
   description: 'Sets the size of the voice channel that the user is in, if the channel already has a user limit. Can only be used in text channels in the VOICE CHAT category',
   usage: '[new size]',
   cooldown: 3,
