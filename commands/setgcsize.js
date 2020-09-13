@@ -16,8 +16,36 @@ module.exports = {
       return message.channel.send('Please use this command only in the #voice-chat channels.');
     }
 
-    const voiceChannel = message.member.voice.channel;
-    if (!voiceChannel) return message.channel.send('Please join a voice channel and try again!');
+    let newSize = parseInt(args[0]);
+
+    if (isNaN(newSize)) {
+      return message.channel.send(`You'll need to give me a number to set the user limit to`);
+    }
+
+    if (newSize == 0) {
+      return message.channel.send(`Sorry, I cannot remove the limit from a channel.`);
+    }
+
+    //Find the channel
+    var voiceChannel;
+    if(args.length > 1)
+    {
+      if(message.member.roles.cache.has(config.roleStaff))
+      {
+        //Check for second argument
+        var vcArg = message.guild.channels.resolve(args[1])
+        if(vcArg && vcArg.type == "voice")
+        {
+          voiceChannel = vcArg;
+        }
+      }
+    }
+
+    if(!voiceChannel)
+    {
+      voiceChannel = message.member.voice.channel;
+      if (!voiceChannel) return message.channel.send('Please join a voice channel and try again!');
+    }
     
     const mypermissions = message.guild.me.permissionsIn(voiceChannel);
     // console.log(permissions);
@@ -27,16 +55,6 @@ module.exports = {
 
     if (voiceChannel.userLimit == 0) {
       return message.channel.send(`Sorry, I can only set the user limit on channels that already have a limit.`);
-    }
-
-    let newSize = parseInt(args[0]);
-
-    if (isNaN(newSize)) {
-      return message.channel.send(`You'll need to give me a number to set the user limit to`);
-    }
-
-    if (newSize == 0) {
-      return message.channel.send(`Sorry, I cannot remove the limit from a channel.`);
     }
 
     voiceChannel.setUserLimit(newSize);
