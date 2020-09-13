@@ -12,8 +12,10 @@ module.exports = {
   staffOnly: true,
   args: true,
   execute(message, args, client) {
-    if (!config.voiceTextChannelIds.includes(message.channel.id)) {
-      return message.channel.send('Please use this command only in the #voice-chat channels.');
+    if (!config.vcSizeChannelIds.includes(message.channel.id)) {
+      var outMsg = 'Please use this command only in these channels:';
+      config.vcSizeChannelIds.forEach(channelId => outMsg += ' <#' + message.guild.channels.resolve(channelId).id + '>'); 
+      return message.channel.send(outMsg);
     }
 
     let newSize = parseInt(args[0]);
