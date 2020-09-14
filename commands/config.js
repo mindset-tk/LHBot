@@ -118,7 +118,9 @@ module.exports = {
 
     function outputConfig() {
       const ignoreChans = [];
+      const voiceTextChans = [];
       config.pinIgnoreChannels.forEach(chanID => ignoreChans.push(getChannelName(chanID)));
+      config.voiceTextChannelIds.forEach(chanID => voiceTextChans.push(getChannelName(chanID)));
       return `Here's my current configuration:
 __General settings__
 Command prefix: **${config.prefix}**
@@ -128,6 +130,7 @@ Member role: **@${getRoleName(config.roleComrade)}**
 __Special Channels:__
 User join/exit notifications: **${config.invLogToggle ? ('#' + getChannelName(config.channelInvLogs)) : 'off.'}**
 Counting: **${config.countingToggle ? ('#' + getChannelName(config.countingChannelId)) : 'off.'}**
+Text channels to use for voice-related commands: **${(config.voiceTextChannelIds[0]) ? '#' + voiceTextChans.join(', #') : 'None'}**
 Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}** (Note: does nothing at this time)
 Event announcement channel: **${config.eventInfoChannelId ? ('#' + getChannelName(config.eventInfoChannelId)) : 'not set.'}**
 
@@ -146,6 +149,7 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
     else {
       message.channel.send(outputConfig() + '\n\n**Would you like to change any of these settings? (Y/N)**');
       let reply = await msgCollector();
+      if (!reply) { return; }
       if (reply.content.toLowerCase() == 'n' || reply.content.toLowerCase() == 'no') {
         return message.channel.send('OK!');
       }
@@ -190,6 +194,7 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
           replyContent += ' Would you like to turn it on or off?';
           message.channel.send(replyContent);
           reply = await msgCollector();
+          if (!reply) {return;}
           switch (reply.content.toLowerCase()) {
           case 'on':
           case 'true':
