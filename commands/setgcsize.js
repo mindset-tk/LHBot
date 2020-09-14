@@ -5,7 +5,7 @@ const config = require(configPath);
 
 module.exports = {
   name: 'vcsize',
-  description: 'Sets the size of the voice channel that the user is in, if the channel already has a user limit. Can only be used in text channels in the VOICE CHAT category',
+  description: 'Sets the size of the voice channel that the user is in, if the channel already has a user limit. Can only be used in text channels in the VOICE CHAT category.  The maximum user limit for a channel is 99 (Discord limitation).',
   usage: '[new size]',
   cooldown: 3,
   guildOnly: true,
@@ -14,9 +14,9 @@ module.exports = {
   execute(message, args, client) {
     var isStaff = message.member.roles.cache.has(config.roleStaff);
 
-    if (!isStaff && !config.vcSizeChannelIds.includes(message.channel.id)) {
+    if (!isStaff && !config.voiceTextChannelIds.includes(message.channel.id)) {
       var outMsg = 'Please use this command only in these channels:';
-      config.vcSizeChannelIds.forEach(channelId => outMsg += ' <#' + message.guild.channels.resolve(channelId).id + '>'); 
+      config.voiceTextChannelIds.forEach(channelId => outMsg += ' <#' + message.guild.channels.resolve(channelId).id + '>'); 
       return message.channel.send(outMsg);
     }
 
@@ -28,6 +28,10 @@ module.exports = {
 
     if (newSize == 0) {
       return message.channel.send(`Sorry, I cannot remove the limit from a channel.`);
+    }
+
+    if (newSize > 99) {
+      return message.channel.send('Sorry, I cannot set a limit higher than 99.');
     }
 
     //Find the channel
