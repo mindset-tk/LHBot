@@ -17,7 +17,6 @@ function PublicVCSnapbackCheck(oldState, newState, client) {
       (lastVoiceChannel.userLimit != config.voiceChamberDefaultSizes[oldUserChannel].Size || //(the current userlimit is different from the default OR
       lastVoiceChannel.name != config.voiceChamberDefaultSizes[oldUserChannel].Name)) //the current name is different from the default)
       {
-    // User leaves a voice channel OR switches channels, and the old channel is now empty, and is in the list of config'd channels, and the size was changed to begin with
 	setTimeout(StillEmpty, 1000, lastVoiceChannel, client); //ideally make configurable! gonna do a 5min default
   }
 }
