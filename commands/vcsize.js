@@ -62,8 +62,6 @@ module.exports = {
       return message.channel.send(`Sorry, I can only set the user limit on channels that already have a configured limit.`);
     }
     
-    if (voiceChannel.id == 0) {
-    }
     voiceChannel.setUserLimit(newSize);
     return message.channel.send(`Set the user limit in ${voiceChannel.name} to ${args[0]}.`);
   }

@@ -16,7 +16,6 @@ function writeCounting() {
     }
   });
 }
-//console.log(JSON.stringify(`be,!\e"p`))
 
 module.exports = {
   name: 'config',

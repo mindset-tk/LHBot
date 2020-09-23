@@ -5,8 +5,7 @@ const Discord = require('discord.js');
 const configPath = './config.json';
 const config = require(configPath);
 const Counting = require('./counting.js');
-const voice = require('./voice.js');
-//fix next line
+const vccheck = require('./commands/vccheck.js');
 const wait = require('util').promisify(setTimeout);
 const listPath = './gamelist.json';
 const gameList = require(listPath);
@@ -75,7 +74,7 @@ client.on('ready', async () => {
   console.log('Ready!');
   client.user.setActivity(config.currentActivity.Name, { type: config.currentActivity.Type });
   Counting.OnReady(config, client);
-  voice.OnReady(client);
+  vccheck.OnReady(client);
   // Lock datalog while caching offline messages. When that finishes, the callback will unlock the log.
   dataLogLock = 1;
   console.log('Fetching offline messages...');
@@ -94,8 +93,8 @@ client.on('ready', async () => {
 
 //set up listener to revert configured game chambers to their default sizes
 client.on('voiceStateUpdate', (oldState, newState) => { 
-  if (voice.VCSnapbackCheck) {
-      voice.VCSnapbackCheck (oldState, newState, client);
+  if (vccheck.ChannelSnapbackCheck) {
+      vccheck.ChannelSnapbackCheck (oldState, newState, client);
   } 
 });
      

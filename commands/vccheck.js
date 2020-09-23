@@ -4,7 +4,7 @@ const configPath = path.resolve('./config.json');
 const config = require(configPath);
 
 
-function PublicVCSnapbackCheck(oldState, newState, client) {
+function PublicChannelSnapbackCheck(oldState, newState, client) {
   if (!config.voiceChamberDefaultSizes) {return;}
   let newUserChannel = newState.channelID;
   let oldUserChannel = oldState.channelID;
@@ -54,6 +54,18 @@ function PublicOnReady(client) {
   }
 }
 
-exports.OnReady = PublicOnReady;
-exports.VCSnapbackCheck = PublicVCSnapbackCheck;
-//initialize GCs on bot start if nobody's in them
+module.exports = {
+  name: 'vccheck',
+  description: 'Checks if any of the voice channels need to be snapped back, and does that if so',
+  usage: '',
+  cooldown: 3,
+  guildOnly: true,
+  staffOnly: true,
+  args: false,
+  execute(message, args, client) {
+    PublicOnReady (client);
+  }
+};
+
+module.exports.OnReady = PublicOnReady;
+module.exports.ChannelSnapbackCheck = PublicChannelSnapbackCheck;

@@ -46,10 +46,7 @@ module.exports = {
       return message.channel.send(`Sorry, I don't have permission to set the limit in that channel.`);
     }
     if (!config.voiceChamberDefaultSizes[voiceChannel.id]) {
-      return message.channel.send(`Sorry, I can only set the user limit on channels that already have a configured limit.`);
-    }
-
-    if (voiceChannel.id == 0) {
+      return message.channel.send(`Sorry, I can only set the name on channels that already have a configured limit.`);
     }
 
     voiceChannel.setName(args.join(' '));
