@@ -50,7 +50,7 @@ module.exports = {
     }
 
     voiceChannel.setName(args.join(' '));
-    return message.channel.send(`Set the temporary of **${config.voiceChamberDefaultSizes[voiceChannel.id].Name}** to **${args.join(' ')}**.`);
+    return message.channel.send(`Set the temporary name of **${config.voiceChamberDefaultSizes[voiceChannel.id].Name}** to **${args.join(' ')}**.`);
 
   }
 };
