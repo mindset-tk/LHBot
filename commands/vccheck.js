@@ -10,7 +10,6 @@ function PublicChannelSnapbackCheck(oldState, newState, client) {
   let oldUserChannel = oldState.channelID;
   let lastVoiceChannel = client.channels.resolve(oldUserChannel);
 //  if(!oldUserChannel && newUserChannel) {     // User Joins a voice channel after not being in one (not currently needed)
-//     console.log(oldState);
   if((!newUserChannel || (oldUserChannel && newUserChannel)) && //leaving voice or changing channels AND
       lastVoiceChannel.members.size == 0 && //channel is empty AND
       config.voiceChamberDefaultSizes[oldUserChannel] &&  //channel being left is configured AND
@@ -31,7 +30,6 @@ function StillEmpty(channel, client) {
       if (channel.name !== config.voiceChamberDefaultSizes[channel.id].Name) { //is the current name is different from the default?
         channel.setName(config.voiceChamberDefaultSizes[channel.id].Name);
       }
-//    console.log(voiceChannel.userLimit);
 }
 }
 
