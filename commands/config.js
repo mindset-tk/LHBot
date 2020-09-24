@@ -41,6 +41,8 @@ module.exports = {
       ['countingToggle', 'Toggle counting', 'boolean'],
       ['countingChannelId', 'Counting channel', 'channel'],
       ['voiceTextChannelIds', 'Text channel(s) for voice commands', 'channelArray'],
+      ['voiceChamberDefaultSizes', 'Default sizes for size-limited channels', 'voiceChamberSettings'],
+      ['voiceChamberSnapbackDelay', 'Delay before empty size-limited channels revert to default sizes', 'integer'],
       ['pinsToPin', 'Number of pin reacts to pin a message', 'integer'],
       ['pinIgnoreChannels', 'Channel(s) to ignore for pinning', 'channelArray'],
       ['botChannelId', 'Bot stuff channel', 'channel'],
@@ -119,8 +121,10 @@ module.exports = {
     function outputConfig() {
       const ignoreChans = [];
       const voiceTextChans = [];
+      const cfgVoiceChans = [];
       config.pinIgnoreChannels.forEach(chanID => ignoreChans.push(getChannelName(chanID)));
       config.voiceTextChannelIds.forEach(chanID => voiceTextChans.push(getChannelName(chanID)));
+      Object.keys(config.voiceChamberDefaultSizes).forEach(chanID => cfgVoiceChans.push("#" + config.voiceChamberDefaultSizes[chanID].Name + " (Size: " + config.voiceChamberDefaultSizes[chanID].Size + ")"));
       return `Here's my current configuration:
 __General settings__
 Command prefix: **${config.prefix}**
@@ -131,6 +135,8 @@ __Special Channels:__
 User join/exit notifications: **${config.invLogToggle ? ('#' + getChannelName(config.channelInvLogs)) : 'off.'}**
 Counting: **${config.countingToggle ? ('#' + getChannelName(config.countingChannelId)) : 'off.'}**
 Text channels to use for voice-related commands: **${(config.voiceTextChannelIds[0]) ? '#' + voiceTextChans.join(', #') : 'None'}**
+Configured user-limited voice channels: **${(config.voiceChamberDefaultSizes) ? cfgVoiceChans.join(', ') : 'None'}**
+User-limited voice channels snapback delay: **${config.voiceChamberSnapbackDelay ? config.voiceChamberSnapbackDelay : 'Not set, defaulting to 5min'}**
 Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}** (Note: does nothing at this time)
 Event announcement channel: **${config.eventInfoChannelId ? ('#' + getChannelName(config.eventInfoChannelId)) : 'not set.'}**
 
@@ -261,6 +267,162 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
           }
           else {return message.channel.send(`Sorry, I couldn't parse '${reply.content}' into a count. Please enter an integer (no decimals).`);}
         }
+        
+        
+        
+        
+        
+        
+        else if (changeType == 'voiceChamberSettings') {
+          replyContent += ' Would you like to **add**, **remove**, or **change** a channel from the list?';
+          message.channel.send(replyContent);
+          reply = await msgCollector();
+          if(!reply) {return;}
+          if (reply.content.toLowerCase() == 'add') {
+            message.channel.send('Please paste the channel ID.');
+            reply = await msgCollector();
+            if(!reply) {return;}
+            const newChannel = await getChannel(reply.content);
+            if (!config[changeName]) {
+              config[changeName] = new Object();
+            }
+            if (!config[changeName][newChannel.id]) {
+              config[changeName][newChannel.id] = new Object();
+              message.channel.send('Please enter the default name for the channel (this should really be 24 chars or less). You can say "current" to use the name it already has');
+              reply = await msgCollector();
+              if(!reply) {return;}
+              if(reply.content.toLowerCase() == 'current') {
+                config[changeName][newChannel.id]["Name"] = newChannel.name.replace(/"/g, '');
+              } else {
+                config[changeName][newChannel.id]["Name"] = reply.content.replace(/"/g, '');
+              }
+              message.channel.send('Please send the default user limit for this channel (e.g. "4")');
+              reply = await msgCollector();
+              if(!reply) {return;}         
+              if (!reply.content.includes('.') && parseInt(reply.content) && reply.content <= 99) {
+                config[changeName][newChannel.id]["Size"] = reply.content;
+                writeConfig();
+                return message.channel.send(`Added ${newChannel} to the list of voice chambers with a default size of **${parseInt(reply.content)}**`);
+              }
+              else {return message.channel.send(`Sorry, I couldn't parse '${reply.content}' into a count or the entry was over 99 (discord's max). Please enter an integer (no decimals) 99 or under.`);}
+            }
+            else {return message.channel.send(`${newChannel} is already in the list of voice chambers`);}
+          }
+          
+          else if (reply.content.toLowerCase() == 'remove') {
+            if(!config.voiceChamberDefaultSizes) { return message.channel.send("No channels have been setup, you should do that first"); }
+            else if(Object.keys(config[changeName]).length == 0) { return message.channel.send("No channels have been setup, you should do that first"); }
+            
+            const chanArr = [];
+            const msgArr = [];
+            i = 0;
+            for (const chanID in config[changeName]) {
+              i++;
+              const chan = await getChannel(chanID);
+              if (chan) {
+                chanArr.push(chan);
+                msgArr.push(`${i}. ${config[changeName][chanID]["Name"]}`);
+              }
+              else {
+                msgArr.push(`Bad channel ID in config.json! See console for details; type ${i} to just delete this entry.`);
+                console.log(`Could not find channel ID ${chanID} in ${changeName}!`);
+              }
+            }
+            message.channel.send(`Please choose from the following to remove:\n${msgArr.join('\n')}\ntype all to remove all items.\ntype 0 to cancel.`);
+            reply = await msgCollector();
+            if (!reply) { return; }
+            else if (reply.content.toLowerCase() == "all") {
+              config[changeName] = {};
+              writeConfig();
+              return message.channel.send(`Cleared all *${changeDesc}* entries.`);
+            }
+            else if (parseInt(reply.content) > Object.keys(config[changeName]).length) {
+              return message.channel.send('Invalid entry! That\'s more than the highest item on the list!');
+            }
+            else if (reply.content == 0) {
+              return message.channel.send('Canceled. No values changed.');
+            }
+            else if (reply.content.includes('.') || !parseInt(reply.content)) {
+              return message.channel.send('Sorry, I couldn\'t parse that. Please answer with only the number of your response.');
+            }
+            else {
+              const indexToRemove = parseInt(reply.content) - 1;
+              const removedChan = await getChannel(Object.keys(config[changeName])[indexToRemove]);
+              delete config[changeName][Object.keys(config[changeName])[indexToRemove]];
+              writeConfig();
+              if (removedChan) { return message.channel.send(`Removed ${removedChan} from *${changeDesc}*.`); }
+              else { return message.channel.send(`Removed bad entry ${config[changeName][indexToRemove]} from *${changeDesc}*`); }
+            }
+          }
+          
+          else if (reply.content.toLowerCase() == 'change') {
+            if(!config.voiceChamberDefaultSizes) { return message.channel.send("No channels have been setup, you should do that first"); }
+            else if(Object.keys(config[changeName]).length == 0) { return message.channel.send("No channels have been setup, you should do that first"); }
+            
+            const chanArr = [];
+            const msgArr = [];
+            i = 0;
+            for (const chanID in config[changeName]) {
+              i++;
+              const chan = await getChannel(chanID);
+              if (chan) {
+                chanArr.push(chan);
+                msgArr.push(`${i}. ${config[changeName][chanID]["Name"]} (default size: ${config[changeName][chanID]["Size"]})`);
+              }
+              else {
+                msgArr.push(`Bad channel ID in config.json! See console for details; type ${i} to just delete this entry.`);
+                console.log(`Could not find channel ID ${chanID} in ${changeName}!`);
+              }
+            }
+            message.channel.send(`Please choose from the following to change:\n${msgArr.join('\n')}\ntype 0 to cancel.`);
+            reply = await msgCollector();
+            if (!reply) { return; }
+            else if (parseInt(reply.content) > Object.keys(config[changeName]).length) {
+              return message.channel.send('Invalid entry! That\'s more than the highest item on the list!');
+            }
+            else if (reply.content == 0) {
+              return message.channel.send('Canceled. No values changed.');
+            }
+            else if (reply.content.includes('.') || !parseInt(reply.content)) {
+              return message.channel.send('Sorry, I couldn\'t parse that. Please answer with only the number of your response.');
+            }
+            else {
+              const indexToChange = parseInt(reply.content) - 1;
+              const chanID = Object.keys(config[changeName])[indexToChange];
+
+              message.channel.send(`Do you want to change the default **name**, **size**, or **both**?`);
+              reply = await msgCollector();
+              if (!reply) { return; }
+
+              const changeType = reply.content.toLowerCase();              
+              
+              if (changeType == "name" || changeType == "both") {
+                message.channel.send('Please enter the default name for the channel (this should really be 24 chars or less)');
+                reply = await msgCollector();
+                if(!reply) {return;}         
+                config[changeName][chanID]["Name"] = reply.content.replace(/"/g, '');
+              }
+  
+              if (changeType == "size" || changeType == "both") {
+                message.channel.send('Please send the default user limit for this channel (e.g. "4")');
+                reply = await msgCollector();
+                if(!reply) {return;}         
+                if (!reply.content.includes('.') && parseInt(reply.content) && reply.content <= 99) {
+                  config[changeName][chanID]["Size"] = reply.content;
+                } else {
+                  return message.channel.send("Sorry, I couldn't parse that, or the entry was over 99 (discord's max). Please enter an integer (no decimals) 99 or under.");
+                }
+              }
+
+            writeConfig();
+            return message.channel.send(`Updated ${config[changeName][chanID]["Name"]}'s defaults. The default size is **${config[changeName][chanID]["Size"]}**`);
+            }
+          }
+        }
+
+
+
+            
         else if (changeType == 'channelArray') {
           replyContent += ' Would you like to add or remove a channel from the list?';
           message.channel.send(replyContent);
