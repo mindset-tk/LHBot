@@ -1,6 +1,22 @@
 // require the filesystem and discord.js modules, and pull data from config.json
 require('console-stamp')(console, { pattern: 'mm/dd/yy HH:MM:ss', label: false });
 const fs = require('fs');
+
+//initialize any configs the a new instance doesn't start with to avoid breaking, and tell them to make use "config example.json" if they haven't done that
+const filenames = ["config.json", "counting.json", "gamelist.json", "datalog.json"];
+filenames.forEach(filename => {
+  if (!fs.existsSync(filename)) {
+    if (filename != "config.json") {
+      fs.writeFileSync(filename, "{}", function (err) {
+        if (err) return console.log(err);
+      });
+    } else {
+      console.log("ERROR: You need to make a config.json. See 'config example.json' for a template");
+      process.exit(0);
+    }
+  }
+});
+
 const Discord = require('discord.js');
 const configPath = './config.json';
 const config = require(configPath);
