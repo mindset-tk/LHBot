@@ -41,7 +41,8 @@ module.exports = {
       ['countingToggle', 'Toggle counting', 'boolean'],
       ['countingChannelId', 'Counting channel', 'channel'],
       ['voiceTextChannelIds', 'Text channel(s) for voice commands', 'channelArray'],
-      ['voiceChamberDefaultSizes', 'default sizes for size-limited channels', 'voiceChamberSettings'],
+      ['voiceChamberDefaultSizes', 'Default sizes for size-limited channels', 'voiceChamberSettings'],
+      ['voiceChamberSnapbackDelay', 'Delay before empty size-limited channels revert to default sizes', 'integer'],
       ['pinsToPin', 'Number of pin reacts to pin a message', 'integer'],
       ['pinIgnoreChannels', 'Channel(s) to ignore for pinning', 'channelArray'],
       ['botChannelId', 'Bot stuff channel', 'channel'],
@@ -123,7 +124,7 @@ module.exports = {
       const cfgVoiceChans = [];
       config.pinIgnoreChannels.forEach(chanID => ignoreChans.push(getChannelName(chanID)));
       config.voiceTextChannelIds.forEach(chanID => voiceTextChans.push(getChannelName(chanID)));
-//      config.voiceChamberDefaultSizes.forEach(chanID => cfgVoiceChans.push(getChannelName(chanID)));
+      Object.keys(config.voiceChamberDefaultSizes).forEach(chanID => cfgVoiceChans.push("#" + config.voiceChamberDefaultSizes[chanID].Name + " (Size: " + config.voiceChamberDefaultSizes[chanID].Size + ")"));
       return `Here's my current configuration:
 __General settings__
 Command prefix: **${config.prefix}**
@@ -134,7 +135,8 @@ __Special Channels:__
 User join/exit notifications: **${config.invLogToggle ? ('#' + getChannelName(config.channelInvLogs)) : 'off.'}**
 Counting: **${config.countingToggle ? ('#' + getChannelName(config.countingChannelId)) : 'off.'}**
 Text channels to use for voice-related commands: **${(config.voiceTextChannelIds[0]) ? '#' + voiceTextChans.join(', #') : 'None'}**
-Voice channels with configured user limits: **${(config.voiceChamberDefaultSizes) ? '#' + cfgVoiceChans.join(', #') : 'None'}**
+Configured user-limited voice channels: **${(config.voiceChamberDefaultSizes) ? cfgVoiceChans.join(', ') : 'None'}**
+User-limited voice channels snapback delay: **${config.voiceChamberSnapbackDelay ? config.voiceChamberSnapbackDelay : 'Not set, defaulting to 5min'}**
 Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}** (Note: does nothing at this time)
 Event announcement channel: **${config.eventInfoChannelId ? ('#' + getChannelName(config.eventInfoChannelId)) : 'not set.'}**
 
@@ -286,19 +288,23 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
             }
             if (!config[changeName][newChannel.id]) {
               config[changeName][newChannel.id] = new Object();
-              message.channel.send('Please enter the default name for the channel (this should really be 24 chars or less)');
+              message.channel.send('Please enter the default name for the channel (this should really be 24 chars or less). You can say "current" to use the name it already has');
               reply = await msgCollector();
-              if(!reply) {return;}         
-              config[changeName][newChannel.id]["Name"] = reply.content.replace(/"/g, '');
+              if(!reply) {return;}
+              if(reply.content.toLowerCase() == 'current') {
+                config[changeName][newChannel.id]["Name"] = newChannel.name.replace(/"/g, '');
+              } else {
+                config[changeName][newChannel.id]["Name"] = reply.content.replace(/"/g, '');
+              }
               message.channel.send('Please send the default user limit for this channel (e.g. "4")');
               reply = await msgCollector();
               if(!reply) {return;}         
-              if (!reply.content.includes('.') && parseInt(reply.content)) {
+              if (!reply.content.includes('.') && parseInt(reply.content) && reply.content <= 99) {
                 config[changeName][newChannel.id]["Size"] = reply.content;
                 writeConfig();
                 return message.channel.send(`Added ${newChannel} to the list of voice chambers with a default size of **${parseInt(reply.content)}**`);
               }
-              else {return message.channel.send(`Sorry, I couldn't parse '${reply.content}' into a count. Please enter an integer (no decimals).`);}
+              else {return message.channel.send(`Sorry, I couldn't parse '${reply.content}' into a count or the entry was over 99 (discord's max). Please enter an integer (no decimals) 99 or under.`);}
             }
             else {return message.channel.send(`${newChannel} is already in the list of voice chambers`);}
           }
@@ -401,8 +407,10 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
                 message.channel.send('Please send the default user limit for this channel (e.g. "4")');
                 reply = await msgCollector();
                 if(!reply) {return;}         
-                if (!reply.content.includes('.') && parseInt(reply.content)) {
+                if (!reply.content.includes('.') && parseInt(reply.content) && reply.content <= 99) {
                   config[changeName][chanID]["Size"] = reply.content;
+                } else {
+                  return message.channel.send("Sorry, I couldn't parse that, or the entry was over 99 (discord's max). Please enter an integer (no decimals) 99 or under.");
                 }
               }
 

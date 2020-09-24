@@ -17,7 +17,8 @@ function PublicChannelSnapbackCheck(oldState, newState, client) {
       (lastVoiceChannel.userLimit != config.voiceChamberDefaultSizes[oldUserChannel].Size || //(the current userlimit is different from the default OR
       lastVoiceChannel.name != config.voiceChamberDefaultSizes[oldUserChannel].Name)) //the current name is different from the default)
       {
-	setTimeout(StillEmpty, 1000, lastVoiceChannel, client); //ideally make configurable! gonna do a 5min default
+      let snapbackDelay = ((config.voiceChamberSnapbackDelay) ? (config.voiceChamberSnapbackDelay * 60000) : 300000);
+      setTimeout(StillEmpty, snapbackDelay, lastVoiceChannel, client);
   }
 }
 
