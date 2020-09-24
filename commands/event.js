@@ -1119,10 +1119,10 @@ async function msgCollector(message) {
   let reply = false;
   // create a filter to ensure output is only accepted from the author who initiated the command.
   const filter = input => (input.author.id === message.author.id);
-  await message.channel.awaitMessages(filter, { max: 1, time: 180000, errors: ['time'] })
+  await message.channel.awaitMessages(filter, { max: 1, time: 30000, errors: ['time'] })
     // this method creates a collection; since there is only one entry we get the data from collected.first
     .then(collected => reply = collected.first())
-    .catch(collected => message.channel.send('Sorry, I waited 3 minutes with no response, please run the command again.'));
+    .catch(collected => message.channel.send('Sorry, I waited 30 seconds with no response, please run the command again.'));
   // console.log('Reply processed...');
   return reply;
 }
@@ -1141,7 +1141,7 @@ async function DMCollector(DMChannel) {
   return reply;
 }
 
-async function createWizard(message) {
+async function createWizard(message, channel) {
   let eventData = {};
   let awaitingAnswer = true;
   let reply;
@@ -1414,7 +1414,7 @@ async function createWizard(message) {
       }
     }
   }
-  eventData.channel = message.channel.id;
+  eventData.channel = channel.id;
   eventData.owner = message.author.id;
   eventData.guild = message.guild.id;
 
@@ -1477,8 +1477,8 @@ async function createWizard(message) {
   eventData.role = role.id;
 
   await eventManager.add(eventData);
-
-  return message.channel.send(
+  
+  return channel.send(
     embedEvent(eventData, null, {
       title: `New event: ${eventData.name}`,
       forUser: message.author.id,
@@ -1542,14 +1542,42 @@ Staff can add users to the event by hand simply by giving any user the associate
   staffOnly: false,
   args: true,
   async execute(message, args, client) {
+
+    // function to get a channel object based on a channel ID or mention.
+    async function getChannel(ID) {
+      if (ID.startsWith('<#') && ID.endsWith('>')) {
+        ID = ID.slice(2, -1);
+        return await client.channels.cache.get(ID);
+      }
+      else {
+        try { return await client.channels.cache.get(ID);}
+          catch { return null;}
+        }
+    }
+
     // this is the segment that is being replaced by a wizard.
     let [subcommand, ...cmdArgs] = args;
     subcommand = subcommand.toLowerCase();
     switch (subcommand) {
     case 'add':
     case 'create':
+    case 'new':
+      message.channel.send('Please #mention the channel the event should take place in. For the current channel, just reply with `this`');
+      let newChannel;;
+      let reply = await msgCollector(message);
+      if (!reply) {return;}
+
+      else if (reply.content.toLowerCase() == 'this') {
+        newChannel = message.channel;
+      }
+      else
+      {
+        newChannel = await getChannel(reply.content);
+        if (!newChannel) {return message.channel.send("Please start the process again and #mention the channel or copy/paste the channel ID.");}
+      }
       message.channel.send('I\'ve opened a DM with you for event management.');
-      await createWizard(message);
+      await createWizard(message, newChannel);
+      
       return;
     case 'delete':
     case 'remove':
