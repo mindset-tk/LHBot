@@ -1563,7 +1563,7 @@ Staff can add users to the event by hand simply by giving any user the associate
     case 'create':
     case 'new':
       message.channel.send('Please #mention the channel the event should take place in. For the current channel, just reply with `this`');
-      let newChannel;;
+      let newChannel;
       let reply = await msgCollector(message);
       if (!reply) {return;}
 
