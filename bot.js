@@ -1,28 +1,98 @@
-// require the filesystem and discord.js modules, and pull data from config.json
+// function to pretty print the config data so that arrays show on one line, so it's easier to visually parse the config file when hand opening it. Purely cosmetic.
+function prettyPrintConfig(cfg) {
+  const output = JSON.stringify(cfg, function(k, v) {
+  if (v instanceof Array) {
+    return JSON.stringify(v);
+  }
+  return v;
+    }, 2).replace(/\\/g, '')
+  .replace(/"\[/g, '[')
+  .replace(/\]"/g, ']')
+  .replace(/"\{/g, '{')
+  .replace(/\}"/g, '}');
+  return output;
+}
+
+// function to write config to file.
+function writeConfig(cfg) {
+  fs.writeFileSync(configPath, prettyPrintConfig(cfg), function(err) {
+if (err) {
+  message.channel.send('There was an error saving the config file!');
+  return console.log(err);
+}
+  });
+}
+
+// require the filesystem and discord.js modules
 require('console-stamp')(console, { pattern: 'mm/dd/yy HH:MM:ss', label: false });
 const fs = require('fs');
+const Discord = require('discord.js');
+const configPath = './config.json';
+var config = undefined;
+const wait = require('util').promisify(setTimeout);
 
-//initialize any configs the a new instance doesn't start with to avoid breaking, and tell them to make use "config example.json" if they haven't done that
-const filenames = ["config.json", "counting.json", "gamelist.json", "datalog.json"];
-filenames.forEach(filename => {
-  if (!fs.existsSync(filename)) {
-    if (filename != "config.json") {
+//initialize or load any configs the a new instance doesn't start with to avoid breaking
+const CONFIG_FILENAMES = ["config.json", "counting.json", "gamelist.json", "datalog.json"];
+CONFIG_FILENAMES.forEach(filename => {
+
+  if (filename != "config.json") {
+    if (!fs.existsSync(filename)) {
       fs.writeFileSync(filename, "{}", function (err) {
         if (err) return console.log(err);
       });
-    } else {
-      console.log("ERROR: You need to make a config.json. See 'config example.json' for a template");
-      process.exit(0);
     }
+  } else {
+      const lastArg = process.argv[process.argv.length-1];
+      if (!fs.existsSync(filename)) {
+        freshConfig = new Object();
+        freshConfig.prefix = ".";
+        freshConfig.authtoken = (lastArg.length == 59) ? lastArg : "";
+        freshConfig.roleStaff = "";
+        freshConfig.roleComrade = "";
+        freshConfig.roleAirlock = "";
+        freshConfig.airlockPruneDays = "";
+        freshConfig.airlockPruneMessage = ""
+        freshConfig.invLogToggle = false;
+        freshConfig.channelInvLogs = "";
+        freshConfig.countingToggle = false;
+        freshConfig.countingChannelId = "";
+	freshConfig.countingFailMessages = [],
+	freshConfig.countingStartMessages = [],
+	freshConfig.countingFailRepeatMessages = [],
+	freshConfig.repeatReacts = [],
+        freshConfig.knownInvites = [],
+	freshConfig.eventInfoChannelId = "";
+	freshConfig.pinIgnoreChannels = [];
+	freshConfig.voiceTextChannelIds = [];
+	freshConfig.voiceChamberDefaultSizes = new Object();
+	freshConfig.voiceChamberSnapbackDelay = "";
+	freshConfig.currentActivity = new Object();
+	freshConfig.currentActivity.Type = "";
+	freshConfig.currentActivity.Name = "";
+	freshConfig.youTubeAPIKey = "";
+	writeConfig(freshConfig);
+	console.log("You haven't setup your 'config.json' file yet. A fresh one has been generated for you!");
+      }
+
+      config = require(configPath);
+      if (!config.authtoken) {
+      	if (lastArg.length == 59) {
+      	  config.authtoken = lastArg;
+          writeConfig(config);
+      	}
+      	else {
+          console.log ("ERROR: " + 
+                       "\n- You still need to enter your bot's discord auth key to continue!" + 
+                       "\n- You can do this by entering it into your 'config.json' *or*" +
+                       "\n  by passing your discord bot auth token as the final arg (just one time) when running this script next");
+          process.exit(1);
+        }
+      }
   }
 });
 
-const Discord = require('discord.js');
-const configPath = './config.json';
-const config = require(configPath);
 const Counting = require('./counting.js');
 const vccheck = require('./commands/vccheck.js');
-const wait = require('util').promisify(setTimeout);
 const listPath = './gamelist.json';
 const gameList = require(listPath);
 const dataLogger = require('./datalog.js');
@@ -283,9 +353,10 @@ client.on('guildMemberAdd', member => {
 });
 
 client.on('guildMemberRemove', member => {
+  const canLog = (config.invLogToggle && Boolean(config.channelInvLogs));
   const logChannel = client.channels.cache.get(config.channelInvLogs);
   const data = [];
-  logChannel.send(`${member} (${member.user.tag} / ${member.id}) left the server.`);
+  if (canLog) { logChannel.send(`${member} (${member.user.tag} / ${member.id}) left the server.`); }
   let exitConLog = `${member.user.tag} exited.`;
   Object.keys(gameList).forEach(sysname => {
     if (!gameList[sysname].accounts[0]) return;
@@ -299,7 +370,7 @@ client.on('guildMemberRemove', member => {
   if (data.length > 0) {exitConLog += ` removing from the following game rosters: ${data.join(', ')}.`;}
   fs.writeFile(listPath, JSON.stringify(gameList, null, 2), function(err) {
     if (err) {
-      logChannel.send('There was an error updating games list information for exited user!');
+      if (canLog) { logChannel.send('There was an error updating games list information for exited user!'); }
       return console.log(err);
     }
   });
@@ -307,7 +378,7 @@ client.on('guildMemberRemove', member => {
     delete global.eventData.userTimeZones[member.id];
     fs.writeFile(eventDataPath, JSON.stringify(global.eventData, null, 2, function(err) {
       if (err) {
-        logChannel.send('There was an error removing exited user from events.json!');
+        if (canLog) { logChannel.send('There was an error removing exited user from events.json!');}
         return console.log(err);
       }
     }));

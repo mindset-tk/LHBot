@@ -32,10 +32,9 @@ const DATE_OUTPUT_FORMAT = 'dddd, MMMM Do YYYY, h:mm A';
 // Edit this to alter the text of the upcoming events message in the
 // event info channel.
 const EVENT_MESSAGE_TEMPLATE = ({ events, serverName, timeZone, prefix }) => `\
-**UPCOMING EVENTS**
+__**UPCOMING EVENTS**__
+(listed in **${timeZone}**)
 
-The upcoming events for ${serverName} are listed below, with the next upcoming event listed first. \
-All times are listed in **${timeZone}**, the default timezone for this server. \
 Use \`${prefix}event info event name\` to view the event time in your local timezone, and \
 \`${prefix}event join event name\` to be reminded about the event.
 
@@ -60,7 +59,10 @@ Please contact staff if your preferred time zone doesn't have an abbreviation on
 // Edit this to alter how individual events in the above message
 // are displayed.
 const EVENT_INFO_TEMPLATE = ({ name, owner, channel, description, due }) => `\
-**${name}** - created by <@${owner}> in <#${channel}>, starts at ${due.format(DATE_OUTPUT_FORMAT)}${(description) ? `\n\xa0\xa0\xa0\xa0\xa0*Event description:* ${description}` : ''}\
+**${name}** (by: <@${owner}> in <#${channel}>)
+> - Starts: ${due.format(DATE_OUTPUT_FORMAT)}
+> - ${(description) ? `Description: ${description.replace(/\n/g, '\n> ')}` : ''}\
+
 `;
 
 if (global.eventData == null) {
@@ -447,7 +449,7 @@ class EventManager {
       return false;
     }
 
-    this.upcomingEvents[guildId].splice(index);
+    this.upcomingEvents[guildId].splice(index, 1);
     await this.updateUpcomingEventsPost(guildId);
     await this.saveState();
     return true;
@@ -584,6 +586,11 @@ class EventManager {
       if (message) {
         console.log('Updating events message ', message.id);
         await message.edit(EVENT_MESSAGE_TEMPLATE(templateParams));
+        await message.channel.send(".")
+          .then(msg => {
+            msg.delete({ timeout: 100 })
+          });        //await message.delete();
+//          global.eventData.guildDefaultTimeZones[guild.id];
       }
       else {
         console.log(
@@ -968,7 +975,7 @@ async function servertzCommand(message, client, timeZone) {
     );
   }
 
-  await setGuildTimeZone(message.guild.id, timeZone);
+  await setGuildTimeZone(message.guild, timeZone);
 
   return message.channel.send(
     `The server's default time zone is now set to **${getTimeZoneCanonicalDisplayName(
@@ -1119,10 +1126,10 @@ async function msgCollector(message) {
   let reply = false;
   // create a filter to ensure output is only accepted from the author who initiated the command.
   const filter = input => (input.author.id === message.author.id);
-  await message.channel.awaitMessages(filter, { max: 1, time: 180000, errors: ['time'] })
+  await message.channel.awaitMessages(filter, { max: 1, time: 30000, errors: ['time'] })
     // this method creates a collection; since there is only one entry we get the data from collected.first
     .then(collected => reply = collected.first())
-    .catch(collected => message.channel.send('Sorry, I waited 3 minutes with no response, please run the command again.'));
+    .catch(collected => message.channel.send('Sorry, I waited 30 seconds with no response, please run the command again.'));
   // console.log('Reply processed...');
   return reply;
 }
@@ -1141,7 +1148,7 @@ async function DMCollector(DMChannel) {
   return reply;
 }
 
-async function createWizard(message) {
+async function createWizard(message, channel) {
   let eventData = {};
   let awaitingAnswer = true;
   let reply;
@@ -1414,7 +1421,7 @@ async function createWizard(message) {
       }
     }
   }
-  eventData.channel = message.channel.id;
+  eventData.channel = channel.id;
   eventData.owner = message.author.id;
   eventData.guild = message.guild.id;
 
@@ -1477,8 +1484,8 @@ async function createWizard(message) {
   eventData.role = role.id;
 
   await eventManager.add(eventData);
-
-  return message.channel.send(
+  
+  return channel.send(
     embedEvent(eventData, null, {
       title: `New event: ${eventData.name}`,
       forUser: message.author.id,
@@ -1542,14 +1549,51 @@ Staff can add users to the event by hand simply by giving any user the associate
   staffOnly: false,
   args: true,
   async execute(message, args, client) {
+
+    // function to get a channel object based on a channel ID or mention.
+    async function getChannel(ID) {
+      if (ID.startsWith('<#') && ID.endsWith('>')) {
+        ID = ID.slice(2, -1);
+        return await client.channels.cache.get(ID);
+      }
+      else {
+        try { return await client.channels.cache.get(ID);}
+          catch { return null;}
+        }
+    }
+
     // this is the segment that is being replaced by a wizard.
     let [subcommand, ...cmdArgs] = args;
     subcommand = subcommand.toLowerCase();
     switch (subcommand) {
     case 'add':
     case 'create':
-      message.channel.send('I\'ve opened a DM with you for event management.');
-      await createWizard(message);
+    case 'new':
+      let newChannel;
+      let userInput;
+      if (!cmdArgs.join(' ')) {
+        message.channel.send('What channel would you like the event to take place in? Please #mention the channel the event should take place in. For the current channel, just reply with `this`');
+        let reply = await msgCollector(message);
+        if (!reply) {return;}
+        userInput = reply.content;
+      } else {
+        userInput = cmdArgs.join(' ');
+      }
+
+      if (userInput.toLowerCase() == 'this') {
+          newChannel = message.channel;
+      }
+      else
+      {
+        newChannel = await getChannel(userInput);
+        if (!newChannel) {return message.channel.send("Please try again and make sure you either #mention the channel or copy/paste the channel ID.");}
+        if(!newChannel.permissionsFor(message.author).has('SEND_MESSAGES'))  {return message.channel.send("Please choose a channel that you have the ability to send messages in");}
+      }
+
+      message.channel.send('Ok! I\'ve opened a DM with you for event management.');
+      await createWizard(message, newChannel);
+
+
       return;
     case 'delete':
     case 'remove':

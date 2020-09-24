@@ -1,4 +1,5 @@
 const fs = require('fs');
+const Discord = require('discord.js');
 const path = require('path');
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
@@ -36,8 +37,12 @@ module.exports = {
     const configurableProps = [['prefix', 'Command Prefix', 'prefix'],
       ['roleStaff', 'Staff Role', 'role'],
       ['roleComrade', 'Comrade Role', 'role'],
+      ['roleAirlock', 'Airlock Role', 'role'],
+      ['airlockPruneDays', 'Max days for airlock prune', 'integer'],
+      ['airlockPruneMessage', 'Kick message used when airlock is pruned', 'string'],
       ['invLogToggle', 'Toggle invite logging and reporting', 'boolean'],
       ['channelInvLogs', 'Invite logging channel', 'channel'],
+      ['knownInvites', 'Invite code descriptions', 'inviteCodesArray'],
       ['countingToggle', 'Toggle counting', 'boolean'],
       ['countingChannelId', 'Counting channel', 'channel'],
       ['voiceTextChannelIds', 'Text channel(s) for voice commands', 'channelArray'],
@@ -122,23 +127,35 @@ module.exports = {
       const ignoreChans = [];
       const voiceTextChans = [];
       const cfgVoiceChans = [];
+      const knownInv = [];
       config.pinIgnoreChannels.forEach(chanID => ignoreChans.push(getChannelName(chanID)));
       config.voiceTextChannelIds.forEach(chanID => voiceTextChans.push(getChannelName(chanID)));
-      Object.keys(config.voiceChamberDefaultSizes).forEach(chanID => cfgVoiceChans.push("#" + config.voiceChamberDefaultSizes[chanID].Name + " (Size: " + config.voiceChamberDefaultSizes[chanID].Size + ")"));
+      if (config.knownInvites) {config.knownInvites.forEach(inv => knownInv.push("**" + inv[1] + "** (" + inv[0] + ")"));}
+//      console.log((Object.keys(config[voiceChamberDefaultSizes]).length == 0));
+      if(typeof config.voiceChamberDefaultSizes == "object") Object.keys(config.voiceChamberDefaultSizes).forEach(chanID => cfgVoiceChans.push("#" + config.voiceChamberDefaultSizes[chanID].Name + " (Size: " + config.voiceChamberDefaultSizes[chanID].Size + ")"));
+
       return `Here's my current configuration:
 __General settings__
 Command prefix: **${config.prefix}**
-Staff role: **@${getRoleName(config.roleStaff)}**
-Member role: **@${getRoleName(config.roleComrade)}**
+Staff role: **${config.roleStaff ? "@" + getRoleName(config.roleStaff) : "Not set"}**
+Member role: **${config.roleComrade ? "@" + getRoleName(config.roleComrade) : "Not set"}**
+Airlock role: **${config.roleAirlock ? "@" + getRoleName(config.roleAirlock) : "Not set"}**
 
 __Special Channels:__
 User join/exit notifications: **${config.invLogToggle ? ('#' + getChannelName(config.channelInvLogs)) : 'off.'}**
 Counting: **${config.countingToggle ? ('#' + getChannelName(config.countingChannelId)) : 'off.'}**
 Text channels to use for voice-related commands: **${(config.voiceTextChannelIds[0]) ? '#' + voiceTextChans.join(', #') : 'None'}**
-Configured user-limited voice channels: **${(config.voiceChamberDefaultSizes) ? cfgVoiceChans.join(', ') : 'None'}**
-User-limited voice channels snapback delay: **${config.voiceChamberSnapbackDelay ? config.voiceChamberSnapbackDelay : 'Not set, defaulting to 5min'}**
+Configured user-limited voice channels: **${(cfgVoiceChans[0]) ? cfgVoiceChans.join(', ') : 'None'}**
 Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}** (Note: does nothing at this time)
 Event announcement channel: **${config.eventInfoChannelId ? ('#' + getChannelName(config.eventInfoChannelId)) : 'not set.'}**
+
+__Message Settings:__
+Airlock Prune Message: **${config.airlockPruneMessage ? config.airlockPruneMessage : "Not set"}**
+
+__Other Settings:__
+Invite code descriptions: ${(knownInv[0]) ? knownInv.join(', ') : '**None**'}
+User-limited voice channels snapback delay: **${config.voiceChamberSnapbackDelay ? config.voiceChamberSnapbackDelay : 'Not set, defaulting to 5min'}**
+Max days for airlock prune: **${config.airlockPruneDays ? config.airlockPruneDays : 'Not set, defaulting to 7 days'}**
 
 __Pins:__
 Pin reacts needed to pin a message: **${config.pinsToPin}**
@@ -267,7 +284,15 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
           }
           else {return message.channel.send(`Sorry, I couldn't parse '${reply.content}' into a count. Please enter an integer (no decimals).`);}
         }
-        
+        else if (changeType == 'string') {
+          replyContent += ' What would you like to change it to?';
+          message.channel.send(replyContent);
+          reply = await msgCollector();
+          if(!reply) {return;}
+            config[changeName] = reply.content.replace(/"/g, '');
+            writeConfig();
+            return message.channel.send(`${changeDesc} is now **${reply.content.replace(/"/g, '')}**`);
+        }
         
         
         
@@ -422,6 +447,89 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
 
 
 
+
+        else if (changeType == 'inviteCodesArray') {
+          if (!config[changeName]) {config[changeName] = [];} 
+          replyContent += ' Would you like to **add**, **remove**, or **change** an invite code description from the list?';
+          message.channel.send(replyContent);
+          reply = await msgCollector();
+          if(!reply) {return;}
+          if (reply.content.toLowerCase() == 'add') {
+            message.channel.send('Please say the invite code you would like to add to the list');
+            reply = await msgCollector();
+            if(!reply) {return;}
+            let response = reply.content.slice(-7);
+            const knownInvites = new Map(config.knownInvites);
+            if (!knownInvites.has(response)) {
+              message.guild.fetchInvites().then(async guildInvites => {
+                let invite = new Discord.Collection();
+                if (guildInvites.has(response)) {
+                  invite = guildInvites.get(response);
+                  const inviter = client.users.cache.get(invite.inviter.id);
+                  message.channel.send("Okay, what do you want the description to be?");
+                  reply = await msgCollector();
+                  if(!reply) {return;}
+                  config[changeName].push([invite.code, reply.content.replace(/"/g, '')]);                  
+                  writeConfig();
+                  return message.channel.send(`Ok! **${reply.content.replace(/"/g, '')}** (${invite.code}) by <@${inviter.id}> (${inviter.username}#${inviter.discriminator} / ${inviter.id}) has been added to the *${changeDesc}*`);
+                }
+                else {
+                  return message.channel.send("The invite code you provided wasn't found on the server. Please make sure you pasted it in correctly!");
+                }
+              });
+            } else {
+                  return message.channel.send(`**${knownInvites.get(response)}** (${response}) is already in *${changeDesc}*`);
+            }
+          }
+          if ((reply.content.toLowerCase() == 'remove' || reply.content.toLowerCase() == 'change')) {
+          if (config[changeName].length == 0) { return message.channel.send("No invite code descriptions have been setup, you should do that first"); }
+            const action = reply.content.toLowerCase();
+            const invCodeArr = [];
+            const msgArr = [];
+            i = 0;
+            for (const invcode of config[changeName]) {
+              i++;
+              invCodeArr.push(invcode);
+              msgArr.push(`${i}. **${invcode[1]}** (${invcode[0]})`);
+            }
+            if (action == "remove") msgArr.push("\ntype all to remove all items.");
+            message.channel.send(`Please choose from the following to ${action}:\n${msgArr.join('\n')}\ntype 0 to cancel.`);
+            reply = await msgCollector();
+            if (!reply) { return; }
+            else if (reply.content.toLowerCase() == 'all' && action == "remove") {
+              config[changeName] = [];
+              writeConfig();
+              return message.channel.send(`Cleared all *${changeDesc}* entries.`);
+            }
+            else if (parseInt(reply.content) > config[changeName].length) {
+              return message.channel.send('Invalid entry! That\'s more than the highest item on the list!');
+            }
+            else if (reply.content == 0) {
+              return message.channel.send('Canceled. No values changed.');
+            }
+            else if (reply.content.includes('.') || !parseInt(reply.content)) {
+              return message.channel.send('Sorry, I couldn\'t parse that. Please answer with only the number of your response.');
+            }
+
+            else {
+              const index = parseInt(reply.content) - 1;
+              const selectedInv = config[changeName][index];
+              if (action == "remove") {
+                config[changeName].splice(index, 1);
+                writeConfig();
+                return message.channel.send(`Removed ${selectedInv[1]} (${selectedInv[0]}) from *${changeDesc}*.`);
+              }
+              else if (action == "change") {
+                message.channel.send('What should be the new description for this invite code?');
+                reply = await msgCollector();
+                if(!reply) {return;}
+                config[changeName][index][1] = reply.content.replace(/"/g, '');
+                writeConfig();
+                return message.channel.send(`Changed the description for ${selectedInv[0]} from ${selectedInv[1]} to ${config[changeName][index][1]} in the *${changeDesc}*.`);
+              }
+            }
+          }
+        }
             
         else if (changeType == 'channelArray') {
           replyContent += ' Would you like to add or remove a channel from the list?';
@@ -459,7 +567,7 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
             message.channel.send(`Please choose from the following to remove:\n${msgArr.join('\n')}\ntype all to remove all items.\ntype 0 to cancel.`);
             reply = await msgCollector();
             if (!reply) { return; }
-            else if (reply.content.toLowerCase == 'all') {
+            else if (reply.content.toLowerCase() == 'all') {
               config[changeName] = [];
               writeConfig();
               return message.channel.send(`Cleared all *${changeDesc}* entries.`);
