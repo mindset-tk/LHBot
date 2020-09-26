@@ -1562,22 +1562,31 @@ Staff can add users to the event by hand simply by giving any user the associate
     case 'add':
     case 'create':
     case 'new':
-      message.channel.send('Please #mention the channel the event should take place in. For the current channel, just reply with `this`');
       let newChannel;
-      let reply = await msgCollector(message);
-      if (!reply) {return;}
+      let userInput;
+      if (!cmdArgs.join(' ')) {
+        message.channel.send('What channel would you like the event to take place in? Please #mention the channel the event should take place in. For the current channel, just reply with `this`');
+        let reply = await msgCollector(message);
+        if (!reply) {return;}
+        userInput = reply.content;
+      } else {
+        userInput = cmdArgs.join(' ');
+      }
 
-      else if (reply.content.toLowerCase() == 'this') {
-        newChannel = message.channel;
+      if (userInput.toLowerCase() == 'this') {
+          newChannel = message.channel;
       }
       else
       {
-        newChannel = await getChannel(reply.content);
-        if (!newChannel) {return message.channel.send("Please start the process again and #mention the channel or copy/paste the channel ID.");}
+        newChannel = await getChannel(userInput);
+        if (!newChannel) {return message.channel.send("Please try again and make sure you either #mention the channel or copy/paste the channel ID.");}
+        if(!newChannel.permissionsFor(message.author).has('SEND_MESSAGES'))  {return message.channel.send("Please choose a channel that you have the ability to send messages in");}
       }
-      message.channel.send('I\'ve opened a DM with you for event management.');
+
+      message.channel.send('Ok! I\'ve opened a DM with you for event management.');
       await createWizard(message, newChannel);
-      
+
+
       return;
     case 'delete':
     case 'remove':
