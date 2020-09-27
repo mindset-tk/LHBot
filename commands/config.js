@@ -124,7 +124,9 @@ module.exports = {
       const cfgVoiceChans = [];
       config.pinIgnoreChannels.forEach(chanID => ignoreChans.push(getChannelName(chanID)));
       config.voiceTextChannelIds.forEach(chanID => voiceTextChans.push(getChannelName(chanID)));
-      Object.keys(config.voiceChamberDefaultSizes).forEach(chanID => cfgVoiceChans.push("#" + config.voiceChamberDefaultSizes[chanID].Name + " (Size: " + config.voiceChamberDefaultSizes[chanID].Size + ")"));
+//      console.log((Object.keys(config[voiceChamberDefaultSizes]).length == 0));
+      if(typeof config.voiceChamberDefaultSizes == "object") Object.keys(config.voiceChamberDefaultSizes).forEach(chanID => cfgVoiceChans.push("#" + config.voiceChamberDefaultSizes[chanID].Name + " (Size: " + config.voiceChamberDefaultSizes[chanID].Size + ")"));
+
       return `Here's my current configuration:
 __General settings__
 Command prefix: **${config.prefix}**
@@ -135,7 +137,7 @@ __Special Channels:__
 User join/exit notifications: **${config.invLogToggle ? ('#' + getChannelName(config.channelInvLogs)) : 'off.'}**
 Counting: **${config.countingToggle ? ('#' + getChannelName(config.countingChannelId)) : 'off.'}**
 Text channels to use for voice-related commands: **${(config.voiceTextChannelIds[0]) ? '#' + voiceTextChans.join(', #') : 'None'}**
-Configured user-limited voice channels: **${(config.voiceChamberDefaultSizes) ? cfgVoiceChans.join(', ') : 'None'}**
+Configured user-limited voice channels: **${(cfgVoiceChans[0]) ? cfgVoiceChans.join(', ') : 'None'}**
 User-limited voice channels snapback delay: **${config.voiceChamberSnapbackDelay ? config.voiceChamberSnapbackDelay : 'Not set, defaulting to 5min'}**
 Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}** (Note: does nothing at this time)
 Event announcement channel: **${config.eventInfoChannelId ? ('#' + getChannelName(config.eventInfoChannelId)) : 'not set.'}**
