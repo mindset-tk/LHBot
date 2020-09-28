@@ -32,10 +32,9 @@ const DATE_OUTPUT_FORMAT = 'dddd, MMMM Do YYYY, h:mm A';
 // Edit this to alter the text of the upcoming events message in the
 // event info channel.
 const EVENT_MESSAGE_TEMPLATE = ({ events, serverName, timeZone, prefix }) => `\
-**UPCOMING EVENTS**
+__**UPCOMING EVENTS**__
+(listed in **${timeZone}**)
 
-The upcoming events for ${serverName} are listed below, with the next upcoming event listed first. \
-All times are listed in **${timeZone}**, the default timezone for this server. \
 Use \`${prefix}event info event name\` to view the event time in your local timezone, and \
 \`${prefix}event join event name\` to be reminded about the event.
 
@@ -60,7 +59,10 @@ Please contact staff if your preferred time zone doesn't have an abbreviation on
 // Edit this to alter how individual events in the above message
 // are displayed.
 const EVENT_INFO_TEMPLATE = ({ name, owner, channel, description, due }) => `\
-**${name}** - created by <@${owner}> in <#${channel}>, starts at ${due.format(DATE_OUTPUT_FORMAT)}${(description) ? `\n\xa0\xa0\xa0\xa0\xa0*Event description:* ${description}` : ''}\
+**${name}** (by: <@${owner}> in <#${channel}>)
+> - Starts: ${due.format(DATE_OUTPUT_FORMAT)}
+> - ${(description) ? `Description: ${description.replace(/\n/g, '\n> ')}` : ''}\
+
 `;
 
 if (global.eventData == null) {
