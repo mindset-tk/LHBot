@@ -964,7 +964,7 @@ async function servertzCommand(message, client, timeZone) {
     );
   }
 
-  await setGuildTimeZone(message.guild.id, timeZone);
+  await setGuildTimeZone(message.guild, timeZone);
 
   return message.channel.send(
     `The server's default time zone is now set to **${getTimeZoneCanonicalDisplayName(
