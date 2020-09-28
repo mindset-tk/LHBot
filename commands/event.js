@@ -583,18 +583,14 @@ class EventManager {
 
       if (message) {
         console.log('Updating events message ', message.id);
-        await message.edit(EVENT_MESSAGE_TEMPLATE(templateParams));
+//        await message.edit(EVENT_MESSAGE_TEMPLATE(templateParams));
+          await message.delete();
       }
-      else {
-        console.log(
-          `No event info message found for guild ${guildId}, send a new one.`,
-        );
-        const newMessage = await eventInfoChannel.send(
-          EVENT_MESSAGE_TEMPLATE(templateParams),
-        );
-        this.eventInfoMessage[guildId] = newMessage;
-        await this.saveState();
-      }
+      const newMessage = await eventInfoChannel.send(
+        EVENT_MESSAGE_TEMPLATE(templateParams),
+      );
+      this.eventInfoMessage[guildId] = newMessage;
+      await this.saveState();
     }
   }
 }
