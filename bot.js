@@ -1,15 +1,15 @@
 // function to pretty print the config data so that arrays show on one line, so it's easier to visually parse the config file when hand opening it. Purely cosmetic.
 function prettyPrintConfig(cfg) {
   const output = JSON.stringify(cfg, function(k, v) {
-if (v instanceof Array) {
-  return JSON.stringify(v);
-}
-return v;
-  }, 2).replace(/\\/g, '')
-.replace(/"\[/g, '[')
-.replace(/\]"/g, ']')
-.replace(/"\{/g, '{')
-.replace(/\}"/g, '}');
+  if (v instanceof Array) {
+    return JSON.stringify(v);
+  }
+  return v;
+    }, 2).replace(/\\/g, '')
+  .replace(/"\[/g, '[')
+  .replace(/\]"/g, ']')
+  .replace(/"\{/g, '{')
+  .replace(/\}"/g, '}');
   return output;
 }
 
@@ -44,18 +44,23 @@ CONFIG_FILENAMES.forEach(filename => {
   } else {
       const lastArg = process.argv[process.argv.length-1];
       if (!fs.existsSync(filename)) {
-	freshConfig = new Object();
-	freshConfig.prefix = ".";
-	freshConfig.authtoken = (lastArg.length == 59) ? lastArg : "";
-	freshConfig.roleStaff = "";
-	freshConfig.roleComrade = "";
-	freshConfig.invLogToggle = false;
-	freshConfig.channelInvLogs = "";
-	freshConfig.countingToggle = false;
-	freshConfig.countingChannelId = "";
+        freshConfig = new Object();
+        freshConfig.prefix = ".";
+        freshConfig.authtoken = (lastArg.length == 59) ? lastArg : "";
+        freshConfig.roleStaff = "";
+        freshConfig.roleComrade = "";
+        freshConfig.invLogToggle = false;
+        freshConfig.channelInvLogs = "";
+        freshConfig.countingToggle = false;
+        freshConfig.countingChannelId = "";
+	freshConfig.countingFailMessages = [],
+	freshConfig.countingStartMessages = [],
+	freshConfig.countingFailRepeatMessages = [],
+	freshConfig.repeatReacts = [],
+        freshConfig.knownInvites = [],
 	freshConfig.eventInfoChannelId = "";
-	freshConfig.pinIgnoreChannels = [""];
-	freshConfig.voiceTextChannelIds = [""];
+	freshConfig.pinIgnoreChannels = [];
+	freshConfig.voiceTextChannelIds = [];
 	freshConfig.voiceChamberDefaultSizes = new Object();
 	freshConfig.voiceChamberSnapbackDelay = "";
 	freshConfig.currentActivity = new Object();
