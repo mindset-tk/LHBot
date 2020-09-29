@@ -350,9 +350,10 @@ client.on('guildMemberAdd', member => {
 });
 
 client.on('guildMemberRemove', member => {
+  const canLog = (config.invLogToggle && Boolean(config.channelInvLogs));
   const logChannel = client.channels.cache.get(config.channelInvLogs);
   const data = [];
-  logChannel.send(`${member} (${member.user.tag} / ${member.id}) left the server.`);
+  if (canLog) { logChannel.send(`${member} (${member.user.tag} / ${member.id}) left the server.`); }
   let exitConLog = `${member.user.tag} exited.`;
   Object.keys(gameList).forEach(sysname => {
     if (!gameList[sysname].accounts[0]) return;
@@ -366,7 +367,7 @@ client.on('guildMemberRemove', member => {
   if (data.length > 0) {exitConLog += ` removing from the following game rosters: ${data.join(', ')}.`;}
   fs.writeFile(listPath, JSON.stringify(gameList, null, 2), function(err) {
     if (err) {
-      logChannel.send('There was an error updating games list information for exited user!');
+      if (canLog) { logChannel.send('There was an error updating games list information for exited user!'); }
       return console.log(err);
     }
   });
@@ -374,7 +375,7 @@ client.on('guildMemberRemove', member => {
     delete global.eventData.userTimeZones[member.id];
     fs.writeFile(eventDataPath, JSON.stringify(global.eventData, null, 2, function(err) {
       if (err) {
-        logChannel.send('There was an error removing exited user from events.json!');
+        if (canLog) { logChannel.send('There was an error removing exited user from events.json!');}
         return console.log(err);
       }
     }));
