@@ -449,7 +449,7 @@ class EventManager {
       return false;
     }
 
-    this.upcomingEvents[guildId].splice(index);
+    this.upcomingEvents[guildId].splice(index, 1);
     await this.updateUpcomingEventsPost(guildId);
     await this.saveState();
     return true;
@@ -585,14 +585,23 @@ class EventManager {
 
       if (message) {
         console.log('Updating events message ', message.id);
-//        await message.edit(EVENT_MESSAGE_TEMPLATE(templateParams));
-          await message.delete();
+        await message.edit(EVENT_MESSAGE_TEMPLATE(templateParams));
+        await message.channel.send(".")
+          .then(msg => {
+            msg.delete({ timeout: 100 })
+          });        //await message.delete();
+//          global.eventData.guildDefaultTimeZones[guild.id];
       }
-      const newMessage = await eventInfoChannel.send(
-        EVENT_MESSAGE_TEMPLATE(templateParams),
-      );
-      this.eventInfoMessage[guildId] = newMessage;
-      await this.saveState();
+      else {
+        console.log(
+          `No event info message found for guild ${guildId}, send a new one.`,
+        );
+        const newMessage = await eventInfoChannel.send(
+          EVENT_MESSAGE_TEMPLATE(templateParams),
+        );
+        this.eventInfoMessage[guildId] = newMessage;
+        await this.saveState();
+      }
     }
   }
 }
