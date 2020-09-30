@@ -63,7 +63,7 @@ async execute(message, args, client) {
         if (hasPosted) {
           var lastPostTimestamp = Number((BigInt(usrMap.get(u.id)) >> BigInt(22)) + BigInt(1420070400000));
           var timeSinceLastPost = moment.duration(now.diff(lastPostTimestamp)).asDays();
-          if (timeSinceLastPost.asDays > 1) {
+          if (timeSinceLastPost >= 1) {
             entry += `, and last posted **${parseInt(timeSinceLastPost)} day(s)** ago`;
           }
           else {
