@@ -22,7 +22,7 @@ async execute(message, args, client) {
       const usersOverLimit = [];
       const usrMap = new Map;
       const AIRLOCK_ROLE_ID = config.roleAirlock;
-      const AIRLOCK_PRUNE_LIMIT = config.airlockPruneDays ? config.airlockPruneDays : 1;
+      const AIRLOCK_PRUNE_LIMIT = config.airlockPruneDays ? config.airlockPruneDays : 7;
       const AIRLOCK_PRUNE_KICKMESSAGE = config.airlockPruneMessage ? config.airlockPruneMessage : "Kicked during airlock prune";
       const AIRLOCK_CHANNEL = config.airlockChannel ? config.airlockPruneMessage : false;
       const currentGuildUsrs = await message.guild.members.cache;
