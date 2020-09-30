@@ -38,7 +38,8 @@ module.exports = {
       ['roleStaff', 'Staff Role', 'role'],
       ['roleComrade', 'Comrade Role', 'role'],
       ['roleAirlock', 'Airlock Role', 'role'],
-      ['airlockPruneDays', 'Max days for airlock prune', 'integer'],
+      ['airlockChannel', 'Name of or prefix for airlock channels', 'string'],
+      ['airlockPruneDays', 'Max days for airlock prune since last post', 'integer'],
       ['airlockPruneMessage', 'Kick message used when airlock is pruned', 'string'],
       ['invLogToggle', 'Toggle invite logging and reporting', 'boolean'],
       ['channelInvLogs', 'Invite logging channel', 'channel'],
@@ -148,6 +149,7 @@ Text channels to use for voice-related commands: **${(config.voiceTextChannelIds
 Configured user-limited voice channels: **${(cfgVoiceChans[0]) ? cfgVoiceChans.join(', ') : 'None'}**
 Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}** (Note: does nothing at this time)
 Event announcement channel: **${config.eventInfoChannelId ? ('#' + getChannelName(config.eventInfoChannelId)) : 'not set.'}**
+Airlock Channel Name/Prefix: **${config.airlockChannel ? config.airlockChannel : "Not set"}**
 
 __Message Settings:__
 Airlock Prune Message: **${config.airlockPruneMessage ? config.airlockPruneMessage : "Not set"}**
@@ -155,7 +157,7 @@ Airlock Prune Message: **${config.airlockPruneMessage ? config.airlockPruneMessa
 __Other Settings:__
 Invite code descriptions: ${(knownInv[0]) ? knownInv.join(', ') : '**None**'}
 User-limited voice channels snapback delay: **${config.voiceChamberSnapbackDelay ? config.voiceChamberSnapbackDelay : 'Not set, defaulting to 5min'}**
-Max days for airlock prune: **${config.airlockPruneDays ? config.airlockPruneDays : 'Not set, defaulting to 7 days'}**
+Max days since last post for airlock prune: **${config.airlockPruneDays ? config.airlockPruneDays : 'Not set, defaulting to 7 days'}**
 
 __Pins:__
 Pin reacts needed to pin a message: **${config.pinsToPin}**
