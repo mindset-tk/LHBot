@@ -4,6 +4,10 @@ const configPath = path.resolve('./config.json');
 const config = require(configPath);
 const moment = require('moment-timezone');
 
+function kickUser (user, reason) {
+  user.send(`You've been kicked from **${user.guild.name}** with reason: "${reason}"`);
+}
+
 module.exports = {
   name: 'airlockprune',
   description: "Lists all members of an airlock role, and offers to kick the ones that haven't finished onboarding after one week",
@@ -17,7 +21,7 @@ module.exports = {
       const usersUnderLimit = [];
       const usersOverLimit = [];
       const AIRLOCK_ROLE_ID = config.roleAirlock;
-      const AIRLOCK_PRUNE_LIMIT = config.airlockPruneDays ? config.airlockPruneDays : 7;
+      const AIRLOCK_PRUNE_LIMIT = config.airlockPruneDays ? config.airlockPruneDays : 0;
       const AIRLOCK_PRUNE_KICKMESSAGE = config.airlockPruneMessage ? config.airlockPruneMessage : "Kicked during airlock prune";
       const canKick = message.guild.me.hasPermission("KICK_MEMBERS");
       const pruneNow = Boolean(args[0] == "y");
@@ -29,8 +33,10 @@ module.exports = {
         if (daysSinceJoin >= AIRLOCK_PRUNE_LIMIT) {
           usersOverLimit.push(entry);
           if (pruneNow && canKick) {
-              console.log("this is where I'd kick the user");
+            kickUser(u, AIRLOCK_PRUNE_KICKMESSAGE);
+            setTimeout(function() {
               u.kick(AIRLOCK_PRUNE_KICKMESSAGE);
+            }, 1000);
           }
         }
         else if (!pruneNow){
