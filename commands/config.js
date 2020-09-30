@@ -37,6 +37,9 @@ module.exports = {
     const configurableProps = [['prefix', 'Command Prefix', 'prefix'],
       ['roleStaff', 'Staff Role', 'role'],
       ['roleComrade', 'Comrade Role', 'role'],
+      ['roleAirlock', 'Airlock Role', 'role'],
+      ['airlockPruneDays', 'Max days for airlock prune', 'integer'],
+      ['airlockPruneMessage', 'Kick message used when airlock is pruned', 'string'],
       ['invLogToggle', 'Toggle invite logging and reporting', 'boolean'],
       ['channelInvLogs', 'Invite logging channel', 'channel'],
       ['knownInvites', 'Invite code descriptions', 'inviteCodesArray'],
@@ -134,8 +137,9 @@ module.exports = {
       return `Here's my current configuration:
 __General settings__
 Command prefix: **${config.prefix}**
-Staff role: **@${getRoleName(config.roleStaff)}**
-Member role: **@${getRoleName(config.roleComrade)}**
+Staff role: **${config.roleStaff ? "@" + getRoleName(config.roleStaff) : "Not set"}**
+Member role: **${config.roleComrade ? "@" + getRoleName(config.roleComrade) : "Not set"}**
+Airlock role: **${config.roleAirlock ? "@" + getRoleName(config.roleAirlock) : "Not set"}**
 
 __Special Channels:__
 User join/exit notifications: **${config.invLogToggle ? ('#' + getChannelName(config.channelInvLogs)) : 'off.'}**
@@ -145,9 +149,13 @@ Configured user-limited voice channels: **${(cfgVoiceChans[0]) ? cfgVoiceChans.j
 Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}** (Note: does nothing at this time)
 Event announcement channel: **${config.eventInfoChannelId ? ('#' + getChannelName(config.eventInfoChannelId)) : 'not set.'}**
 
+__Message Settings:__
+Airlock Prune Message: **${config.airlockPruneMessage ? config.airlockPruneMessage : "Not set"}**
+
 __Other Settings:__
 Invite code descriptions: ${(knownInv[0]) ? knownInv.join(', ') : '**None**'}
 User-limited voice channels snapback delay: **${config.voiceChamberSnapbackDelay ? config.voiceChamberSnapbackDelay : 'Not set, defaulting to 5min'}**
+Max days for airlock prune: **${config.airlockPruneDays ? config.airlockPruneDays : 'Not set, defaulting to 7 days'}**
 
 __Pins:__
 Pin reacts needed to pin a message: **${config.pinsToPin}**
@@ -276,7 +284,15 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
           }
           else {return message.channel.send(`Sorry, I couldn't parse '${reply.content}' into a count. Please enter an integer (no decimals).`);}
         }
-        
+        else if (changeType == 'string') {
+          replyContent += ' What would you like to change it to?';
+          message.channel.send(replyContent);
+          reply = await msgCollector();
+          if(!reply) {return;}
+            config[changeName] = reply.content.replace(/"/g, '');
+            writeConfig();
+            return message.channel.send(`${changeDesc} is now **${reply.content.replace(/"/g, '')}**`);
+        }
         
         
         
