@@ -24,7 +24,7 @@ async execute(message, args, client) {
       const AIRLOCK_ROLE_ID = config.roleAirlock;
       const AIRLOCK_PRUNE_LIMIT = config.airlockPruneDays ? config.airlockPruneDays : 7;
       const AIRLOCK_PRUNE_KICKMESSAGE = config.airlockPruneMessage ? config.airlockPruneMessage : "Kicked during airlock prune";
-      const AIRLOCK_CHANNEL = config.airlockChannel ? config.airlockPruneMessage : false;
+      const AIRLOCK_CHANNEL = config.airlockChannel;
       const currentGuildUsrs = await message.guild.members.cache;
       const canKick = await message.guild.me.hasPermission("KICK_MEMBERS");
       const pruneNow = Boolean(args[0] == "y");
