@@ -44,6 +44,7 @@ module.exports = {
       ['invLogToggle', 'Toggle invite logging and reporting', 'boolean'],
       ['channelInvLogs', 'Invite logging channel', 'channel'],
       ['knownInvites', 'Invite code descriptions', 'inviteCodesArray'],
+      ['channelLobby', 'Lobby channel for creating new invites', 'channel'],
       ['countingToggle', 'Toggle counting', 'boolean'],
       ['countingChannelId', 'Counting channel', 'channel'],
       ['voiceTextChannelIds', 'Text channel(s) for voice commands', 'channelArray'],
@@ -150,6 +151,7 @@ Configured user-limited voice channels: **${(cfgVoiceChans[0]) ? cfgVoiceChans.j
 Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}** (Note: does nothing at this time)
 Event announcement channel: **${config.eventInfoChannelId ? ('#' + getChannelName(config.eventInfoChannelId)) : 'not set.'}**
 Airlock Channel Name/Prefix: **${config.airlockChannel ? config.airlockChannel : "Not set"}**
+Lobby channel for invites: **${config.channelLobby ? ('#' + getChannelName(config.channelLobby)) : 'not set.'}**
 
 __Message Settings:__
 Airlock Prune Message: **${config.airlockPruneMessage ? config.airlockPruneMessage : "Not set"}**
