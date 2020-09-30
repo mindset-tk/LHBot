@@ -49,6 +49,9 @@ CONFIG_FILENAMES.forEach(filename => {
         freshConfig.authtoken = (lastArg.length == 59) ? lastArg : "";
         freshConfig.roleStaff = "";
         freshConfig.roleComrade = "";
+        freshConfig.roleAirlock = "";
+        freshConfig.airlockPruneDays = "";
+        freshConfig.airlockPruneMessage = ""
         freshConfig.invLogToggle = false;
         freshConfig.channelInvLogs = "";
         freshConfig.countingToggle = false;
