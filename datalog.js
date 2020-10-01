@@ -47,9 +47,24 @@ function monthMinusOne(dateString) {
   return lastMonth;
 }
 
+// save disk space and increase readability of datalog.json file.
+function prettyPrintJson() {
+  const output = JSON.stringify(global.dataLog, function(k, v) {
+    if (v instanceof Array) {
+      return JSON.stringify(v);
+    }
+    return v;
+  }, 2).replace(/\\/g, '')
+    .replace(/"\[/g, '[')
+    .replace(/\]"/g, ']')
+    .replace(/"\{/g, '{')
+    .replace(/\}"/g, '}');
+  return output;
+}
+
 // Function to write to .json file for session persistence.
 function writeData() {
-  fs.writeFile(dataLogPath, JSON.stringify(global.dataLog, null, 2), function(err) {
+  fs.writeFile(dataLogPath, prettyPrintJson(), function(err) {
     if (err) {
       return console.log(err);
     }
