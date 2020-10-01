@@ -586,11 +586,12 @@ class EventManager {
       if (message) {
         console.log('Updating events message ', message.id);
         await message.edit(EVENT_MESSAGE_TEMPLATE(templateParams));
-        await message.channel.send(".")
+        await message.channel.send('.')
           .then(msg => {
-            msg.delete({ timeout: 100 })
-          });        //await message.delete();
-//          global.eventData.guildDefaultTimeZones[guild.id];
+            msg.delete({ timeout: 100 });
+          });
+        // await message.delete();
+        // global.eventData.guildDefaultTimeZones[guild.id];
       }
       else {
         console.log(
@@ -1558,8 +1559,8 @@ Staff can add users to the event by hand simply by giving any user the associate
       }
       else {
         try { return await client.channels.cache.get(ID);}
-          catch { return null;}
-        }
+        catch { return null;}
+      }
     }
 
     // this is the segment that is being replaced by a wizard.
@@ -1576,18 +1577,18 @@ Staff can add users to the event by hand simply by giving any user the associate
         let reply = await msgCollector(message);
         if (!reply) {return;}
         userInput = reply.content;
-      } else {
+      }
+      else {
         userInput = cmdArgs.join(' ');
       }
 
       if (userInput.toLowerCase() == 'this') {
-          newChannel = message.channel;
+        newChannel = message.channel;
       }
-      else
-      {
+      else {
         newChannel = await getChannel(userInput);
-        if (!newChannel) {return message.channel.send("Please try again and make sure you either #mention the channel or copy/paste the channel ID.");}
-        if(!newChannel.permissionsFor(message.author).has('SEND_MESSAGES'))  {return message.channel.send("Please choose a channel that you have the ability to send messages in");}
+        if (!newChannel) {return message.channel.send('Please try again and make sure you either #mention the channel or copy/paste the channel ID.');}
+        if(!newChannel.permissionsFor(message.author).has('SEND_MESSAGES')) {return message.channel.send('Please choose a channel that you have the ability to send messages in');}
       }
 
       message.channel.send('Ok! I\'ve opened a DM with you for event management.');

@@ -49,7 +49,7 @@ const LOCAL_TIMEZONES = [
     name: 'Central Time',
     abbr: 'CST',
     dstAbbr: 'CDT',
-    locale: 'America/Chicago'
+    locale: 'America/Chicago',
   },
   {
     name: 'Central European Time',
@@ -143,7 +143,7 @@ const LOCAL_TIMEZONES = [
   {
     name: 'Western Africa Time',
     abbr: 'WAT',
-    locale: 'Africa/Lagos'
+    locale: 'Africa/Lagos',
   },
 ];
 
@@ -200,12 +200,12 @@ const EXTRA_TIMEZONES = {
   'UTC-12': 'Etc/GMT-12',
   'UTC-13': 'Etc/GMT-13',
   'UTC-14': 'Etc/GMT-14',
-}
+};
 
 const TIMEZONE_CODES = {
   ...makeTimezoneMapping(LOCAL_TIMEZONES),
-  ...EXTRA_TIMEZONES
-}
+  ...EXTRA_TIMEZONES,
+};
 
 module.exports = {
   LOCAL_TIMEZONES,
@@ -213,14 +213,14 @@ module.exports = {
 };
 
 function makeTimezoneMapping(timezoneList) {
-  const mapping = {}
+  const mapping = {};
 
-  timezoneList.forEach(({abbr, dstAbbr, locale}) => {
-      mapping[abbr] = locale
-      if (dstAbbr) {
-        mapping[dstAbbr] = locale
-      }
-  })
+  timezoneList.forEach(({ abbr, dstAbbr, locale }) => {
+    mapping[abbr] = locale;
+    if (dstAbbr) {
+      mapping[dstAbbr] = locale;
+    }
+  });
 
-  return mapping
+  return mapping;
 }
