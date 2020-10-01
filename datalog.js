@@ -47,9 +47,24 @@ function monthMinusOne(dateString) {
   return lastMonth;
 }
 
+// save disk space and increase readability of datalog.json file.
+function prettyPrintJson() {
+  const output = JSON.stringify(global.dataLog, function(k, v) {
+    if (v instanceof Array) {
+      return JSON.stringify(v);
+    }
+    return v;
+  }, 2).replace(/\\/g, '')
+    .replace(/"\[/g, '[')
+    .replace(/\]"/g, ']')
+    .replace(/"\{/g, '{')
+    .replace(/\}"/g, '}');
+  return output;
+}
+
 // Function to write to .json file for session persistence.
 function writeData() {
-  fs.writeFile(dataLogPath, JSON.stringify(global.dataLog, null, 2), function(err) {
+  fs.writeFile(dataLogPath, prettyPrintJson(), function(err) {
     if (err) {
       return console.log(err);
     }
@@ -107,14 +122,13 @@ async function restoreMessages(config, client, callback) {
       }
       for (let gc of g.channels.cache) {
         gc = gc[1];
-        if (config.airlockChannel != '' && gc.name.includes(config.airlockChannel)) {return;}
         // check if each channel has an entry in the log. if not, create a new property with info about the channel.
-        if (gc.type === 'text' && !global.dataLog[g.id][gc.id] && gc.permissionsFor(g.me).has(['VIEW_CHANNEL', 'READ_MESSAGE_HISTORY'])) {
+        if (gc.type === 'text' && !global.dataLog[g.id][gc.id] && gc.permissionsFor(g.me).has(['VIEW_CHANNEL', 'READ_MESSAGE_HISTORY']) && !(config.airlockChannel != '' && gc.name.includes(config.airlockChannel))) {
         // initialize data for new channel
           global.dataLog[g.id][gc.id] = { channelName:gc.name, lastMessageID:null, numMessages:[] };
           writeData();
         }
-        if (gc.lastMessageID != null && gc.permissionsFor(g.me).has(['VIEW_CHANNEL', 'READ_MESSAGE_HISTORY'])) {
+        if (gc.lastMessageID != null && gc.permissionsFor(g.me).has(['VIEW_CHANNEL', 'READ_MESSAGE_HISTORY']) && !(config.airlockChannel != '' && gc.name.includes(config.airlockChannel))) {
         // if the channel doesn't have a null lastMessage, we can just iterate back to the most recent seen message.
           if (global.dataLog[g.id][gc.id].lastMessageID) {
             let lastSeenMessage = global.dataLog[g.id][gc.id].lastMessageID;
