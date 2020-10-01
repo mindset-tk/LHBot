@@ -642,7 +642,7 @@ function embedEvent(event, guild, options = {}) {
   if (role) {
     eventEmbed.addField('Participants', `${role.members.keyArray().length}`);
     if (forUser) {
-      const member = guild.members.cache.get(forUser);
+      const member = guild.members.cache.get(forUser.id);
       eventEmbed.addField(
         `Have you (${(member.nickname) ? member.nickname : member.user.username}) RSVPed?`,
         forUser === event.owner || member.roles.cache.has(event.role)
@@ -890,7 +890,7 @@ async function infoCommand(message, client, name) {
       '',
       embedEvent(event, message.guild, {
         title: event.name,
-        forUser: message.author.id,
+        forUser: message.author,
       }),
     );
   }
@@ -1484,11 +1484,11 @@ async function createWizard(message, channel) {
   eventData.role = role.id;
 
   await eventManager.add(eventData);
-  
+
   return channel.send(
     embedEvent(eventData, null, {
       title: `New event: ${eventData.name}`,
-      forUser: message.author.id,
+      forUser: message.author,
     }),
   );
 }
