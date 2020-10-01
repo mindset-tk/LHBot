@@ -56,7 +56,8 @@ function writeData() {
   });
 }
 
-function publicOnMessage(message) {
+function publicOnMessage(message, config) {
+  if (config.airlockChannel != '' && message.channel.name.includes(config.airlockChannel)) {return;}
   // Format a YYYY-MM date string, then push message data through the dataLog object
   const dateString = formatDate(message.createdTimestamp);
   let numMsgData = new Map();
@@ -93,7 +94,7 @@ function publicOnMessage(message) {
   writeData();
 }
 
-async function restoreMessages(client, callback) {
+async function restoreMessages(config, client, callback) {
   let retrievedMessages = 0;
   // console.log('Fetching offline messages...');
   do {
@@ -106,6 +107,7 @@ async function restoreMessages(client, callback) {
       }
       for (let gc of g.channels.cache) {
         gc = gc[1];
+        if (config.airlockChannel != '' && gc.name.includes(config.airlockChannel)) {return;}
         // check if each channel has an entry in the log. if not, create a new property with info about the channel.
         if (gc.type === 'text' && !global.dataLog[g.id][gc.id] && gc.permissionsFor(g.me).has(['VIEW_CHANNEL', 'READ_MESSAGE_HISTORY'])) {
         // initialize data for new channel
@@ -126,7 +128,7 @@ async function restoreMessages(client, callback) {
                 if (messages.size > 0) {
                   for (let message of messages) {
                     message = message[1];
-                    publicOnMessage(message);
+                    publicOnMessage(message, config);
                   }
                   numMsgsFetched += messages.size;
                 }
@@ -152,7 +154,7 @@ async function restoreMessages(client, callback) {
             // this is necessary because the "before:" param on messages.fetch will not include the message that is within that param.
             if (gc.lastMessageID != null) {
               await gc.messages.fetch(gc.lastMessageID)
-                .then(lastmsg => publicOnMessage(lastmsg))
+                .then(lastmsg => publicOnMessage(lastmsg, config))
                 .catch(err => {
                   if (err.name == 'DiscordAPIError' && err.message == 'Unknown Message') {
                     console.log('Last message in #' + gc.name + ' was deleted or invalid. Ignoring.');
@@ -168,7 +170,7 @@ async function restoreMessages(client, callback) {
                 if (messages.size > 0) {
                   for (let message of messages) {
                     message = message[1];
-                    publicOnMessage(message);
+                    publicOnMessage(message, config);
                     oldestSeenMessageID = Math.min(parseInt(message.id), parseInt(oldestSeenMessageID)).toString();
                   }
                   numMsgsFetched += messages.size;
@@ -194,7 +196,7 @@ async function restoreMessages(client, callback) {
 // This function actually only tabulates unique data for the previous month and earlier.
 // TODO: write a version within xlslog that will tabulate the current month *without* writing to json
 // (Writing to JSON would interfere with some data validation within this func.)
-async function uniqueUserCounter(client) {
+async function uniqueUserCounter(config, client) {
   // get current month in YYYY-MM format
   const nowString = formatDate(new Date());
   for (const gID of Object.keys(global.dataLog)) {
@@ -208,6 +210,7 @@ async function uniqueUserCounter(client) {
     for (const cID of Object.keys(global.dataLog[gID])) {
       let skip = 0;
       const gc = await g.channels.cache.get(cID);
+      if (!gc || (config.airlockChannel != '' && gc.name.includes(config.airlockChannel))) { skip = 1;}
       if (!global.dataLog[gID][cID].numMessages) { skip = 1;}
       // create uniqueUsers arr if it doesn't exist
       else if (!global.dataLog[gID][cID].uniqueUsers) {
@@ -312,8 +315,8 @@ async function getTotalServerUsers(client) {
 }
 
 function publicOnReady(config, client, callback) {
-  restoreMessages(client, callback);
-  uniqueUserCounter (client);
+  restoreMessages(config, client, callback);
+  uniqueUserCounter (config, client);
   getTotalServerUsers (client);
 }
 
