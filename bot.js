@@ -195,7 +195,7 @@ client.on('message', async message => {
   // console.log(message.author);
   // only do datalogging on non-DM text channels. Don't log messages while offline retrieval is proceeding.
   // (offline logging will loop and catch new messages on the fly.)
-  if (message.channel.type === 'text' && dataLogLock != 1) { dataLogger.OnMessage(message); }
+  if (message.channel.type === 'text' && dataLogLock != 1) { dataLogger.OnMessage(message, config); }
   if(Counting.HandleMessage(message)) {
     return;
   }
