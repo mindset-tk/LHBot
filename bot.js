@@ -1,25 +1,25 @@
 // function to pretty print the config data so that arrays show on one line, so it's easier to visually parse the config file when hand opening it. Purely cosmetic.
 function prettyPrintConfig(cfg) {
   const output = JSON.stringify(cfg, function(k, v) {
-  if (v instanceof Array) {
-    return JSON.stringify(v);
-  }
-  return v;
-    }, 2).replace(/\\/g, '')
-  .replace(/"\[/g, '[')
-  .replace(/\]"/g, ']')
-  .replace(/"\{/g, '{')
-  .replace(/\}"/g, '}');
+    if (v instanceof Array) {
+      return JSON.stringify(v);
+    }
+    return v;
+  }, 2).replace(/\\/g, '')
+    .replace(/"\[/g, '[')
+    .replace(/\]"/g, ']')
+    .replace(/"\{/g, '{')
+    .replace(/\}"/g, '}');
   return output;
 }
 
 // function to write config to file.
 function writeConfig(cfg) {
   fs.writeFileSync(configPath, prettyPrintConfig(cfg), function(err) {
-if (err) {
-  message.channel.send('There was an error saving the config file!');
-  return console.log(err);
-}
+    if (err) {
+      console.log('There was an error saving the config file!');
+      return console.log(err);
+    }
   });
 }
 
@@ -28,66 +28,67 @@ require('console-stamp')(console, { pattern: 'mm/dd/yy HH:MM:ss', label: false }
 const fs = require('fs');
 const Discord = require('discord.js');
 const configPath = './config.json';
-var config = undefined;
+let config = undefined;
 const wait = require('util').promisify(setTimeout);
 
-//initialize or load any configs the a new instance doesn't start with to avoid breaking
-const CONFIG_FILENAMES = ["config.json", "counting.json", "gamelist.json", "datalog.json"];
+// initialize or load any configs the a new instance doesn't start with to avoid breaking
+const CONFIG_FILENAMES = ['config.json', 'counting.json', 'gamelist.json', 'datalog.json'];
 CONFIG_FILENAMES.forEach(filename => {
 
-  if (filename != "config.json") {
+  if (filename != 'config.json') {
     if (!fs.existsSync(filename)) {
-      fs.writeFileSync(filename, "{}", function (err) {
+      fs.writeFileSync(filename, '{}', function(err) {
         if (err) return console.log(err);
       });
     }
-  } else {
-      const lastArg = process.argv[process.argv.length-1];
-      if (!fs.existsSync(filename)) {
-        freshConfig = new Object();
-        freshConfig.prefix = ".";
-        freshConfig.authtoken = (lastArg.length == 59) ? lastArg : "";
-        freshConfig.roleStaff = "";
-        freshConfig.roleComrade = "";
-        freshConfig.roleAirlock = "";
-        freshConfig.airlockPruneDays = "";
-        freshConfig.airlockPruneMessage = ""
-        freshConfig.invLogToggle = false;
-        freshConfig.channelInvLogs = "";
-        freshConfig.countingToggle = false;
-        freshConfig.countingChannelId = "";
-	freshConfig.countingFailMessages = [],
-	freshConfig.countingStartMessages = [],
-	freshConfig.countingFailRepeatMessages = [],
-	freshConfig.repeatReacts = [],
-        freshConfig.knownInvites = [],
-	freshConfig.eventInfoChannelId = "";
-	freshConfig.pinIgnoreChannels = [];
-	freshConfig.voiceTextChannelIds = [];
-	freshConfig.voiceChamberDefaultSizes = new Object();
-	freshConfig.voiceChamberSnapbackDelay = "";
-	freshConfig.currentActivity = new Object();
-	freshConfig.currentActivity.Type = "";
-	freshConfig.currentActivity.Name = "";
-	freshConfig.youTubeAPIKey = "";
-	writeConfig(freshConfig);
-	console.log("You haven't setup your 'config.json' file yet. A fresh one has been generated for you!");
-      }
+  }
+  else {
+    const lastArg = process.argv[process.argv.length - 1];
+    if (!fs.existsSync(filename)) {
+      const freshConfig = new Object();
+      freshConfig.prefix = '.';
+      freshConfig.authtoken = (lastArg.length == 59) ? lastArg : '';
+      freshConfig.roleStaff = '';
+      freshConfig.roleComrade = '';
+      freshConfig.roleAirlock = '';
+      freshConfig.airlockPruneDays = '';
+      freshConfig.airlockPruneMessage = '';
+      freshConfig.invLogToggle = false;
+      freshConfig.channelInvLogs = '';
+      freshConfig.countingToggle = false;
+      freshConfig.countingChannelId = '';
+      freshConfig.countingFailMessages = [],
+      freshConfig.countingStartMessages = [],
+      freshConfig.countingFailRepeatMessages = [],
+      freshConfig.repeatReacts = [],
+      freshConfig.knownInvites = [],
+      freshConfig.eventInfoChannelId = '';
+      freshConfig.pinIgnoreChannels = [];
+      freshConfig.voiceTextChannelIds = [];
+      freshConfig.voiceChamberDefaultSizes = new Object();
+      freshConfig.voiceChamberSnapbackDelay = '';
+      freshConfig.currentActivity = new Object();
+      freshConfig.currentActivity.Type = '';
+      freshConfig.currentActivity.Name = '';
+      freshConfig.youTubeAPIKey = '';
+      writeConfig(freshConfig);
+      console.log('You haven\'t setup your \'config.json\' file yet. A fresh one has been generated for you!');
+    }
 
-      config = require(configPath);
-      if (!config.authtoken) {
-      	if (lastArg.length == 59) {
-      	  config.authtoken = lastArg;
-          writeConfig(config);
-      	}
-      	else {
-          console.log ("ERROR: " + 
-                       "\n- You still need to enter your bot's discord auth key to continue!" + 
-                       "\n- You can do this by entering it into your 'config.json' *or*" +
-                       "\n  by passing your discord bot auth token as the final arg (just one time) when running this script next");
-          process.exit(1);
-        }
+    config = require(configPath);
+    if (!config.authtoken) {
+      if (lastArg.length == 59) {
+        config.authtoken = lastArg;
+        writeConfig(config);
       }
+      else {
+        console.log ('ERROR: ' +
+                       '\n- You still need to enter your bot\'s discord auth key to continue!' +
+                       '\n- You can do this by entering it into your \'config.json\' *or*' +
+                       '\n  by passing your discord bot auth token as the final arg (just one time) when running this script next');
+        process.exit(1);
+      }
+    }
   }
 });
 
@@ -177,13 +178,13 @@ client.on('ready', async () => {
   });
 });
 
-//set up listener to revert configured game chambers to their default sizes
-client.on('voiceStateUpdate', (oldState, newState) => { 
+// set up listener to revert configured game chambers to their default sizes
+client.on('voiceStateUpdate', (oldState, newState) => {
   if (vccheck.ChannelSnapbackCheck) {
-      vccheck.ChannelSnapbackCheck (oldState, newState, client);
-  } 
+    vccheck.ChannelSnapbackCheck (oldState, newState, client);
+  }
 });
-     
+
 
 // login to Discord with your app's token
 client.login(config.authtoken);
@@ -291,7 +292,7 @@ client.on('raw', async packet => {
     return;
   }
 
-  //Forward the event to any command that handles events
+  // Forward the event to any command that handles events
   client.eventHandlers.forEach(handler => handler.HandleEvent(client, config, packet));
 });
 
