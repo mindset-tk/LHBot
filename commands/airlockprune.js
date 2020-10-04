@@ -32,7 +32,7 @@ async execute(message, args, client) {
       var outMsg = "";
       
       //Loop through any airlock channels to find the last post date of airlock users
-      airlockChannels = await client.channels.cache.filter(channel => channel.name.includes(AIRLOCK_CHANNEL) && channel.viewable && !channel.deleted);
+      airlockChannels = await client.channels.cache.filter(channel => channel.viewable && !channel.deleted && channel.type == "text" && channel.name.includes(AIRLOCK_CHANNEL));
        for (channel of airlockChannels) {
         await channel[1].messages.fetch().then(messages => {
 //          messages = messages.filter(m => m.member.roles.cache.has(AIRLOCK_ROLE_ID));
