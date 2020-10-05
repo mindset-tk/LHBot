@@ -327,7 +327,7 @@ client.on('guildMemberAdd', member => {
     // load the current invite list.
     member.guild.fetchInvites().then(guildInvites => {
     const pfp = member.user.displayAvatarURL();
-    var creationDate = moment(member.createdAt).tz('America/Los_Angeles').format('MMM Do YYYY, h:mma z');
+    const creationDate = (moment(member.user.createdAt)).tz('America/Los_Angeles').format('MMM Do YYYY, h:mma z');
     const msgEmbed = new Discord.MessageEmbed()
 	.setColor('#228B22')
 	.setAuthor(`${member.user.tag} (${member.id})`, pfp, pfp)
