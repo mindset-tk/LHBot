@@ -32,7 +32,7 @@ let config = undefined;
 const wait = require('util').promisify(setTimeout);
 
 // initialize or load any configs the a new instance doesn't start with to avoid breaking
-const CONFIG_FILENAMES = ['config.json', 'counting.json', 'gamelist.json', 'datalog.json'];
+const CONFIG_FILENAMES = ['config.json', 'counting.json', 'gamelist.json', 'datalog.json', 'prunedata.json'];
 CONFIG_FILENAMES.forEach(filename => {
 
   if (filename != 'config.json') {
@@ -327,7 +327,7 @@ client.on('guildMemberAdd', member => {
     // load the current invite list.
     member.guild.fetchInvites().then(guildInvites => {
     const pfp = member.user.displayAvatarURL();
-    var creationDate = moment(member.createdAt).tz('America/Los_Angeles').format('MMM Do YYYY, h:mma z');
+    const creationDate = (moment(member.user.createdAt)).tz('America/Los_Angeles').format('MMM Do YYYY, h:mma z');
     const msgEmbed = new Discord.MessageEmbed()
 	.setColor('#228B22')
 	.setAuthor(`${member.user.tag} (${member.id})`, pfp, pfp)
