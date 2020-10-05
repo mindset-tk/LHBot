@@ -100,6 +100,7 @@ const dataLogger = require('./datalog.js');
 const fetch = require('node-fetch');
 const eventDataPath = './events.json';
 if (fs.existsSync(eventDataPath)) { global.eventData = require(eventDataPath);}
+const moment = require('moment-timezone');
 
 Discord.Structures.extend('Guild', Guild => {
   class MusicGuild extends Guild {
@@ -325,6 +326,14 @@ client.on('guildMemberAdd', member => {
     const logChannel = client.channels.cache.get(config.channelInvLogs);
     // load the current invite list.
     member.guild.fetchInvites().then(guildInvites => {
+    const pfp = member.user.displayAvatarURL();
+    var creationDate = moment(member.createdAt).tz('America/Los_Angeles').format('MMM Do YYYY, h:mma z');
+    const msgEmbed = new Discord.MessageEmbed()
+	.setColor('#228B22')
+	.setAuthor(`${member.user.tag} (${member.id})`, pfp, pfp)
+	.setThumbnail(pfp)
+	.setTimestamp()
+	.setFooter(`Joined`, 'https://cdn.discordapp.com/icons/673680737685340203/a_597e22b0a2a75e6fe09166f11d7c9ac9.gif?size=4096');
       try {
         const knownInvites = new Map(config.knownInvites);
         let invite = new Discord.Collection();
@@ -344,11 +353,16 @@ client.on('guildMemberAdd', member => {
           knownInvString = knownInvites.get(invite.code);
         }
         // A real basic message with the information we need.
-        logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined using invite code **${invite.code}** ${knownInvString ? `(${knownInvString})` : `from ${inviter} (${inviter.tag})`}. This invite has been used **${invite.uses}** times since its creation.`);
+        
+
+        msgEmbed.setDescription(`Created: ${creationDate}\nInvite: **${invite.code}** ${knownInvString ? `(${knownInvString})` : `\nInvited by: ${inviter} (${inviter.tag})`}\nUses: **${invite.uses}**`);
+//        logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined using invite code **${invite.code}** ${knownInvString ? `(${knownInvString})` : `from ${inviter} (${inviter.tag})`}. This invite has been used **${invite.uses}** times since its creation.`);
       }
       catch {
-        logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined the server, but no invite information was available.`);
+	msgEmbed.setDescription(`Created: ${creationDate}\nInvite: No info available`)
+//        logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined the server, but no invite information was available.`);
       }
+      logChannel.send({ content: ":inbox_tray: <@" + member.id + "> joined the server!", embed: msgEmbed});
     });
   }
 });
@@ -357,7 +371,7 @@ client.on('guildMemberRemove', member => {
   const canLog = (config.invLogToggle && Boolean(config.channelInvLogs));
   const logChannel = client.channels.cache.get(config.channelInvLogs);
   const data = [];
-  if (canLog) { logChannel.send(`${member} (${member.user.tag} / ${member.id}) left the server.`); }
+  if (canLog) { logChannel.send(`${member} (${member.user.tag} / ${member.id}) left the server :<`); }
   let exitConLog = `${member.user.tag} exited.`;
   Object.keys(gameList).forEach(sysname => {
     if (!gameList[sysname].accounts[0]) return;
