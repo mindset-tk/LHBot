@@ -71,8 +71,8 @@ module.exports = {
           }
           let oldestMsg = fakeMsgIdNow;
           // fetch messages repeatedly, looping until the channels's last message ID matches our last message ID.
-          while (prevLastSeen > oldestSeenMessage) {
-            prevLastSeen = oldestSeenMessage;
+          while (prevLastSeen < oldestSeenMessage) {
+            //prevLastSeen = oldestSeenMessage;
             await gc.messages.fetch({ limit: 100, before: oldestSeenMessage }).then(messages => {
               if (messages.size > 0) {
                 for (let message of messages) {
@@ -106,7 +106,7 @@ module.exports = {
     const colHeaders = ['username', 'lastSeen'];
     const colData = [];
     colHeaders.forEach(hdr => {
-      colData.push({ header: hdr, key: hdr, width: 9 });
+      colData.push({ header: hdr, width:12, key: hdr, width: 12 });
     });
     listSheet.columns = colData;
     // const data = [];
