@@ -136,9 +136,12 @@ If the bot is the only user in a voice channel when it finishes playback of the 
               message.guild.musicData.songDispatcher = dispatcher;
               message.guild.musicData.songDispatcher.pausedTime = null;
               dispatcher.setVolume(message.guild.musicData.volume);
+              // ugly spacer line in the .setDescription in order to account for a known discord issue where mobile clients see embeds as long and 0-width
               const videoEmbed = new Discord.MessageEmbed()
                 .setThumbnail(queue[0].thumbnail)
                 .setColor('#e9f931')
+                .setTitle('Youtube Playback')
+                .setDescription('\u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B ')
                 .addField('Now Playing:', queue[0].title)
                 .addField('Duration:', queue[0].duration)
                 .addField('Added by:', queue[0].addedBy)
@@ -274,13 +277,16 @@ If the bot is the only user in a voice channel when it finishes playback of the 
         titleArray.push(obj.title);
       });
       const queueEmbed = new Discord.MessageEmbed()
-        .setColor('#ff7373');
-      const queueData = [`**Now Playing**: ${ message.guild.musicData.nowPlaying.title}`];
+        .setColor('#ff7373')
+        .setTitle('Youtube Playlist')
+        .setDescription('\u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B ')
+        .addField('Now Playing', `${ message.guild.musicData.nowPlaying.title}`);
+      const queueData = [];
       if (titleArray.length == 0) {queueData.push('There are no songs in queue after the current song.'); }
       for (let i = 0; i < titleArray.length; i++) {
         queueData.push(`**${i + 1}.** ${titleArray[i]}`);
       }
-      queueEmbed.addField('Music queue', queueData.join('\n'));
+      queueEmbed.addField('Up next:', queueData.join('\n'));
       return message.channel.send(queueEmbed);
     }
     else if (args[0].toLowerCase() == 'list' && args[1].toLowerCase() == 'clear') {
