@@ -32,7 +32,7 @@ let config = undefined;
 const wait = require('util').promisify(setTimeout);
 
 // initialize or load any configs the a new instance doesn't start with to avoid breaking
-const CONFIG_FILENAMES = ['config.json', 'counting.json', 'gamelist.json', 'datalog.json'];
+const CONFIG_FILENAMES = ['config.json', 'counting.json', 'gamelist.json', 'datalog.json', 'prunedata.json'];
 CONFIG_FILENAMES.forEach(filename => {
 
   if (filename != 'config.json') {
