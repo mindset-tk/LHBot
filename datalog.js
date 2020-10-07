@@ -106,6 +106,20 @@ function publicOnMessage(message, config) {
   if ((parseInt(message.id) > parseInt(global.dataLog[message.guild.id][message.channel.id].lastMessageID)) || !global.dataLog[message.guild.id][message.channel.id].lastMessageID) {
     global.dataLog[message.guild.id][message.channel.id].lastMessageID = message.id;
   }
+
+  // get pruneData array as an ES6 map
+  let pruneData = new Map(global.dataLog[message.guild.id].pruneData);
+  // If a non-bot user isn't in the pruneData array yet, or has a last-active entry older than this one, then update it
+  if ((!pruneData.get(message.author.id) || (parseInt(message.id) > parseInt(pruneData.get(message.author.id)))) && !message.author.bot) {
+      if (!message.guild.member(message.author.id)) {
+        pruneData.delete(message.author.id);
+      }
+      else {
+        pruneData.set(message.author.id, message.id);
+      }
+    global.dataLog[message.guild.id].pruneData = [...pruneData];
+  }
+
   writeData();
 }
 
