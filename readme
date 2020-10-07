@@ -1,12 +1,19 @@
+This is a small bot used to administer a mid-sized discord server.  You may fork at your leisure.  Commands can be found via the help command.
+
+Other features: 
+- logs some basic server metrics (monthly messages per channel, number of active users per month, total number of users on server @ EOM)
+- Any post accruing enough 📌 emoji reacts will be pinned in a given channel. (configurable)
+- Any post that a user reacts to with the 🔖 will be PMed to the user for later use.
+
 To use:
-1. initialize your config.json by filling in the various IDs; You can rename config example.json for this purpose and fill in the fields.
-    -Prefix is the prefix symbol for your bot commands, by default it will be ! but you can change it here.
-    I haven't tested with emoji or other nonstandard characters, but any unicode should work.
-    -authtoken is your server's auth token !!do not share this with anyone!!
-    -ServerID is the server ID.
-2. run bot.js (typically, 'node bot.js' will be enough)
+1. Use npm/node to initialize your working folder.
+2. Start the bot once to create an empty config.json. it will probably error out after doing so since it won't have an auth token to log in.
+2. all config entries must be enclosed in 'single quotes'; fill the following:
+    - authtoken - the authorization token discord generated for your bot. This is necessary to log in.
+    - prefix - the prefix for your commands.  '.' or '!' are good options.
+    - roleStaff - the ID of the staff or mod role for your server.
+    - roleComrade - the ID of regular "user" level role for your server.
+    (if your server has a relatively flat structure, you could set these to be the same, or even to match the @everyone role - however, the stronger commands are set up to be staff only, so tread with caution)
+    - youTubeAPIKey - Only needed if you plan to use the youtube-to-voice streaming functionality from the .yt command
+3. Once these are filled, the bot should boot and log in.  You can now use the .config command to configure the remaining functions
 
-Currently, no commands are implemented. This will change; however it will pin items with 5 pin reactions on them,
-and DM a copy of a message to you if you react to it with :bookmark:
-
-Dependencies: discord.js, fs (module for node.js)
