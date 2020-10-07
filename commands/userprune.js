@@ -1,7 +1,7 @@
 const wait = require('util').promisify(setTimeout);
 const fs = require('fs');
 const path = require('path');
-
+const moment = require('moment-timezone');
 const ExcelJS = require('exceljs');
 
 /*
@@ -100,30 +100,46 @@ module.exports = {
     }
 */
     if(global.dataLog[message.guild.id].pruneData && global.dataLogLock != 1) {
+      const maxTimeSinceActive = args[0] ? (parseInt(args[0]) ? parseInt(args[0]) : 6) : 0;
+      const currentTime = moment();
       const pruneData = new Map(global.dataLog[message.guild.id].pruneData.sort((a, b) => a[1] - b[1]));
       const xlsUsrList = new ExcelJS.Workbook;
       const listSheet = xlsUsrList.addWorksheet('User List');
       const colHeaders = ['Username', 'Display', 'Last Posted'];
       const colData = [];
       colHeaders.forEach(hdr => {
-        colData.push({ header: hdr, key: hdr, width: 25 });
+        if (hdr == 'Last Posted') {
+          colData.push({ header: hdr, key: hdr, width: 15, style: { numFmt: 'm/d/yyyy' } });
+        }
+        else {
+          colData.push({ header: hdr, key: hdr, width: 25 });
+        }
       });
       listSheet.columns = colData;
-      // const data = [];
-      
+            
       
       for (const usr of pruneData) {
         const memberObj = await message.guild.member(usr[0]);
         const usrObj = memberObj.user;
-        let datelastactive = 'N/A';
+        let dateLastActive = 'N/A';
+        let formattedDateLastActive;
         if (usr[1] != 0) {
-          const msgUnixDate = (BigInt(usr[1]) >> BigInt(22)) + discordEpoch;
+          const lastPostUnixDate = Number((BigInt(usr[1]) >> BigInt(22)) + discordEpoch);
           // const dateoptions = { timeZone: 'America/Los_Angeles', timeZoneName: 'short', hour: '2-digit', minute: '2-digit', hour12: false };
-          datelastactive = new Date(Number(msgUnixDate));
+          dateLastActive = moment(lastPostUnixDate);
+          formattedDateLastActive = moment(lastPostUnixDate).toDate();
           // data.push(`${usrObj.tag} last message: ${datelastactive.toLocaleString('en-US', dateoptions)}`);
         }
-        
-        listSheet.addRow({ Username: usrObj.tag, Display: memberObj.nickname, 'Last Posted': datelastactive });
+        else {
+          formattedDateLastActive = dateLastActive;
+        }
+        if (dateLastActive !== 'N/A') {
+//change this to months on live! also have it read from the first arg
+          const timeSinceLastActive = moment.duration(currentTime.diff(dateLastActive)).asMonths();
+          //console.log(timeSinceLastActive);
+          if (timeSinceLastActive < maxTimeSinceActive) {break;}
+        }
+        listSheet.addRow({ Username: usrObj.tag, Display: memberObj.nickname, 'Last Posted': formattedDateLastActive });
       }
       //global.pruneData[message.guild.id]['lastChecked'] = fakeMsgIdNow.toString(); 
       await xlsUsrList.xlsx.writeFile('./usrs.xlsx');
