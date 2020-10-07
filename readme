@@ -14,6 +14,6 @@ To use:
     - roleStaff - the ID of the staff or mod role for your server.
     - roleComrade - the ID of regular "user" level role for your server.
     (if your server has a relatively flat structure, you could set these to be the same, or even to match the @everyone role - however, the stronger commands are set up to be staff only, so tread with caution)
-    - youTubeAPIKey - Only needed if you plan to use the youtube-to-voice streaming functionality from the .yt command
+    - youTubeAPIKey - Only needed if you plan to use the youtube-to-voice streaming functionality from the .yt command (if not you may delete the yt.js file and the code block relating to Discord.Structures.extend('Guild', Guild => { class MusicGuild extends Guild ... } in bot.js.
 3. Once these are filled, the bot should boot and log in.  You can now use the .config command to configure the remaining functions
 
