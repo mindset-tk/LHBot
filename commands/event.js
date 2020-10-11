@@ -1226,7 +1226,7 @@ async function createWizard(message, channel) {
       DMChannel.send(`Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`);
       return false;
     }
-    eventData.name = reply.content;
+    eventData.name = reply.content.replace(/["_\*>`\n]/g, '');
     if (eventManager.getByName(message.guild.id, eventData.name)) {
       DMChannel.send(`An event called '${eventData.name}' already exists. Please enter a different name.`);
     }
@@ -1381,8 +1381,8 @@ async function createWizard(message, channel) {
   while(needsDesc == true) {
     reply = await DMCollector(DMChannel);
     if (!reply) {return;}
-    description = reply.content.toLowerCase();
-    switch (description) {
+    description = reply.content.replace(/["_\*>`]/g, '');
+    switch (description.toLowerCase()) {
     case 'cancel':
       DMChannel.send(`Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`);
       return;
@@ -1393,7 +1393,7 @@ async function createWizard(message, channel) {
     case false:
       return;
     default:
-      DMChannel.send(`Great,\n> *${description}* will be the description of your event. Is this OK? **Y/N**`);
+      DMChannel.send(`Great,\n> ${description.replace(/\n/g, "\n> ")}\nwill be the description of your event. Is this OK? **Y/N**`);
       awaitingAnswer = true;
       while (awaitingAnswer) {
         reply = await DMCollector(DMChannel);
