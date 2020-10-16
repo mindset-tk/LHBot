@@ -109,9 +109,17 @@ If the bot is the only user in a voice channel when it finishes playback of the 
     const voiceChannel = message.member.voice.channel;
     if (!voiceChannel && args[0] != 'list') return message.channel.send('Please join a voice channel and try again!');
     const mypermissions = message.guild.me.permissionsIn(voiceChannel);
-    // console.log(permissions);
-    if (!mypermissions.has(['CONNECT', 'SPEAK'])) {
+    // console.log(mypermissions.toArray());
+    if (!mypermissions.has(['VIEW_CHANNEL', 'CONNECT', 'SPEAK'])) {
       return message.channel.send(`Sorry, I don't have permissions to join ${voiceChannel}.`);
+    }
+    else if (voiceChannel.full) {
+      return message.channel.send(`Sorry, ${voiceChannel} is full!`);
+    }
+    else if (!voiceChannel.joinable) {
+      try { voiceChannel.join(); }
+      catch(err) { console.log(`Unable to join voice channel ID ${voiceChannel.id} due to following error: ${err}`); }
+      return message.channel.send(`I couldn't join ${voiceChannel}, but I'm not sure why. Please see log for details.`);
     }
     if ((message.guild.musicData.isPlaying == true && voiceChannel != message.guild.musicData.voiceChannel) && !message.member.roles.cache.has(config.roleStaff)) {
       if (!safeCommands.includes(args[0])) {
@@ -146,14 +154,14 @@ If the bot is the only user in a voice channel when it finishes playback of the 
                 .addField('Duration:', queue[0].duration)
                 .addField('Added by:', queue[0].addedBy)
                 .addField('Link:', queue[0].url);
-              // also display next song title, if there is one in queue
+                // also display next song title, if there is one in queue
               if (queue[1]) videoEmbed.addField('Next Song:', queue[1].title);
               message.guild.musicData.voiceTextChannel.send(videoEmbed);
               // dequeue the song.
               return message.guild.musicData.nowPlaying = queue.shift();
             })
             .on('finish', async () => {
-            // if there are more songs in queue, continue playing
+              // if there are more songs in queue, continue playing
               const VCUsersNotMe = [];
               message.guild.musicData.voiceChannel.members.forEach((value, key) => {
                 if (key != client.user.id) {
