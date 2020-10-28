@@ -26,7 +26,7 @@ function writeConfig(cfg) {
 // require the filesystem and discord.js modules
 require('console-stamp')(console, { pattern: 'mm/dd/yy HH:MM:ss', label: false });
 const fs = require('fs');
-const Discord = require('discord.js');
+
 const configPath = './config.json';
 let config = undefined;
 const wait = require('util').promisify(setTimeout);
@@ -92,6 +92,9 @@ CONFIG_FILENAMES.forEach(filename => {
   }
 });
 
+const Discord = require('discord.js');
+const myIntents = new Discord.Intents();
+
 const Counting = require('./counting.js');
 const vccheck = require('./commands/vccheck.js');
 const listPath = './gamelist.json';
@@ -121,7 +124,8 @@ Discord.Structures.extend('Guild', Guild => {
 });
 
 // initialize client, commands, command cooldown collections
-const client = new Discord.Client();
+myIntents.add(Discord.Intents.NON_PRIVILEGED,'GUILD_MEMBERS');
+const client = new Discord.Client({ ws: { intents: myIntents } });
 client.commands = new Discord.Collection();
 const cooldowns = new Discord.Collection();
 client.eventHandlers = [];
