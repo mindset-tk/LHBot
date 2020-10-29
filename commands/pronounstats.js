@@ -12,16 +12,15 @@ async execute(message, args, client) {
     return Math.round(((number*100) + Number.EPSILON) * 100) / 100;
   }
 
-  let pronounStats = new Map();
   let content = "__**Pronoun Role Usage:**__\n";
-  let totalRolesApplied = 0;
   const fullMemberList = await message.guild.members.fetch();
   //Detect pronoun roles by searching for ones with a slash in them. Might update this later to let people exclude certain roles ig? This is fine for our purposes right now
   const pronounRoles = await message.guild.roles.cache.filter(role => role.name.includes("/") || role.name.toLowerCase().includes("pronoun")).sort((a, b) => a.name.localeCompare(b.name));
   //Get total # of members with and without at least one pronoun role
   const membersWithPronounRoles = await message.guild.members.cache.filter(u => u.roles.cache.find(r => pronounRoles.find(pronounRole => pronounRole === r)) && !u.user.bot).size;
   const membersWithoutPronounRoles = await message.guild.members.cache.filter(u => !u.roles.cache.find(r => pronounRoles.find(pronounRole => pronounRole === r)) && !u.user.bot).size;
-
+  const totalRolesApplied = pronounRoles.reduce((prevVal, role) => prevVal + role.members.size, 0);
+  
   //Iterate through each pronoun role to get the stats for it
   for (curRole of pronounRoles) {
     curRole = curRole[1];
@@ -29,25 +28,15 @@ async execute(message, args, client) {
     const otherRoles = pronounRoles.filter(r => r.name !== curRole.name);
     //Get the number of members with this pronoun role and no others
     const exclusiveSize = curRole.members.filter(user => !user.roles.cache.some(r => otherRoles.find(otherRole => otherRole === r))).size;
-    //Increment the total # of roles applied (non-exclusive)
-    totalRolesApplied += curRole.members.size;
     //Make sure we avoid any roles with pronoun in them that have 0 members
     if (curRole.members.size > 0) {
       //Assign each value to an object to retrieve below, so that we can print them once totalRolesApplied is done calculating
-      pronounStats[curRole.id] = new Object();
-      pronounStats[curRole.id]["Name"] = curRole.name;
-      pronounStats[curRole.id]["Size"] = curRole.members.size;
-      pronounStats[curRole.id]["Exclusive"] = exclusiveSize;
+      const members = (curRole.members.size == 1) ? "member" : "members";
+      const exclMembers = (exclusiveSize == 1) ? "member" : "members";
+      content +=
+      `> **${curRole.name}**: ${curRole.members.size} ${members} (${round(curRole.members.size/totalRolesApplied)}%)
+      > - Exclusive: ${exclusiveSize} ${exclMembers} (${round(exclusiveSize/membersWithPronounRoles)}%)\n\n`;
     }
-  }
-  //Print 'em out!
-  for (role in pronounStats) {
-    role = pronounStats[role];
-    const member = (role.Size == 1) ? "member" : "members";
-    const exclMembers = (role.Exclusive == 1) ? "member" : "members";
-    content +=
-    `> **${role["Name"]}**: ${role.Size} ${member} (${round(role.Size/totalRolesApplied)}%)
-    > - Exclusive: ${role.Exclusive} ${exclMembers} (${round(role.Exclusive/membersWithPronounRoles)}%)\n\n`;
   }
 
   //More stats
