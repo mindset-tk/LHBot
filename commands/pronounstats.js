@@ -43,9 +43,11 @@ async execute(message, args, client) {
   //Print 'em out!
   for (role in pronounStats) {
     role = pronounStats[role];
-    content += 
-    `> **${role["Name"]}**: ${role.Size} people (${round(role.Size/totalRolesApplied)}%)
-    > - Exclusive: ${role.Exclusive} people (${round(role.Exclusive/membersWithPronounRoles)}%)\n\n`;
+    const people = (role.Size == 1) ? "person" : "people";
+    const exclPeople = (role.Exclusive == 1) ? "person" : "people";
+    content +=
+    `> **${role["Name"]}**: ${role.Size} ${people} (${round(role.Size/totalRolesApplied)}%)
+    > - Exclusive: ${role.Exclusive} ${exclPeople} (${round(role.Exclusive/membersWithPronounRoles)}%)\n\n`;
   }
 
   //More stats
