@@ -5,6 +5,33 @@ const moment = require('moment-timezone');
 const ExcelJS = require('exceljs');
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
+
+/*
+// save disk space and increase readability
+function prettyPrintJson() {
+  const output = JSON.stringify(global.pruneData, function(k, v) {
+    if (v instanceof Array) {
+      return JSON.stringify(v);
+    }
+    return v;
+  }, 2).replace(/\\/g, '')
+    .replace(/"\[/g, '[')
+    .replace(/\]"/g, ']')
+    .replace(/"\{/g, '{')
+    .replace(/\}"/g, '}');
+  return output;
+}
+
+// Function to write to .json file
+function writeData() {
+  fs.writeFile(pruneDataPath, prettyPrintJson(), function(err) {
+    if (err) {
+      return console.log(err);
+    }
+  });
+}
+*/
+module.exports = {
   name: 'pruneusers',
   description: 'DMs an xls of user activity to the user',
   usage: '',
