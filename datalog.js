@@ -137,7 +137,7 @@ async function restoreMessages(config, client, callback) {
       for (let gc of g.channels.cache) {
         gc = gc[1];
         // check if each channel has an entry in the log. if not, create a new property with info about the channel.
-        if (gc.type === 'text' && !global.dataLog[g.id][gc.id] && gc.permissionsFor(g.me).has(['VIEW_CHANNEL', 'READ_MESSAGE_HISTORY']) && !(config.airlockChannel != '' && gc.name.includes(config.airlockChannel))) {
+        if ((gc.type === 'text' || gc.type === 'news') && !global.dataLog[g.id][gc.id] && gc.permissionsFor(g.me).has(['VIEW_CHANNEL', 'READ_MESSAGE_HISTORY']) && !(config.airlockChannel != '' && gc.name.includes(config.airlockChannel))) {
         // initialize data for new channel
           global.dataLog[g.id][gc.id] = { channelName:gc.name, lastMessageID:null, numMessages:[] };
           writeData();
@@ -350,17 +350,17 @@ async function pruneDataMaintenance(client) {
   for (const gID of Object.keys(global.dataLog)) {
     const pruneData = new Map(global.dataLog[gID].pruneData);
     const g = await client.guilds.cache.get(gID);
-    const currentGuildUsrs = await g.members.cache.filter(member => !member.user.bot);
+    const currentGuildUsrs = await g.members.fetch().then(members => members.filter(member => !member.user.bot));
     const usersToAdd = currentGuildUsrs.filter(user => !pruneData.has(user.user.id));
     for (user of usersToAdd) {
       pruneData.set(user[0], 0);
-      //console.log("adding " + user[0]);
+    //  console.log("adding " + user[0]);
     }
     if (global.dataLog[gID].pruneData) {
     const usersToRemove = global.dataLog[gID].pruneData.filter(user => !currentGuildUsrs.has(user[0]));
     for (user of usersToRemove) {
         pruneData.delete(user[0]);
-        //console.log("deleting " + user[0]);
+    //    console.log("deleting " + user[0]);
       }
     }
     global.dataLog[gID].pruneData = [...pruneData];
