@@ -190,13 +190,20 @@ client.on('voiceStateUpdate', (oldState, newState) => {
   }
 });
 
+// set up listener for channel creation events
+client.on("channelCreate", async channel => {
+  if (vettinglimit.VettingLimitCheck && config.airlockChannel) {
+    if (channel.name.includes(config.airlockChannel)) {
+      vettinglimit.VettingLimitCheck (channel, client);
+    }
+  }
+});
 
 // login to Discord with your app's token
 client.login(config.authtoken);
 
 // command parser
 client.on('message', async message => {
-
   // console.log(message.author);
   // only do datalogging on non-DM text channels. Don't log messages while offline retrieval is proceeding.
   // (offline logging will loop and catch new messages on the fly.)
@@ -366,7 +373,7 @@ client.on('guildMemberAdd', member => {
 	msgEmbed.setDescription(`Created: ${creationDate}\nInvite: No info available`)
 //        logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined the server, but no invite information was available.`);
       }
-      logChannel.send({ content: ":inbox_tray: <@" + member.id + "> joined the server!", embed: msgEmbed});
+      logChannel.send({ content: ":inbox_tray: <@" + member.id + "> joined!", embed: msgEmbed});
     });
   }
 });
@@ -375,7 +382,7 @@ client.on('guildMemberRemove', member => {
   const canLog = (config.invLogToggle && Boolean(config.channelInvLogs));
   const logChannel = client.channels.cache.get(config.channelInvLogs);
   const data = [];
-  if (canLog) { logChannel.send(`${member} (${member.user.tag} / ${member.id}) left the server :<`); }
+  if (canLog) { logChannel.send(`📤${member} (${member.user.tag} / ${member.id}) left :<`); }
   let exitConLog = `${member.user.tag} exited.`;
   Object.keys(gameList).forEach(sysname => {
     if (!gameList[sysname].accounts[0]) return;
