@@ -219,7 +219,7 @@ client.on('userUpdate', (oldUser, newUser) => {
     const newPFP = `https://cdn.discordapp.com/avatars/${newUser.id}/${newUser.avatar}.jpg`;
     const logChannel = client.channels.cache.get(config.channelInvLogs);
     const msgEmbed = new Discord.MessageEmbed()
-      .setColor('#228B22')
+      .setColor('#DC143C')
       .setTimestamp();
       // .setFooter('Changed PFP', client.iconURL())
     if (oldUser.avatar !== null) {
