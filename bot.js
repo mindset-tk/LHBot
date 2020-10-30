@@ -1,3 +1,11 @@
+// require the filesystem and discord.js modules
+require('console-stamp')(console, { pattern: 'mm/dd/yy HH:MM:ss', label: false });
+const fs = require('fs');
+const configPath = './config.json';
+let config = undefined;
+const wait = require('util').promisify(setTimeout);
+const fsp = fs.promises;
+
 // function to pretty print the config data so that arrays show on one line, so it's easier to visually parse the config file when hand opening it. Purely cosmetic.
 function prettyPrintConfig(cfg) {
   const output = JSON.stringify(cfg, function(k, v) {
@@ -22,14 +30,6 @@ function writeConfig(cfg) {
     }
   });
 }
-
-// require the filesystem and discord.js modules
-require('console-stamp')(console, { pattern: 'mm/dd/yy HH:MM:ss', label: false });
-const fs = require('fs');
-
-const configPath = './config.json';
-let config = undefined;
-const wait = require('util').promisify(setTimeout);
 
 // initialize or load any configs the a new instance doesn't start with to avoid breaking
 const CONFIG_FILENAMES = ['config.json', 'counting.json', 'gamelist.json', 'datalog.json', 'prunestorage.json'];
@@ -329,8 +329,9 @@ client.on('Resumed', async () => {
 });
 
 // update invite cache from server when invites are created/deleted
-client.on('inviteCreate inviteDelete', async () => {
-  client.guilds.cache.forEach(g => {
+client.on('inviteCreate', async () => {
+  console.log('invite created!');
+  client.guilds.cache.forEach(async g => {
     g.fetchInvites().then(guildInvites => {
       invites[g.id] = guildInvites;
     });
@@ -358,13 +359,11 @@ client.on('guildMemberAdd', member => {
         .setThumbnail(pfp)
         .setTimestamp()
         .setFooter('Joined', member.guild.iconURL());
+      let invite = new Discord.Collection();
+      const knownInvites = new Map(config.knownInvites);
       try {
-        const knownInvites = new Map(config.knownInvites);
-        let invite = new Discord.Collection();
-        // This is the *existing* invites for the guild.
+        // This is the *cached* invites for the guild prior to user join.
         const ei = invites[member.guild.id];
-        // Update the cached invites for the guild.
-        invites[member.guild.id] = guildInvites;
         // Look through the invites, find the one for which the uses went up. This will find any invite that's cached.
         try { invite = guildInvites.find(i => ei.get(i.code).uses < i.uses); }
         // however, if the previous line throws an error, the invite used was not cached.
@@ -376,20 +375,34 @@ client.on('guildMemberAdd', member => {
         if (knownInvites.has(invite.code)) {
           knownInvString = knownInvites.get(invite.code);
         }
-        // A real basic message with the information we need.
-        msgEmbed.setDescription(`Created: ${creationDate}\nInvite: **${invite.code}** ${knownInvString ? `(${knownInvString})` : `\nInvited by: ${inviter} (${inviter.tag})`}\nUses: **${invite.uses}**`);
+        msgEmbed.setDescription(`Created: ${creationDate}\nInvite: **${invite.code}** ${knownInvString ? `(${knownInvString})` : `\nInvite created by: ${inviter} (${inviter.tag})`}\nUses: **${invite.uses}${invite.maxUses ? `/${invite.maxUses}` : ''}**`);
         // logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined using invite code **${invite.code}** ${knownInvString ? `(${knownInvString})` : `from ${inviter} (${inviter.tag})`}. This invite has been used **${invite.uses}** times since its creation.`);
       }
       catch {
-        msgEmbed.setDescription(`Created: ${creationDate}\nInvite: No info available`);
+        if (invites[member.guild.id].size > guildInvites.size) { 
+          for (const i of invites[member.guild.id]) {
+            if (!guildInvites.has(i[0])) {
+              invite = i[1];
+            }
+          }
+          const inviter = client.users.cache.get(invite.inviter.id);
+          let knownInvString = false;
+          if (knownInvites.has(invite.code)) {
+            knownInvString = knownInvites.get(invite.code);
+          }
+          msgEmbed.setDescription(`Created: ${creationDate}\nInvite: **${invite.code}** ${knownInvString ? `(${knownInvString})` : `\nInvite created by: ${inviter} (${inviter.tag})`}\nUses: **${invite.uses + 1}${invite.maxUses ? `/${invite.maxUses}` : ''}**\n**Last use of limited invite code**`);
+        }
+        else { msgEmbed.setDescription(`Created: ${creationDate}\nInvite: No info available`); }
         // logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined the server, but no invite information was available.`);
       }
+      // Update the cached invites for the guild.
+      invites[member.guild.id] = guildInvites;
       logChannel.send({ content: ':inbox_tray: <@' + member.id + '> joined!', embed: msgEmbed });
     });
   }
 });
 
-client.on('guildMemberRemove', member => {
+client.on('guildMemberRemove', async member => {
   const canLog = (config.invLogToggle && Boolean(config.channelInvLogs));
   const logChannel = client.channels.cache.get(config.channelInvLogs);
   const data = [];
@@ -405,7 +418,7 @@ client.on('guildMemberRemove', member => {
     }
   });
   if (data.length > 0) {exitConLog += ` removing from the following game rosters: ${data.join(', ')}.`;}
-  fs.writeFile(listPath, JSON.stringify(gameList, null, 2), function(err) {
+  await fsp.writeFile(listPath, JSON.stringify(gameList, null, 2), function(err) {
     if (err) {
       if (canLog) { logChannel.send('There was an error updating games list information for exited user!'); }
       return console.log(err);
@@ -413,7 +426,7 @@ client.on('guildMemberRemove', member => {
   });
   if(global.eventData.userTimeZones[member.id]) {
     delete global.eventData.userTimeZones[member.id];
-    fs.writeFile(eventDataPath, JSON.stringify(global.eventData, null, 2, function(err) {
+    await fsp.writeFile(eventDataPath, JSON.stringify(global.eventData, null, 2, function(err) {
       if (err) {
         if (canLog) { logChannel.send('There was an error removing exited user from events.json!');}
         return console.log(err);
