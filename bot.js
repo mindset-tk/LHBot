@@ -375,7 +375,7 @@ client.on('guildMemberAdd', member => {
         if (knownInvites.has(invite.code)) {
           knownInvString = knownInvites.get(invite.code);
         }
-        msgEmbed.setDescription(`Created: ${creationDate}\nInvite: **${invite.code}** ${knownInvString ? `(${knownInvString})` : `\nInvite created by: ${inviter} (${inviter.tag})`}\nUses: **${invite.uses}${invite.maxUses ? `/${invite.maxUses}` : ''}**`);
+        msgEmbed.setDescription(`Created: ${creationDate}\nInvite: **${invite.code}** ${knownInvString ? `(${knownInvString})` : `\nInvite by: ${inviter} (${inviter.tag})`}\nUses: **${invite.uses}${invite.maxUses ? `/${invite.maxUses}` : ''}**`);
         // logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined using invite code **${invite.code}** ${knownInvString ? `(${knownInvString})` : `from ${inviter} (${inviter.tag})`}. This invite has been used **${invite.uses}** times since its creation.`);
       }
       catch {
@@ -390,7 +390,7 @@ client.on('guildMemberAdd', member => {
           if (knownInvites.has(invite.code)) {
             knownInvString = knownInvites.get(invite.code);
           }
-          msgEmbed.setDescription(`Created: ${creationDate}\nInvite: **${invite.code}** ${knownInvString ? `(${knownInvString})` : `\nInvite created by: ${inviter} (${inviter.tag})`}\nUses: **${invite.uses + 1}${invite.maxUses ? `/${invite.maxUses}` : ''}**\n**Last use of limited invite code**`);
+          msgEmbed.setDescription(`Created: ${creationDate}\nInvite: **${invite.code}** ${knownInvString ? `(${knownInvString})` : `\nInvite by: ${inviter} (${inviter.tag})`}\nUses: **${invite.uses + 1}${invite.maxUses ? `/${invite.maxUses}` : ''}**\n**Last use of limited invite code**`);
         }
         else { msgEmbed.setDescription(`Created: ${creationDate}\nInvite: No info available`); }
         // logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined the server, but no invite information was available.`);
