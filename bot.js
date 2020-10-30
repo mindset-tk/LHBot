@@ -32,7 +32,7 @@ let config = undefined;
 const wait = require('util').promisify(setTimeout);
 
 // initialize or load any configs the a new instance doesn't start with to avoid breaking
-const CONFIG_FILENAMES = ['config.json', 'counting.json', 'gamelist.json', 'datalog.json', 'prunedata.json'];
+const CONFIG_FILENAMES = ['config.json', 'counting.json', 'gamelist.json', 'datalog.json', 'prunestorage.json'];
 CONFIG_FILENAMES.forEach(filename => {
 
   if (filename != 'config.json') {
@@ -321,6 +321,15 @@ client.on('Resumed', async () => {
   });
   await wait(1000);
   // update invite cache from server.
+  client.guilds.cache.forEach(g => {
+    g.fetchInvites().then(guildInvites => {
+      invites[g.id] = guildInvites;
+    });
+  });
+});
+
+// update invite cache from server when invites are created/deleted
+client.on('inviteCreate inviteDelete', async () => {
   client.guilds.cache.forEach(g => {
     g.fetchInvites().then(guildInvites => {
       invites[g.id] = guildInvites;
