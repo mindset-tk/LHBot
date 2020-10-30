@@ -330,7 +330,7 @@ client.on('Resumed', async () => {
 
 // update invite cache from server when invites are created/deleted
 client.on('inviteCreate', async () => {
-  console.log('invite created!');
+  // console.log('invite created!');
   client.guilds.cache.forEach(async g => {
     g.fetchInvites().then(guildInvites => {
       invites[g.id] = guildInvites;
@@ -379,8 +379,11 @@ client.on('guildMemberAdd', member => {
         // logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined using invite code **${invite.code}** ${knownInvString ? `(${knownInvString})` : `from ${inviter} (${inviter.tag})`}. This invite has been used **${invite.uses}** times since its creation.`);
       }
       catch {
-        if (invites[member.guild.id].size > guildInvites.size) { 
+        // if the previous code didn't work, compare the size of the cached invites to the fresh copy of guild invites.
+        // if it's decreased, we can safely assume that an invite was deleted.
+        if (invites[member.guild.id].size > guildInvites.size) {
           for (const i of invites[member.guild.id]) {
+            // compare cached to current and find the missing invite.
             if (!guildInvites.has(i[0])) {
               invite = i[1];
             }
