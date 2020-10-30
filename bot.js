@@ -94,7 +94,6 @@ CONFIG_FILENAMES.forEach(filename => {
 
 const Discord = require('discord.js');
 const myIntents = new Discord.Intents();
-
 const Counting = require('./counting.js');
 const vccheck = require('./commands/vccheck.js');
 const listPath = './gamelist.json';
@@ -158,6 +157,7 @@ const events = {
 
 // initialize invite cache
 const invites = {};
+const vanityInvites = {};
 
 // since the datalogger takes some time to cache messages, especially on larger servers, create a global check digit to block unwanted processing of new messages during datalogging
 let dataLogLock = 0;
@@ -181,6 +181,14 @@ client.on('ready', async () => {
     g.fetchInvites().then(guildInvites => {
       invites[g.id] = guildInvites;
     });
+    if (g.vanityURLCode) {
+      g.fetchVanityData().then(vanityData => {
+        vanityInvites[g.id] = {
+          code: vanityData.code,
+          uses: vanityData.uses,
+        };
+      });
+    }
   });
 });
 
@@ -325,6 +333,14 @@ client.on('Resumed', async () => {
     g.fetchInvites().then(guildInvites => {
       invites[g.id] = guildInvites;
     });
+    if (g.vanityURLCode) {
+      g.fetchVanityData().then(vanityData => {
+        vanityInvites[g.id] = {
+          code: vanityData.code,
+          uses: vanityData.uses,
+        };
+      });
+    }
   });
 });
 
@@ -346,62 +362,80 @@ client.on('shardError', err => {
 // all other error logging
 client.on('error', err => {console.error(err);});
 
-client.on('guildMemberAdd', member => {
+client.on('guildMemberAdd', async member => {
   if (config.invLogToggle) {
+    const pfp = member.user.displayAvatarURL();
+    const creationDate = (moment(member.user.createdAt)).tz('America/Los_Angeles').format('MMM Do YYYY, h:mma z');
+    const msgEmbed = new Discord.MessageEmbed()
+      .setColor('#228B22')
+      .setAuthor(`${member.user.tag} (${member.id})`, pfp, pfp)
+      .setThumbnail(pfp)
+      .setTimestamp()
+      .setFooter('Joined', member.guild.iconURL());
     const logChannel = client.channels.cache.get(config.channelInvLogs);
-    // load the current invite list.
-    member.guild.fetchInvites().then(guildInvites => {
-      const pfp = member.user.displayAvatarURL();
-      const creationDate = (moment(member.user.createdAt)).tz('America/Los_Angeles').format('MMM Do YYYY, h:mma z');
-      const msgEmbed = new Discord.MessageEmbed()
-        .setColor('#228B22')
-        .setAuthor(`${member.user.tag} (${member.id})`, pfp, pfp)
-        .setThumbnail(pfp)
-        .setTimestamp()
-        .setFooter('Joined', member.guild.iconURL());
-      let invite = new Discord.Collection();
-      const knownInvites = new Map(config.knownInvites);
-      try {
-        // This is the *cached* invites for the guild prior to user join.
-        const ei = invites[member.guild.id];
-        // Look through the invites, find the one for which the uses went up. This will find any invite that's cached.
-        try { invite = guildInvites.find(i => ei.get(i.code).uses < i.uses); }
-        // however, if the previous line throws an error, the invite used was not cached.
-        // in this case, since invites are cached every time someone joins, the invite must be the uncached invite, that has exactly one use on it.
-        catch {	invite = guildInvites.find(i => (!ei.get(i.code) && i.uses === 1));	}
-        // This is just to simplify the message being sent below (inviter doesn't have a tag property)
-        const inviter = client.users.cache.get(invite.inviter.id);
-        let knownInvString = false;
-        if (knownInvites.has(invite.code)) {
-          knownInvString = knownInvites.get(invite.code);
+    let usedVanityCode = 0;
+    // if vanity url uses has increased since last user added we can assume this new member used the vanity url.
+    if (member.guild.vanityURLCode) {
+      await member.guild.fetchVanityData().then(vanityData => {
+        if (vanityInvites[member.guild.id] && vanityData.uses > vanityInvites[member.guild.id].uses && vanityData.uses != 0) {
+          msgEmbed.setDescription(`Created: ${creationDate}\nInvite: **${member.guild.vanityURLCode}** \nUses: **${member.guild.vanityURLUses}**`);
+          logChannel.send({ content: ':inbox_tray: <@' + member.id + '> joined!', embed: msgEmbed });
+          usedVanityCode = 1;
         }
-        msgEmbed.setDescription(`Created: ${creationDate}\nInvite: **${invite.code}** ${knownInvString ? `(${knownInvString})` : `\nInvite by: ${inviter} (${inviter.tag})`}\nUses: **${invite.uses}${invite.maxUses ? `/${invite.maxUses}` : ''}**`);
-        // logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined using invite code **${invite.code}** ${knownInvString ? `(${knownInvString})` : `from ${inviter} (${inviter.tag})`}. This invite has been used **${invite.uses}** times since its creation.`);
-      }
-      catch {
-        // if the previous code didn't work, compare the size of the cached invites to the fresh copy of guild invites.
-        // if it's decreased, we can safely assume that an invite was deleted.
-        if (invites[member.guild.id].size > guildInvites.size) {
-          for (const i of invites[member.guild.id]) {
-            // compare cached to current and find the missing invite.
-            if (!guildInvites.has(i[0])) {
-              invite = i[1];
-            }
-          }
+        // update vanity cache for this guild
+        vanityInvites[member.guild.id] = {
+          code: vanityData.code,
+          uses: vanityData.uses,
+        };
+      });
+    }
+    if (!usedVanityCode) {
+      // since vanityinvites weren't incremented, go ahead and load the current invite list.
+      await member.guild.fetchInvites().then(guildInvites => {
+        let invite = new Discord.Collection();
+        const knownInvites = new Map(config.knownInvites);
+        try {
+        // This is the *cached* invites for the guild prior to user join.
+          const ei = invites[member.guild.id];
+          // Look through the invites, find the one for which the uses went up. This will find any invite that's cached.
+          try { invite = guildInvites.find(i => ei.get(i.code).uses < i.uses); }
+          // however, if the previous line throws an error, the invite used was not cached.
+          // in this case, since invites are cached every time someone joins, the invite must be the uncached invite, that has exactly one use on it.
+          catch {	invite = guildInvites.find(i => (!ei.get(i.code) && i.uses === 1));	}
+          // This is just to simplify the message being sent below (inviter doesn't have a tag property)
           const inviter = client.users.cache.get(invite.inviter.id);
           let knownInvString = false;
           if (knownInvites.has(invite.code)) {
             knownInvString = knownInvites.get(invite.code);
           }
-          msgEmbed.setDescription(`Created: ${creationDate}\nInvite: **${invite.code}** ${knownInvString ? `(${knownInvString})` : `\nInvite by: ${inviter} (${inviter.tag})`}\nUses: **${invite.uses + 1}${invite.maxUses ? `/${invite.maxUses}` : ''}**\n**Last use of limited invite code**`);
+          msgEmbed.setDescription(`Created: ${creationDate}\nInvite: **${invite.code}** ${knownInvString ? `(${knownInvString})` : `\nInvite by: ${inviter} (${inviter.tag})`}\nUses: **${invite.uses}${invite.maxUses ? `/${invite.maxUses}` : ''}**`);
+        // logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined using invite code **${invite.code}** ${knownInvString ? `(${knownInvString})` : `from ${inviter} (${inviter.tag})`}. This invite has been used **${invite.uses}** times since its creation.`);
         }
-        else { msgEmbed.setDescription(`Created: ${creationDate}\nInvite: No info available`); }
+        catch {
+        // if the previous code didn't work, compare the size of the cached invites to the fresh copy of guild invites.
+        // if it's decreased, we can safely assume that an invite was deleted.
+          if (invites[member.guild.id].size > guildInvites.size) {
+            for (const i of invites[member.guild.id]) {
+            // compare cached to current and find the missing invite.
+              if (!guildInvites.has(i[0])) {
+                invite = i[1];
+              }
+            }
+            const inviter = client.users.cache.get(invite.inviter.id);
+            let knownInvString = false;
+            if (knownInvites.has(invite.code)) {
+              knownInvString = knownInvites.get(invite.code);
+            }
+            msgEmbed.setDescription(`Created: ${creationDate}\nInvite: **${invite.code}** ${knownInvString ? `(${knownInvString})` : `\nInvite by: ${inviter} (${inviter.tag})`}\nUses: **${invite.uses + 1}${invite.maxUses ? `/${invite.maxUses}` : ''}**\n**Last use of limited invite code**`);
+          }
+          else { msgEmbed.setDescription(`Created: ${creationDate}\nInvite: No info available`); }
         // logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined the server, but no invite information was available.`);
-      }
-      // Update the cached invites for the guild.
-      invites[member.guild.id] = guildInvites;
-      logChannel.send({ content: ':inbox_tray: <@' + member.id + '> joined!', embed: msgEmbed });
-    });
+        }
+        // Update the cached invites for the guild.
+        invites[member.guild.id] = guildInvites;
+        logChannel.send({ content: ':inbox_tray: <@' + member.id + '> joined!', embed: msgEmbed });
+      });
+    }
   }
 });
 
