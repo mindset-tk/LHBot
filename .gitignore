@@ -6,6 +6,7 @@ counting.json
 datalog.json
 events.json
 prunestorage.json
+prunedata.json
 vettinglimit.json
 *CSV*
 .editorconfig

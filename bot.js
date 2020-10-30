@@ -125,7 +125,7 @@ Discord.Structures.extend('Guild', Guild => {
 });
 
 // initialize client, commands, command cooldown collections
-myIntents.add(Discord.Intents.NON_PRIVILEGED,'GUILD_MEMBERS');
+myIntents.add(Discord.Intents.NON_PRIVILEGED, 'GUILD_MEMBERS');
 const client = new Discord.Client({ ws: { intents: myIntents } });
 client.commands = new Discord.Collection();
 const cooldowns = new Discord.Collection();
@@ -192,7 +192,7 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 });
 
 // set up listener for channel creation events
-client.on("channelCreate", async channel => {
+client.on('channelCreate', async channel => {
   if (fs.existsSync(vettingLimitPath)) {
     vettingLimit = require(vettingLimitPath);
     if (vettingLimit.VettingLimitCheck && config.airlockChannel) {
@@ -341,14 +341,14 @@ client.on('guildMemberAdd', member => {
     const logChannel = client.channels.cache.get(config.channelInvLogs);
     // load the current invite list.
     member.guild.fetchInvites().then(guildInvites => {
-    const pfp = member.user.displayAvatarURL();
-    const creationDate = (moment(member.user.createdAt)).tz('America/Los_Angeles').format('MMM Do YYYY, h:mma z');
-    const msgEmbed = new Discord.MessageEmbed()
-	.setColor('#228B22')
-	.setAuthor(`${member.user.tag} (${member.id})`, pfp, pfp)
-	.setThumbnail(pfp)
-	.setTimestamp()
-	.setFooter(`Joined`, member.guild.iconURL());
+      const pfp = member.user.displayAvatarURL();
+      const creationDate = (moment(member.user.createdAt)).tz('America/Los_Angeles').format('MMM Do YYYY, h:mma z');
+      const msgEmbed = new Discord.MessageEmbed()
+        .setColor('#228B22')
+        .setAuthor(`${member.user.tag} (${member.id})`, pfp, pfp)
+        .setThumbnail(pfp)
+        .setTimestamp()
+        .setFooter('Joined', member.guild.iconURL());
       try {
         const knownInvites = new Map(config.knownInvites);
         let invite = new Discord.Collection();
@@ -368,16 +368,14 @@ client.on('guildMemberAdd', member => {
           knownInvString = knownInvites.get(invite.code);
         }
         // A real basic message with the information we need.
-        
-
         msgEmbed.setDescription(`Created: ${creationDate}\nInvite: **${invite.code}** ${knownInvString ? `(${knownInvString})` : `\nInvited by: ${inviter} (${inviter.tag})`}\nUses: **${invite.uses}**`);
-//        logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined using invite code **${invite.code}** ${knownInvString ? `(${knownInvString})` : `from ${inviter} (${inviter.tag})`}. This invite has been used **${invite.uses}** times since its creation.`);
+        // logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined using invite code **${invite.code}** ${knownInvString ? `(${knownInvString})` : `from ${inviter} (${inviter.tag})`}. This invite has been used **${invite.uses}** times since its creation.`);
       }
       catch {
-	msgEmbed.setDescription(`Created: ${creationDate}\nInvite: No info available`)
-//        logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined the server, but no invite information was available.`);
+        msgEmbed.setDescription(`Created: ${creationDate}\nInvite: No info available`);
+        // logChannel.send(`${member} (${member.user.tag} / ${member.id}) joined the server, but no invite information was available.`);
       }
-      logChannel.send({ content: ":inbox_tray: <@" + member.id + "> joined!", embed: msgEmbed});
+      logChannel.send({ content: ':inbox_tray: <@' + member.id + '> joined!', embed: msgEmbed });
     });
   }
 });
