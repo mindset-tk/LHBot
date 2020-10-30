@@ -104,6 +104,7 @@ const fetch = require('node-fetch');
 const eventDataPath = './events.json';
 if (fs.existsSync(eventDataPath)) { global.eventData = require(eventDataPath);}
 const moment = require('moment-timezone');
+const vettingLimitPath = './commands/vettinglimit.js';
 
 Discord.Structures.extend('Guild', Guild => {
   class MusicGuild extends Guild {
@@ -192,9 +193,12 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 
 // set up listener for channel creation events
 client.on("channelCreate", async channel => {
-  if (vettinglimit.VettingLimitCheck && config.airlockChannel) {
-    if (channel.name.includes(config.airlockChannel)) {
-      vettinglimit.VettingLimitCheck (channel, client);
+  if (fs.existsSync(vettingLimitPath)) {
+    vettingLimit = require(vettingLimitPath);
+    if (vettingLimit.VettingLimitCheck && config.airlockChannel) {
+      if (channel.name.includes(config.airlockChannel)) {
+        vettingLimit.VettingLimitCheck (channel, client);
+      }
     }
   }
 });
@@ -344,7 +348,7 @@ client.on('guildMemberAdd', member => {
 	.setAuthor(`${member.user.tag} (${member.id})`, pfp, pfp)
 	.setThumbnail(pfp)
 	.setTimestamp()
-	.setFooter(`Joined`, 'https://cdn.discordapp.com/icons/673680737685340203/a_597e22b0a2a75e6fe09166f11d7c9ac9.gif?size=4096');
+	.setFooter(`Joined`, member.guild.iconURL());
       try {
         const knownInvites = new Map(config.knownInvites);
         let invite = new Discord.Collection();
@@ -382,7 +386,7 @@ client.on('guildMemberRemove', member => {
   const canLog = (config.invLogToggle && Boolean(config.channelInvLogs));
   const logChannel = client.channels.cache.get(config.channelInvLogs);
   const data = [];
-  if (canLog) { logChannel.send(`📤${member} (${member.user.tag} / ${member.id}) left :<`); }
+  if (canLog) { logChannel.send(`📤 ${member} (${member.user.tag} / ${member.id}) left :<`); }
   let exitConLog = `${member.user.tag} exited.`;
   Object.keys(gameList).forEach(sysname => {
     if (!gameList[sysname].accounts[0]) return;
