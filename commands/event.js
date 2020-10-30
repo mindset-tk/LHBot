@@ -1393,7 +1393,7 @@ async function createWizard(message, channel) {
     case false:
       return;
     default:
-      DMChannel.send(`Great,\n> ${description.replace(/\n/g, "\n> ")}\nwill be the description of your event. Is this OK? **Y/N**`);
+      DMChannel.send(`Great,\n> ${description.replace(/\n/g, '\n> ')}\nwill be the description of your event. Is this OK? **Y/N**`);
       awaitingAnswer = true;
       while (awaitingAnswer) {
         reply = await DMCollector(DMChannel);
