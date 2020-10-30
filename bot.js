@@ -211,6 +211,37 @@ client.on('channelCreate', async channel => {
   }
 });
 
+// set up listener for channel creation events
+client.on('userUpdate', (oldUser, newUser) => {
+  if (oldUser.avatar !== newUser.avatar && config.avatarLogToggle) {
+    const nullPFP = 'https://cdn.discordapp.com/embed/avatars/2.png';
+    const oldPFP = `https://cdn.discordapp.com/avatars/${oldUser.id}/${oldUser.avatar}.jpg`;
+    const newPFP = `https://cdn.discordapp.com/avatars/${newUser.id}/${newUser.avatar}.jpg`;
+    const logChannel = client.channels.cache.get(config.channelInvLogs);
+    const msgEmbed = new Discord.MessageEmbed()
+      .setColor('#228B22')
+      .setTimestamp();
+      // .setFooter('Changed PFP', client.iconURL())
+    if (oldUser.avatar !== null) {
+      msgEmbed.setThumbnail(oldPFP);
+    }
+    else {
+      msgEmbed.setThumbnail(nullPFP);
+    }
+    if (newUser.avatar !== null) {
+      msgEmbed.setAuthor(`${newUser.username}#${newUser.discriminator} (${newUser.id})`, newPFP, newPFP);
+      msgEmbed.setDescription('Profile Picture Changed To:');
+      msgEmbed.setImage(newPFP);
+    }
+    else {
+      msgEmbed.setAuthor(`${newUser.username}#${newUser.discriminator} (${newUser.id})`, nullPFP, nullPFP);
+      msgEmbed.setDescription('Profile Picture Removed:');
+      msgEmbed.setImage(nullPFP);
+    }
+    logChannel.send({ content: ':exclamation: <@' + newUser.id + '> changed their profile picture:', embed: msgEmbed });
+  }
+});
+
 // login to Discord with your app's token
 client.login(config.authtoken);
 

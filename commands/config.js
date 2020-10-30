@@ -42,6 +42,7 @@ module.exports = {
       ['airlockPruneDays', 'Max days for airlock prune since last post', 'integer'],
       ['airlockPruneMessage', 'Kick message used when airlock is pruned', 'string'],
       ['invLogToggle', 'Toggle invite logging and reporting', 'boolean'],
+      ['avatarLogToggle', 'Toggle profile picture logging and reporting', 'boolean'],
       ['channelInvLogs', 'Logging channel', 'channel'],
       ['knownInvites', 'Invite code descriptions', 'inviteCodesArray'],
       ['channelLobby', 'Lobby channel', 'channel'],
@@ -145,6 +146,7 @@ Airlock role: **${config.roleAirlock ? '@' + getRoleName(config.roleAirlock) : '
 
 __Special Channels:__
 User join/exit notifications: **${config.invLogToggle ? ('#' + getChannelName(config.channelInvLogs)) : 'off.'}**
+User profile picture change notifications: **${config.avatarLogToggle ? ('#' + getChannelName(config.channelInvLogs)) : 'off.'}**
 Counting: **${config.countingToggle ? ('#' + getChannelName(config.countingChannelId)) : 'off.'}**
 Text channels to use for voice-related commands: **${(config.voiceTextChannelIds[0]) ? '#' + voiceTextChans.join(', #') : 'None'}**
 Configured user-limited voice channels: **${(cfgVoiceChans[0]) ? cfgVoiceChans.join(', ') : 'None'}**
@@ -421,16 +423,16 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
               reply = await msgCollector();
               if (!reply) { return; }
 
-              const changeType = reply.content.toLowerCase();
+              const type = reply.content.toLowerCase();
 
-              if (changeType == 'name' || changeType == 'both') {
+              if (type == 'name' || type == 'both') {
                 message.channel.send('Please enter the default name for the channel (this should really be 24 chars or less)');
                 reply = await msgCollector();
                 if(!reply) {return;}
                 config[changeName][chanID]['Name'] = reply.content.replace(/"/g, '');
               }
 
-              if (changeType == 'size' || changeType == 'both') {
+              if (type == 'size' || type == 'both') {
                 message.channel.send('Please send the default user limit for this channel (e.g. "4")');
                 reply = await msgCollector();
                 if(!reply) {return;}
