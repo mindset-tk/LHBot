@@ -111,12 +111,12 @@ function publicOnMessage(message, config) {
   let pruneData = new Map(global.dataLog[message.guild.id].pruneData);
   // If a non-bot user isn't in the pruneData array yet, or has a last-active entry older than this one, then update it
   if ((!pruneData.get(message.author.id) || (parseInt(message.id) > parseInt(pruneData.get(message.author.id)))) && !message.author.bot) {
-      if (!message.guild.member(message.author.id)) {
-        pruneData.delete(message.author.id);
-      }
-      else {
-        pruneData.set(message.author.id, message.id);
-      }
+    if (!message.guild.member(message.author.id)) {
+      pruneData.delete(message.author.id);
+    }
+    else {
+      pruneData.set(message.author.id, message.id);
+    }
     global.dataLog[message.guild.id].pruneData = [...pruneData];
   }
 
@@ -344,7 +344,7 @@ async function getTotalServerUsers(client) {
 
 // This will compare the pruneData array that stores all users' last activity
 // to the current guild users, doing a clean-up by removing any users which
-// are no longer in the server at the time the command is being run and 
+// are no longer in the server at the time the command is being run and
 // initalizing any users not yet in the log
 async function pruneDataMaintenance(client) {
   for (const gID of Object.keys(global.dataLog)) {
@@ -357,10 +357,10 @@ async function pruneDataMaintenance(client) {
     //  console.log("adding " + user[0]);
     }
     if (global.dataLog[gID].pruneData) {
-    const usersToRemove = global.dataLog[gID].pruneData.filter(user => !currentGuildUsrs.has(user[0]));
-    for (user of usersToRemove) {
+      const usersToRemove = global.dataLog[gID].pruneData.filter(user => !currentGuildUsrs.has(user[0]));
+      for (user of usersToRemove) {
         pruneData.delete(user[0]);
-    //    console.log("deleting " + user[0]);
+        //    console.log("deleting " + user[0]);
       }
     }
     global.dataLog[gID].pruneData = [...pruneData];

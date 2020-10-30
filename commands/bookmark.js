@@ -1,6 +1,6 @@
 const Discord = require('discord.js');
 
-exports.HandleEvent = async function(client, config, packet){
+exports.HandleEvent = async function(client, config, packet) {
   if (packet.t !== 'MESSAGE_REACTION_ADD') {
     return;
   }
@@ -40,4 +40,4 @@ exports.HandleEvent = async function(client, config, packet){
     user.send(`🔖: - from ${message.channel}`, bookmarkEmbed);
     return;
   }
-}
+};

@@ -17,40 +17,37 @@ module.exports = {
 
     if (!isStaff && !config.voiceTextChannelIds.includes(message.channel.id)) {
       var outMsg = 'Please use this command only in these channels:';
-      config.voiceTextChannelIds.forEach(channelId => outMsg += ' <#' + message.guild.channels.resolve(channelId).id + '>'); 
+      config.voiceTextChannelIds.forEach(channelId => outMsg += ' <#' + message.guild.channels.resolve(channelId).id + '>');
       return message.channel.send(outMsg);
     }
 
-    //Find the channel
+    // Find the channel
     var voiceChannel;
-    if (args[args.length-1].match("^[0-9]{18}$"))
-    {
-      //Check for second argument
-      var vcArg = message.guild.channels.resolve(args[args.length-1]);
-      if(vcArg && vcArg.type == "voice")
-      {
+    if (args[args.length - 1].match('^[0-9]{18}$')) {
+      // Check for second argument
+      var vcArg = message.guild.channels.resolve(args[args.length - 1]);
+      if(vcArg && vcArg.type == 'voice') {
         voiceChannel = vcArg;
         args.pop();
       }
     }
 
-    if(!voiceChannel)
-    {
+    if(!voiceChannel) {
       voiceChannel = message.member.voice.channel;
       if (!voiceChannel) return message.channel.send('Please join a voice channel and try again!');
     }
-    
+
     const mypermissions = message.guild.me.permissionsIn(voiceChannel);
     // console.log(permissions);
     if (!mypermissions.has(['MANAGE_CHANNELS'])) {
-      return message.channel.send(`Sorry, I don't have permission to set the limit in that channel.`);
+      return message.channel.send('Sorry, I don\'t have permission to set the limit in that channel.');
     }
     if (!config.voiceChamberDefaultSizes[voiceChannel.id]) {
-      return message.channel.send(`Sorry, I can only set the name on channels that already have a configured limit.`);
+      return message.channel.send('Sorry, I can only set the name on channels that already have a configured limit.');
     }
 
     voiceChannel.setName(args.join(' '));
     return message.channel.send(`Set the temporary name of **${config.voiceChamberDefaultSizes[voiceChannel.id].Name}** to **${args.join(' ')}**.`);
 
-  }
+  },
 };

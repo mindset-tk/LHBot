@@ -19,18 +19,20 @@ module.exports = {
   guildOnly: true,
   staffOnly: true,
   args: false,
-  async execute(message, args, client) {  
+  async execute(message, args, client) {
     const lobby = config.channelLobby ? message.guild.channels.resolve(config.channelLobby) : message.channel;
-    let invite = await lobby.createInvite(
-    {
-//    maxAge: 10 * 60 * 1000, // maximum time for the invite, in milliseconds
-      maxAge: 0, // maximum time for the invite, in milliseconds
-      maxUses: 0 // maximum times it can be used
-    },
-    `Requested with command by ${message.author.tag}`
+    const invite = await lobby.createInvite(
+      {
+        //    maxAge: 10 * 60 * 1000, // maximum time for the invite, in milliseconds
+        // maximum time for the invite, in milliseconds
+        maxAge: 0,
+        // maximum times it can be used
+        maxUses: 0,
+      },
+      `Requested with command by ${message.author.tag}`,
     )
-    .catch(console.log);
-  
-    message.reply(invite ? `Here's your invite: ${invite}` : "There has been an error during the creation of the invite.");
-  }
-}
+      .catch(console.log);
+
+    message.reply(invite ? `Here's your invite: ${invite}` : 'There has been an error during the creation of the invite.');
+  },
+};
