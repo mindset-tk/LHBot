@@ -215,11 +215,11 @@ client.on('channelCreate', async channel => {
 client.on('userUpdate', async (oldUser, newUser) => {
   if (oldUser.avatar !== newUser.avatar && config.avatarLogToggle) {
     // If the toggle to make this feature airlock-role-only is on, then check if the user has that role
-    if (config.avatarLogAirlockOnlyToggle && config.roleAirlock) {
+    if (config.avatarLogAirlockOnlyToggle && config.roleComrade) {
       for (let g of await client.guilds.cache) {
         g = g[1];
         const member = await g.member(newUser.id);
-        if (await !member.roles.cache.has(config.roleAirlock)) {
+        if (await member.roles.cache.has(config.roleComrade)) {
           return;
         }
       }
@@ -257,6 +257,18 @@ client.login(config.authtoken);
 
 // command parser
 client.on('message', async message => {
+
+
+  // VettingLimit: listen for lobby panel message
+  if (fs.existsSync(vettingLimitPath)) {
+    const vettingLimit = require(vettingLimitPath);
+    if (vettingLimit.VettingPanelCheck && config.channelLobby) {
+      if (message.channel.id === config.channelLobby) {
+        vettingLimit.VettingPanelCheck(message);
+      }
+    }
+  }
+
   // console.log(message.author);
   // only do datalogging on non-DM text channels. Don't log messages while offline retrieval is proceeding.
   // (offline logging will loop and catch new messages on the fly.)
@@ -264,6 +276,7 @@ client.on('message', async message => {
   if(Counting.HandleMessage(message)) {
     return;
   }
+
   // handler for PK user messages, so they can use bot commands.
   if (message.author.bot) {
     const pkAPIurl = 'https://api.pluralkit.me/v1/msg/' + message.id;
