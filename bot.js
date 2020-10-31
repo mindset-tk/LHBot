@@ -212,8 +212,18 @@ client.on('channelCreate', async channel => {
 });
 
 // set up listener for channel creation events
-client.on('userUpdate', (oldUser, newUser) => {
+client.on('userUpdate', async (oldUser, newUser) => {
   if (oldUser.avatar !== newUser.avatar && config.avatarLogToggle) {
+    // If the toggle to make this feature airlock-role-only is on, then check if the user has that role
+    if (config.avatarLogAirlockOnlyToggle && config.roleAirlock) {
+      for (let g of await client.guilds.cache) {
+        g = g[1];
+        const member = await g.member(newUser.id);
+        if (await !member.roles.cache.has(config.roleAirlock)) {
+          return;
+        }
+      }
+    }
     const nullPFP = 'https://cdn.discordapp.com/embed/avatars/2.png';
     const oldPFP = `https://cdn.discordapp.com/avatars/${oldUser.id}/${oldUser.avatar}.jpg`;
     const newPFP = `https://cdn.discordapp.com/avatars/${newUser.id}/${newUser.avatar}.jpg`;
