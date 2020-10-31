@@ -43,7 +43,7 @@ module.exports = {
       ['airlockPruneMessage', 'Airlock prune kick message', 'string'],
       ['invLogToggle', 'Toggle __Invite Iogging__', 'boolean'],
       ['avatarLogToggle', 'Toggle __avatar change__ logging/reporting', 'boolean'],
-      ['avatarLogAirlockOnlyToggle', 'Toggle __airlock-role exclusive__ avatar logging/reporting', 'boolean'],
+      ['avatarLogAirlockOnlyToggle', 'Toggle __airlock exclusive__ avatar logging/reporting', 'boolean'],
       ['channelInvLogs', 'Logging channel (joins/leaves/etc)', 'channel'],
       ['knownInvites', 'Invite Code Descriptions', 'inviteCodesArray'],
       ['channelLobby', 'Lobby channel', 'channel'],
