@@ -38,20 +38,21 @@ module.exports = {
       ['roleStaff', 'Staff Role', 'role'],
       ['roleComrade', 'Comrade Role', 'role'],
       ['roleAirlock', 'Airlock Role', 'role'],
-      ['airlockChannel', 'Name of or prefix for airlock channels', 'string'],
-      ['airlockPruneDays', 'Max days for airlock prune since last post', 'integer'],
-      ['airlockPruneMessage', 'Kick message used when airlock is pruned', 'string'],
-      ['invLogToggle', 'Toggle invite logging and reporting', 'boolean'],
-      ['avatarLogToggle', 'Toggle profile picture logging and reporting', 'boolean'],
-      ['channelInvLogs', 'Logging channel', 'channel'],
-      ['knownInvites', 'Invite code descriptions', 'inviteCodesArray'],
+      ['airlockChannel', 'Airlock Channel(s) Name/Prefix', 'string'],
+      ['airlockPruneDays', 'Max Inactivity for __airlock prune eligibility__', 'integer'],
+      ['airlockPruneMessage', 'Airlock prune kick message', 'string'],
+      ['invLogToggle', 'Toggle __Invite Iogging__', 'boolean'],
+      ['avatarLogToggle', 'Toggle __avatar change__ logging/reporting', 'boolean'],
+      ['avatarLogAirlockOnlyToggle', 'Toggle __airlock-role exclusive__ avatar logging/reporting', 'boolean'],
+      ['channelInvLogs', 'Logging channel (joins/leaves/etc)', 'channel'],
+      ['knownInvites', 'Invite Code Descriptions', 'inviteCodesArray'],
       ['channelLobby', 'Lobby channel', 'channel'],
       ['countingToggle', 'Toggle counting', 'boolean'],
       ['countingChannelId', 'Counting channel', 'channel'],
       ['voiceTextChannelIds', 'Text channel(s) for voice commands', 'channelArray'],
-      ['voiceChamberDefaultSizes', 'Default sizes for size-limited channels', 'voiceChamberSettings'],
-      ['voiceChamberSnapbackDelay', 'Delay before empty size-limited channels revert to default sizes', 'integer'],
-      ['pinsToPin', 'Number of pin reacts to pin a message', 'integer'],
+      ['voiceChamberDefaultSizes', 'Default limits for size-limited channels', 'voiceChamberSettings'],
+      ['voiceChamberSnapbackDelay', 'Minutes before cofigured voice channels revert once empty', 'integer'],
+      ['pinsToPin', 'Number of pin reacts to auto-pin a message', 'integer'],
       ['pinIgnoreChannels', 'Channel(s) to ignore for pinning', 'channelArray'],
       ['botChannelId', 'Bot stuff channel', 'channel'],
       ['eventInfoChannelId', 'Event announce channel', 'channel']];
@@ -145,23 +146,25 @@ Member role: **${config.roleComrade ? '@' + getRoleName(config.roleComrade) : 'N
 Airlock role: **${config.roleAirlock ? '@' + getRoleName(config.roleAirlock) : 'Not set'}**
 
 __Special Channels:__
-User join/exit notifications: **${config.invLogToggle ? ('#' + getChannelName(config.channelInvLogs)) : 'off.'}**
-User profile picture change notifications: **${config.avatarLogToggle ? ('#' + getChannelName(config.channelInvLogs)) : 'off.'}**
 Counting: **${config.countingToggle ? ('#' + getChannelName(config.countingChannelId)) : 'off.'}**
-Text channels to use for voice-related commands: **${(config.voiceTextChannelIds[0]) ? '#' + voiceTextChans.join(', #') : 'None'}**
-Configured user-limited voice channels: **${(cfgVoiceChans[0]) ? cfgVoiceChans.join(', ') : 'None'}**
 Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}** (Note: does nothing at this time)
 Event announcement channel: **${config.eventInfoChannelId ? ('#' + getChannelName(config.eventInfoChannelId)) : 'not set.'}**
 Airlock Channel Name/Prefix: **${config.airlockChannel ? config.airlockChannel : 'Not set'}**
 Lobby channel: **${config.channelLobby ? ('#' + getChannelName(config.channelLobby)) : 'not set.'}**
 
-__Message Settings:__
-Airlock Prune Message: **${config.airlockPruneMessage ? config.airlockPruneMessage : 'Not set'}**
+__Logging/Notification Settings:__
+User join/exit notifications: **${config.invLogToggle ? ('On! #' + getChannelName(config.channelInvLogs)) : 'off.'}**
+Log avatar changes: **${config.avatarLogToggle ? 'On** (for: ' + (config.avatarLogAirlockOnlyToggle ? '**airlock role only**)' : '**all members**)') : 'off.**'}
+Defined Invite Codes: ${(knownInv[0]) ? knownInv.join(', ') : '**None**'}
 
-__Other Settings:__
-Invite code descriptions: ${(knownInv[0]) ? knownInv.join(', ') : '**None**'}
-User-limited voice channels snapback delay: **${config.voiceChamberSnapbackDelay ? config.voiceChamberSnapbackDelay : 'Not set, defaulting to 5min'}**
-Max days since last post for airlock prune: **${config.airlockPruneDays ? config.airlockPruneDays : 'Not set, defaulting to 7 days'}**
+__Voice Channel & Command Settings:__
+Text channel(s) for voice commands: **${(config.voiceTextChannelIds[0]) ? '#' + voiceTextChans.join(', #') : 'None'}**
+Configured user-limited voice channels: **${(cfgVoiceChans[0]) ? cfgVoiceChans.join(', ') : 'None'}**
+Configured VC Snapback Delay: **${config.voiceChamberSnapbackDelay ? config.voiceChamberSnapbackDelay : 'Not set, defaulting to 5min'}**
+
+__Airlock/Lobby Settings__
+Inactivity limit before prune eligibility: **${config.airlockPruneDays ? config.airlockPruneDays + 'day(s)' : 'Not set, defaulting to 7 days'}**
+Airlock Prune Message: **${config.airlockPruneMessage ? config.airlockPruneMessage : 'Not set'}**
 
 __Pins:__
 Pin reacts needed to pin a message: **${config.pinsToPin}**
