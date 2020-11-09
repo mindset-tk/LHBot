@@ -203,8 +203,8 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 client.on('channelCreate', async channel => {
   if (fs.existsSync(vettingLimitPath)) {
     const vettingLimit = require(vettingLimitPath);
-    if (vettingLimit.VettingLimitCheck && config.airlockChannel) {
-      if (channel.name.includes(config.airlockChannel)) {
+    if (vettingLimit.VettingLimitCheck && config.airlockChannel && channel.type === 'text') {
+      if (await channel.name.includes(config.airlockChannel)) {
         vettingLimit.VettingLimitCheck (channel, client);
       }
     }

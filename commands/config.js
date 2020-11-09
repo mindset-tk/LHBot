@@ -464,7 +464,7 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
             message.channel.send('Please say the invite code you would like to add to the list');
             reply = await msgCollector();
             if(!reply) {return;}
-            let response = reply.content.slice(-7);
+            const response = reply.content.slice(-7);
             const knownInvites = new Map(config.knownInvites);
             if (!knownInvites.has(response)) {
               message.guild.fetchInvites().then(async guildInvites => {

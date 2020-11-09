@@ -1,4 +1,3 @@
-const wait = require('util').promisify(setTimeout);
 const fs = require('fs');
 const path = require('path');
 const moment = require('moment-timezone');
@@ -63,41 +62,46 @@ module.exports = {
       });
     }
 
-    //change maxTimeSinceActive for live, probably configurable as a default max prune time
+
     let maxTimeSinceActive = 0;
     let excludedUsers = new Array();
-    let usersToPrune = new Array();
-    //Pull the args so we know what we're working with
+    const usersToPrune = new Array();
+    // Pull the args so we know what we're working with
     switch (args.length) {
-      case 3:
-      case 2:
-        excludedUsers = (args[1].indexOf(',') > -1) ? args[1].split(',') : args[1];
-      case 1:
-        maxTimeSinceActive = (parseInt(args[0]) ? parseInt(args[0]) : 6);
-        break;
+    case 3:
+    case 2:
+      excludedUsers = (args[1].indexOf(',') > -1) ? args[1].split(',') : args[1];
+    case 1:
+      maxTimeSinceActive = (parseInt(args[0]) ? parseInt(args[0]) : 6);
     }
-    
-    //Set the name of the role/channel to be used for prunes. Probably will go in a config soon?
-    const pruneTitle = "prune-limbo";
-    //Sets the intro message and description for the prune channel
-    const pruneIntro = "If you're in this channel, you've been inactive in the server for at least " + maxTimeSinceActive + " months! Rather than kick you outright, we want to give people a chance to potentially rejoin the community";
+
+    // Set the name of the role/channel to be used for prunes. Probably will go in a config soon?
+    const pruneTitle = 'prune-limbo';
+    // Sets the intro message and description for the prune channel
+    const pruneIntro = `If you're in this channel, you've been inactive in the server for at least ${maxTimeSinceActive} months! Rather than kick you outright, we want to give people a chance to potentially rejoin the community`;
     const discordEpoch = BigInt(1420070400000);
 
-    //Initialize the pruneStorage map. No need to import an "old one"- we'll be starting anew either way? maybe i'll change my mind and check for the file instead
-    let pruneStorage = new Map();
+    // Initialize the pruneStorage map. No need to import an "old one"- we'll be starting anew either way? maybe i'll change my mind and check for the file instead
+    const pruneStorage = new Map();
 
-    //Only proceed if there isn't a prune in process
-    //Todo? Potentially offer an option to let them clear out an old one instead of just saying "No"
-    if (message.guild.roles.cache.find(role => role.name === pruneTitle) || message.guild.channels.cache.find(role => role.name === pruneTitle)) {
-      return message.channel.send("It looks like there was already a prune in process. You should finish that out first using `.prunekick confirm` or `.prunekick abandon`");
+    // Only proceed if there isn't a prune in process
+    // Todo? Potentially offer an option to let them clear out an old one instead of just saying "No"
+
+    if (message.guild.roles.cache.find(role => role.name === pruneTitle)) {
+      message.guild.roles.cache.find(role => role.name === pruneTitle).delete('Post-prune cleanup');
     }
+    if (message.guild.channels.cache.find(channel => channel.name === pruneTitle)) {
+      message.guild.channels.cache.find(channel => channel.name === pruneTitle).delete();
+    }
+    // return message.channel.send('It looks like there was already a prune in process. You should finish that out first using `.prunekick confirm` or `.prunekick abandon`');
 
-    //Make sure there's data to even process
+
+    // Make sure there's data to even process
     if(!global.dataLog[message.guild.id].pruneData || global.dataLogLock == 1) {
-      return message.channel.send("There's either no prune data right now, or the datalog is still caching");
+      return message.channel.send('There\'s either no prune data right now, or the datalog is still caching');
     }
 
-    
+
     const currentTime = moment();
     const pruneData = new Map(global.dataLog[message.guild.id].pruneData.sort((a, b) => a[1] - b[1]).filter(userid => !excludedUsers.includes(userid[0])));
     const xlsUsrList = new ExcelJS.Workbook;
@@ -113,8 +117,8 @@ module.exports = {
       }
     });
     listSheet.columns = colData;
-          
-    //Loop through the prune data, generating the spreadsheet and prune array for later
+
+    // Loop through the prune data, generating the spreadsheet and prune array for later
     for (const usr of pruneData) {
       const memberObj = await message.guild.member(usr[0]);
       const usrObj = memberObj.user;
@@ -132,18 +136,18 @@ module.exports = {
         const timeSinceLastActive = moment.duration(currentTime.diff(dateLastActive)).asDays();
         if (timeSinceLastActive < maxTimeSinceActive) {break;}
       }
-      //Add each user to the spreadsheet
+      // Add each user to the spreadsheet
       listSheet.addRow({ Username: usrObj.tag, Display: memberObj.nickname, 'Last Posted': formattedDateLastActive });
-      //Add each userID to an array in case we go ahead with the prune
+      // Add each userID to an array in case we go ahead with the prune
       usersToPrune.push((usr[0]));
     }
     await xlsUsrList.xlsx.writeFile('./usrs.xlsx');
 
-    //Send the XLS out!
+    // Send the XLS out!
     message.author.send({ files: ['./usrs.xlsx'] });
-    //message.channel.send({ files: ['./usrs.xlsx'] });
+    // message.channel.send({ files: ['./usrs.xlsx'] });
 
-    //Ask if the user wants to proceed, having had a chance to look at the XLS
+    // Ask if the user wants to proceed, having had a chance to look at the XLS
     message.channel.send('This will affect the **' + usersToPrune.length + '** people in the spreadsheet above. Are you sure you want to move ahead with removing all their roles and put them in a pruning channel?');
     let reply = await msgCollector();
     if (!reply) { return; }
@@ -151,80 +155,72 @@ module.exports = {
       return message.channel.send('Prune canceled');
     }
     else if (reply.content.toLowerCase() == 'y' || reply.content.toLowerCase() == 'yes') {
-      let pruneRole;
-      let pruneChannel;
-      
-      /* todo next: 
+
+      /* todo next:
       - check for bot permissions (adding roles, channels, https://discordjs.guide/popular-topics/permissions.html#roles-as-bot-permissions, https://discord.js.org/#/docs/main/stable/class/Permissions?scrollTo=s-FLAGS)
-      - command to do a final kick of prune users
       */
 
-      //Create the to-prune temp role
-      pruneRole = await message.guild.roles.create({
+      // Create the to-prune temp role
+      message.guild.roles.create({
         data: {
-          name: `${pruneTitle}`,
+          name: pruneTitle,
           // No default permissions needed
           permissions: 0,
           // Mods can mention the user roles regardless, so this way users can't ping each other
           mentionable: false,
         },
-        reason: `User prune prep`,
+        reason: 'User prune prep',
       })
-      .then(async pruneRole => {
-        //Create the to-prune temp channel
-        pruneChannel = await message.guild.channels.create(pruneTitle, {
-          type: 'text',
-          position: 0,
-          reason: "User prune prep",
-          topic: `${pruneIntro}`,
-          permissionOverwrites: [
-            {
-              id: client.user.id,
-              allow: ['VIEW_CHANNEL','SEND_MESSAGES','EMBED_LINKS','USE_EXTERNAL_EMOJIS','ADD_REACTIONS','MENTION_EVERYONE','MANAGE_CHANNELS','MANAGE_MESSAGES'],
-            },
-            {
-              id: pruneRole.id,
-              allow: ['VIEW_CHANNEL','SEND_MESSAGES','EMBED_LINKS','USE_EXTERNAL_EMOJIS'],
-            },
-            {
-              id: config.roleStaff,
-              allow: ['VIEW_CHANNEL','SEND_MESSAGES','EMBED_LINKS','USE_EXTERNAL_EMOJIS','ADD_REACTIONS','MENTION_EVERYONE'],
-            },
-          ],
-        })
-        .then(async channel => {
-          //Set slow mode so they can't spam
-          await channel.setRateLimitPerUser(15, "User prune prep");
-          channel.send(`@rolepinglater: ${pruneIntro}`);
-          //Assign the new role to each user
-          for (const usr of usersToPrune) {
-            //Get the user collection
-            const thisUser = message.guild.members.cache.get(usr);
-            //Initialize a section of pruneStorage for this user
-            pruneStorage[thisUser.id] = new Array();
-            //Store the user's roles in their pruneStorage array
-            thisUser.roles.cache.forEach(role => {
-              pruneStorage[thisUser.id].push(role.id);
-            });
+        .then(async (pruneRole) => {
+        // Create the to-prune temp channel
+          await message.guild.channels.create(pruneTitle, {
+            type: 'text',
+            position: 0,
+            reason: 'User prune prep',
+            topic: pruneIntro,
+            rateLimitPerUser: 15,
+            permissionOverwrites: [
+              {
+                id: client.user.id,
+                allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'EMBED_LINKS', 'USE_EXTERNAL_EMOJIS', 'ADD_REACTIONS', 'MENTION_EVERYONE', 'MANAGE_CHANNELS', 'MANAGE_MESSAGES'],
+              },
+              {
+                id: pruneRole.id,
+                allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'EMBED_LINKS', 'USE_EXTERNAL_EMOJIS'],
+              },
+              {
+                id: config.roleStaff,
+                allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'EMBED_LINKS', 'USE_EXTERNAL_EMOJIS', 'ADD_REACTIONS', 'MENTION_EVERYONE'],
+              },
+            ],
+          })
+            .then(async (pruneChannel) => {
+            // Set slow mode so they can't spam
+              await pruneChannel.send(`@rolepinglater: ${pruneIntro}`);
+              // Assign the new role to each user
+              for (const usr of usersToPrune) {
+              // Get the user collection
+                const thisUser = await message.guild.members.cache.get(usr);
+                // Initialize a section of pruneStorage for this user
+                pruneStorage[thisUser.id] = new Array();
+                // Store the user's roles in their pruneStorage array
+                thisUser.roles.cache.forEach(role => {
+                  pruneStorage[thisUser.id].push(role.id);
+                });
 
-            await thisUser.roles.set([pruneRole], 'User prune prep');
-            //restore roles for now, delete channel, etc
-            await thisUser.roles.set(pruneStorage[thisUser.id], 'Restoring user roles');
-            await channel.delete('Post-prune cleanup');
-            await pruneRole.delete('Post-prune cleanup');
-          }
-          writeData();
-          message.channel.send("Okay, " + usersToPrune.length + " members have been prepared for pruning");
+                await thisUser.roles.set([pruneRole], 'User prune prep');
+                // restore roles for now,  chadeletennel, etc
+                await thisUser.roles.set(pruneStorage[thisUser.id], 'Restoring user roles');
+              }
+              writeData();
+              return message.channel.send(`Okay, ${usersToPrune.length} members have been prepared for pruning`);
+
+            });
         })
         .catch (e => {
-          console.log('Error creating prune channel:', e);
+          console.log('Error:', e);
           return message.channel.send('There was an error creating the prune channel, contact the bot owner.');
         });
-    })
-    .catch (e => {
-      console.log('Error creating prune role:', e);
-      return message.channel.send('There was an error creating the prune role, contact the bot owner.');
-    });
       /*
       let i = 0;
       let toKick = setInterval(async function() {
@@ -257,7 +253,7 @@ module.exports = {
     }
     const now = new Date();
     const fakeMsgIdNow = (BigInt(now) - BigInt(1420070400000)) << BigInt(22);
-    
+
     //const usrMap = new Map;
     const usrMap = global.pruneData[message.guild.id]['pruneData'] ? new Map(global.pruneData[message.guild.id]['pruneData']) : new Map();
     for (let g of await client.guilds.cache) {
