@@ -4,12 +4,10 @@ const configPath = path.resolve('./config.json');
 const config = require(configPath);
 // todo: check if file actually exists first
 const pruneStoragePath = path.resolve('./prunestorage.json');
-if (!fs.existsSync(pruneStoragePath)) {
-  return;
-}
-const pruneStorage = require(pruneStoragePath);
+
 module.exports = {
   name: 'prunerestore',
+  aliases: ['pr'],
   description: 'DMs an xls of user activity to the user',
   usage: '',
   cooldown: 0,
@@ -18,6 +16,15 @@ module.exports = {
   args: false,
   async execute(message, args, client) {
     // todo: delete the user out of prunestorage once roles are restored
+
+    if (!fs.existsSync(pruneStoragePath)) {
+      return message.channel.send('There are no users pending prune to restore the roles for!');
+    }
+
+    // Get users' temporarily stored roles
+    const pruneStorage = require(pruneStoragePath);
+
+    return console.log(Object.keys(pruneStorage).length);
 
     // function to create a message collector.
     async function msgCollector() {
@@ -29,7 +36,6 @@ module.exports = {
         // this method creates a collection; since there is only one entry we get the data from collected.first
         .then(collected => reply = collected.first())
         .catch(collected => message.channel.send('Sorry, I waited 60 seconds with no response, please run the command again.'));
-      // console.log('Reply processed...');
       return reply;
     }
 
@@ -69,7 +75,7 @@ module.exports = {
     }
 
     // change maxTimeSinceActive for live, probably configurable as a default max prune time
-    //Pull the args so we know what we're working with
+    // Pull the args so we know what we're working with
     switch (args.length) {
     case 1:
       // todo: allow passing more than one user at once! probably comma delimited? check for 'all'

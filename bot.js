@@ -56,6 +56,9 @@ CONFIG_FILENAMES.forEach(filename => {
       freshConfig.invLogToggle = false;
       freshConfig.channelInvLogs = '';
       freshConfig.countingToggle = false;
+      freshConfig.avatarLogToggle = false;
+      freshConfig.channelAvatarLogs = '';
+      freshConfig.avatarLogAirlockOnlyToggle = false;
       freshConfig.countingChannelId = '';
       freshConfig.countingFailMessages = [],
       freshConfig.countingStartMessages = [],
@@ -203,8 +206,8 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 client.on('channelCreate', async channel => {
   if (fs.existsSync(vettingLimitPath)) {
     const vettingLimit = require(vettingLimitPath);
-    if (vettingLimit.VettingLimitCheck && config.airlockChannel) {
-      if (channel.name.includes(config.airlockChannel)) {
+    if (vettingLimit.VettingLimitCheck && config.airlockChannel && channel.type === 'text') {
+      if (await channel.name.includes(config.airlockChannel)) {
         vettingLimit.VettingLimitCheck (channel, client);
       }
     }
@@ -213,7 +216,7 @@ client.on('channelCreate', async channel => {
 
 // set up listener for channel creation events
 client.on('userUpdate', async (oldUser, newUser) => {
-  if (oldUser.avatar !== newUser.avatar && config.avatarLogToggle) {
+  if (oldUser.avatar !== newUser.avatar && config.avatarLogToggle && config.channelAvatarLogs) {
     // If the toggle to make this feature airlock-role-only is on, then check if the user has that role
     if (config.avatarLogAirlockOnlyToggle && config.roleComrade) {
       for (let g of await client.guilds.cache) {
@@ -227,7 +230,7 @@ client.on('userUpdate', async (oldUser, newUser) => {
     const nullPFP = 'https://cdn.discordapp.com/embed/avatars/2.png';
     const oldPFP = `https://cdn.discordapp.com/avatars/${oldUser.id}/${oldUser.avatar}.jpg`;
     const newPFP = `https://cdn.discordapp.com/avatars/${newUser.id}/${newUser.avatar}.jpg`;
-    const logChannel = client.channels.cache.get(config.channelInvLogs);
+    const avatarLogChannel = client.channels.cache.get(config.channelAvatarLogs);
     const msgEmbed = new Discord.MessageEmbed()
       .setColor('#DC143C')
       .setTimestamp();
@@ -248,7 +251,7 @@ client.on('userUpdate', async (oldUser, newUser) => {
       msgEmbed.setDescription('Profile Picture Removed:');
       msgEmbed.setImage(nullPFP);
     }
-    logChannel.send({ content: ':exclamation: <@' + newUser.id + '> changed their profile picture:', embed: msgEmbed });
+    avatarLogChannel.send({ content: ':exclamation: <@' + newUser.id + '> changed their profile picture:', embed: msgEmbed });
   }
 });
 
