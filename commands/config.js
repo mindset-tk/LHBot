@@ -42,10 +42,11 @@ module.exports = {
       ['airlockPruneDays', 'Max Inactivity for __airlock prune eligibility__', 'integer'],
       ['airlockPruneMessage', 'Airlock prune kick message', 'string'],
       ['invLogToggle', 'Toggle __Invite Iogging__', 'boolean'],
-      ['avatarLogToggle', 'Toggle __avatar change__ logging/reporting', 'boolean'],
-      ['avatarLogAirlockOnlyToggle', 'Toggle __airlock exclusive__ avatar logging/reporting', 'boolean'],
-      ['channelInvLogs', 'Logging channel (joins/leaves/etc)', 'channel'],
+      ['channelInvLogs', 'Channel for logging joins/leaves', 'channel'],
       ['knownInvites', 'Invite Code Descriptions', 'inviteCodesArray'],
+      ['avatarLogToggle', 'Toggle __avatar change__ logging/reporting', 'boolean'],
+      ['channelAvatarLogs', 'Channel for logging avatar changes', 'channel'],
+      ['avatarLogAirlockOnlyToggle', 'Toggle __airlock exclusive__ avatar logging/reporting', 'boolean'],
       ['channelLobby', 'Lobby channel', 'channel'],
       ['countingToggle', 'Toggle counting', 'boolean'],
       ['countingChannelId', 'Counting channel', 'channel'],
@@ -153,8 +154,8 @@ Airlock Channel Name/Prefix: **${config.airlockChannel ? config.airlockChannel :
 Lobby channel: **${config.channelLobby ? ('#' + getChannelName(config.channelLobby)) : 'not set.'}**
 
 __Logging/Notification Settings:__
-User join/exit notifications: **${config.invLogToggle ? ('On! #' + getChannelName(config.channelInvLogs)) : 'off.'}**
-Log avatar changes: **${config.avatarLogToggle ? 'On** (for: ' + (config.avatarLogAirlockOnlyToggle ? '**airlock role only**)' : '**all members**)') : 'off.**'}
+User join/exit notifications: **${config.invLogToggle ? ('On!** In: **#' + getChannelName(config.channelInvLogs)) : 'off.'}**
+Log avatar changes: **${config.avatarLogToggle ? 'On!** In: ' + (config.channelAvatarLogs ? '**#' + getChannelName(config.channelAvatarLogs) + '**' : 'Not Set') + ' (for: ' + (config.avatarLogAirlockOnlyToggle ? '**airlock role only**)' : '**all members**)') : 'off.**'}
 Defined Invite Codes: ${(knownInv[0]) ? knownInv.join(', ') : '**None**'}
 
 __Voice Channel & Command Settings:__
