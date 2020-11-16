@@ -141,6 +141,35 @@ function getTimeZoneCanonicalDisplayName(timeZone) {
   return moment.tz(getTimeZoneFromUserInput(timeZone)).zoneAbbr();
 }
 
+// returns the amount of time between an input date and now (or two input dates) in simple language ("1 day, 2 hours, and 3 minutes")
+function getRelativeTime(date1, date2) {
+  date1 = moment(date1);
+  if (!date2) {
+    date2 = moment();
+  }
+  else {
+    date2 = moment(date2);
+  }
+
+  let humanized = '';
+  let diffMS = date1.diff(date2);
+  console.log(diffMS);
+  diffMS = moment.duration(diffMS);
+  const minutes = diffMS.minutes();
+  const hours = diffMS.hours();
+  const days = parseInt(diffMS.asDays());
+  if (days > 0) {
+    humanized += `${days} ${days == 1 ? 'day' : 'days'}`;
+    if (hours > 0 || minutes > 0) { humanized += ', '; }
+  }
+  if (hours > 0) {
+    humanized += `${hours} ${hours == 1 ? 'hour' : 'hours'}`;
+    if (minutes > 0) { humanized += ', '; }
+  }
+  if (minutes > 0) {humanized += `${minutes} ${minutes == 1 ? 'minutes' : 'minutes'}`;}
+  return humanized;
+}
+
 class EventManager {
   /**
    * Create a new EventManager instance.
@@ -618,8 +647,14 @@ let eventManager;
  * @returns {module:"discord.js".MessageEmbed} A MessageEmbed with structured info on this event
  */
 function embedEvent(event, guild, options = {}) {
-  const { title, description, forUser } = options;
-  const timeZone = getUserTimeZone(forUser, guild);
+  const { title, description, forUser, firstRun } = options;
+  const guildTimeZone = getGuildTimeZone(guild);
+  let member;
+  if (forUser) { member = guild.members.cache.get(forUser.id); }
+  let userTimeZone = false;
+  if (forUser && global.eventData.userTimeZones[forUser.id] && global.eventData.userTimeZones[forUser.id] != 'server') {
+    userTimeZone = getUserTimeZone(forUser, guild);
+  }
 
   const role = guild && guild.roles.cache.get(event.role);
 
@@ -631,19 +666,18 @@ function embedEvent(event, guild, options = {}) {
           `You can join this event with '${config.prefix}event join ${event.name}'.`,
     )
     .addField('Event name', event.name)
-    .addField('Event time', `${formatDateCalendar(moment(event.due), timeZone)} ${getTimeZoneCanonicalDisplayName(timeZone)}`)
-    .addField('Creator', `<@${event.owner}>`)
+    .addField('Starts at (server time)', `${formatDateCalendar(moment(event.due), guildTimeZone)} ${getTimeZoneCanonicalDisplayName(guildTimeZone)}\n\n${(getRelativeTime(event.due) != '' ? `${getRelativeTime(event.due)} from now.` : 'Starting now.')}`, true);
+  if (userTimeZone) { eventEmbed.addField(`Starts at (${(member.nickname) ? member.nickname : member.user.username} time)`, `${formatDateCalendar(moment(event.due), userTimeZone)} ${getTimeZoneCanonicalDisplayName(userTimeZone)}`, true); }
+  eventEmbed.addField('Creator', `<@${event.owner}>`)
     .addField('Channel', `<#${event.channel}>`)
-    .addField('Event role', `<@&${event.role}>`)
-    .setTimestamp(event.due);
+    .addField('Event role', `<@&${event.role}>`);
   if (event.description) {
     eventEmbed.addField('Description', event.description);
   }
 
-  if (role) {
+  if (role && !firstRun) {
     eventEmbed.addField('Participants', `${role.members.keyArray().length}`);
     if (forUser) {
-      const member = guild.members.cache.get(forUser.id);
       eventEmbed.addField(
         `Have you (${(member.nickname) ? member.nickname : member.user.username}) RSVPed?`,
         forUser === event.owner || member.roles.cache.has(event.role)
@@ -670,8 +704,8 @@ function DMembedEvent(event, guild, options = {}) {
           `Users can join this event with '${config.prefix}event join ${event.name}'.`,
     )
     .addField('Event name', event.name)
-    .addField('Event time', `${formatDateCalendar(moment(event.due), timeZone)} ${getTimeZoneCanonicalDisplayName(timeZone)}`)
-    .addField('Creator', `<@${event.owner}>`)
+    .addField('Event time (server)', `${formatDateCalendar(moment(event.due), timeZone)} ${getTimeZoneCanonicalDisplayName(timeZone)}`);
+  eventEmbed.addField('Creator', `<@${event.owner}>`)
     .addField('Channel', `<#${event.channel}>`)
     .setFooter('Event')
     .setTimestamp(event.due.toISOString());
@@ -1487,9 +1521,10 @@ async function createWizard(message, channel) {
   await eventManager.add(eventData);
 
   return channel.send(
-    embedEvent(eventData, null, {
+    embedEvent(eventData, message.guild, {
       title: `New event: ${eventData.name}`,
       forUser: message.author,
+      firstRun: true,
     }),
   );
 }
