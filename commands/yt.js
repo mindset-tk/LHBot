@@ -264,7 +264,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
         message.guild.musicData.volume = 0.2;
         // edge case if staff initiated video play from outside of the #voice-chat channels, bot will default to the first voice chat channel.
         if (!config.voiceTextChannelIds.includes(message.channel.id)) {
-          message.guild.musicData.voiceTextChannel = config.voiceTextChannelIds[0];
+          message.guild.musicData.voiceTextChannel = await client.channels.fetch(config.voiceTextChannelIds[0]);
         }
         else { message.guild.musicData.voiceTextChannel = message.channel; }
         message.guild.musicData.voiceChannel = voiceChannel;
@@ -334,7 +334,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
       message.channel.send('Song paused :pause_button:');
       message.guild.musicData.songDispatcher.pause();
       await wait(300000);
-      if (message.guild.musicData.songDispatcher.pausedTime >= 290000) {
+      if (message.guild.musicData.songDispatcher.pausedTime && message.guild.musicData.songDispatcher.pausedTime >= 290000) {
         message.guild.musicData.volume = 0.2;
         message.guild.musicData.queue.length = 0;
         message.guild.musicData.songDispatcher = null;
