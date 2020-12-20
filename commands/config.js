@@ -149,7 +149,7 @@ Airlock role: **${config.roleAirlock ? '@' + getRoleName(config.roleAirlock) : '
 
 __Special Channels:__
 Counting: **${config.countingToggle ? ('#' + getChannelName(config.countingChannelId)) : 'off.'}**
-Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}** (Note: does nothing at this time)
+Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}**
 Disboard Bump Channel: **${config.disboardChannelId ? ('#' + getChannelName(config.disboardChannelId)) : 'not set.'}**
 Event announcement channel: **${config.eventInfoChannelId ? ('#' + getChannelName(config.eventInfoChannelId)) : 'not set.'}**
 Airlock Channel Name/Prefix: **${config.airlockChannel ? config.airlockChannel : 'Not set'}**
