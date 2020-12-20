@@ -56,6 +56,7 @@ module.exports = {
       ['pinsToPin', 'Number of pin reacts to auto-pin a message', 'integer'],
       ['pinIgnoreChannels', 'Channel(s) to ignore for pinning', 'channelArray'],
       ['botChannelId', 'Bot stuff channel', 'channel'],
+      ['disboardChannelId', 'Disboard Bumping Channel', 'channel'],
       ['eventInfoChannelId', 'Event announce channel', 'channel']];
     // declaring some useful functions.
     // function to pretty print the config data so that arrays show on one line, so it's easier to visually parse the config file when hand opening it. Purely cosmetic.
@@ -149,6 +150,7 @@ Airlock role: **${config.roleAirlock ? '@' + getRoleName(config.roleAirlock) : '
 __Special Channels:__
 Counting: **${config.countingToggle ? ('#' + getChannelName(config.countingChannelId)) : 'off.'}**
 Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}** (Note: does nothing at this time)
+Disboard Bump Channel: **${config.disboardChannelId ? ('#' + getChannelName(config.disboardChannelId)) : 'not set.'}**
 Event announcement channel: **${config.eventInfoChannelId ? ('#' + getChannelName(config.eventInfoChannelId)) : 'not set.'}**
 Airlock Channel Name/Prefix: **${config.airlockChannel ? config.airlockChannel : 'Not set'}**
 Lobby channel: **${config.channelLobby ? ('#' + getChannelName(config.channelLobby)) : 'not set.'}**

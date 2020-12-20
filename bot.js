@@ -65,6 +65,8 @@ CONFIG_FILENAMES.forEach(filename => {
       freshConfig.countingFailRepeatMessages = [],
       freshConfig.repeatReacts = [],
       freshConfig.knownInvites = [],
+      freshConfig.botChannelId = '';
+      freshConfig.disboardChannelId = '';
       freshConfig.eventInfoChannelId = '';
       freshConfig.pinIgnoreChannels = [];
       freshConfig.voiceTextChannelIds = [];
@@ -98,6 +100,7 @@ CONFIG_FILENAMES.forEach(filename => {
 const Discord = require('discord.js');
 const myIntents = new Discord.Intents();
 const Counting = require('./counting.js');
+const disboard = require('./disboard.js');
 const vccheck = require('./commands/vccheck.js');
 const listPath = './gamelist.json';
 const gameList = require(listPath);
@@ -261,6 +264,8 @@ client.login(config.authtoken);
 // command parser
 client.on('message', async message => {
 
+  // Check for disboard bump messages in a configured channel to schedule a reminder
+  disboard.BumpReminder(config, message);
 
   // VettingLimit: listen for lobby panel message
   if (fs.existsSync(vettingLimitPath)) {
