@@ -14,7 +14,6 @@ fs.existsSync(pruneStoragePath, (err) => {
 
 // function to create a message collector.
 async function msgCollector(message) {
-// let responses = 0;
 let reply = false;
 // create a filter to ensure output is only accepted from the author who initiated the command.
 const filter = input => (input.author.id === message.author.id);
@@ -72,6 +71,8 @@ async function pruneRestore(args, message) {
 
   // Get users' temporarily stored roles
   const pruneStorage = requireUncached(pruneStoragePath);
+
+  // If the prune list is empty, do clean-up!
   if (Object.keys(pruneStorage).length === 0) {
     pruneCleanup(message, pruneTitle);
     return message.channel.send(`There doesn't appear to be an ongoing prune. Any necessary clean-up is completed`);
@@ -86,35 +87,39 @@ async function pruneRestore(args, message) {
     if (reply.content.toLowerCase() == 'n' || reply.content.toLowerCase() == 'no') {
       return message.channel.send('Okay! No changes have been made');
     }
+    // If they say yes, then set the args to all users currently in limbo
     else if (reply.content.toLowerCase() == 'y' || reply.content.toLowerCase() == 'yes') {
       args = Object.keys(pruneStorage);
     }
   }
 
-  
+  // Setup variables for the numbers of successfully restored members and ones where there's an error
   let erroredMembers = 0;
   let restoredMembers = new Array();
   for(arg of args) {
     const member = await getUser(arg, message);
+
+    // If the member doesn't exist, isn't manageable, or isn't in the prunestore, increase 'error' count
     if (member === null || !member.manageable || !pruneStorage[member.user.id]) { 
       erroredMembers += 1;
       continue;
     }
     
-    // const usrObj = memberObj.user;
-    
-    // restore roles for now, delete channel, etc
+    // Restore the roles of the selected people
     await member.roles.set(pruneStorage[member.user.id], 'Restoring user roles');
+
+    // Clear the member out of prunestorage, write it, and add them to the array for the end-report
     delete pruneStorage[member.user.id];
-  
     writeData(pruneStoragePath, pruneStorage);
     restoredMembers.push(`<@${member.user.id}>`);
   }
   
+  // If we've emptied out the prunestorage, then clean-up the prune!
   if (Object.keys(pruneStorage).length === 0) {
     pruneCleanup(message, pruneTitle);
   }
   
+  // List out the results
   let resultMsg = '';
   if (restoredMembers.length > 0) {
     resultMsg += `Restored roles for: ${restoredMembers.join(', ')}`;
@@ -126,10 +131,12 @@ async function pruneRestore(args, message) {
 }
 
 async function prunePrep(args, message, client) {
+
+  // Setup the inactivity variable and intiailize the users-to-prune array
   let maxTimeSinceActive = 0;
   const usersToPrune = new Array();
 
-  // Pull the args so we know what we're working with
+  // Pull the first arg so we know what we're working with
   const firstArg = args.shift();
   maxTimeSinceActive = (parseInt(firstArg) ? parseInt(firstArg) : 6);
 
@@ -137,29 +144,28 @@ async function prunePrep(args, message, client) {
   const pruneTitle = 'prune-limbo';
   // Sets the intro message and description for the prune channel
   const pruneIntro = `If you're in this channel, you've been inactive in the server for at least ${maxTimeSinceActive} months! Rather than kick you outright, we want to give people a chance to potentially rejoin the community`;
+
+  // For discord snowflake processing
   const discordEpoch = BigInt(1420070400000);
 
   // Initialize the pruneStorage map. No need to import an "old one"- we'll be starting anew either way? maybe i'll change my mind and check for the file instead
   const pruneStorage = new Map();
 
   // Only proceed if there isn't a prune in process
-  // Todo? Potentially offer an option to let them clear out an old one instead of just saying "No"
-
-  if (message.guild.roles.cache.find(role => role.name === pruneTitle) || message.guild.channels.cache.find(channel => channel.name === pruneTitle)) {
-    //message.guild.roles.cache.find(role => role.name === pruneTitle).delete('Post-prune cleanup');
-    //message.guild.channels.cache.find(channel => channel.name === pruneTitle).delete();
+    if (message.guild.roles.cache.find(role => role.name === pruneTitle) || message.guild.channels.cache.find(channel => channel.name === pruneTitle)) {
     return message.channel.send('It looks like there was already a prune in process. You should finish that out first using `.prunekick confirm` or `.prunekick abandon`');
   }
-
 
   // Make sure there's data to even process
   if(!global.dataLog[message.guild.id].pruneData || global.dataLogLock == 1) {
     return message.channel.send('There\'s either no prune data right now, or the datalog is still caching');
   }
 
-
+  // Get a current timestamp and user activity data
   const currentTime = moment();
   const pruneData = new Map(global.dataLog[message.guild.id].pruneData.sort((a, b) => a[1] - b[1]).filter(userid => !args.includes(userid[0])));
+
+  // Create and format the workbook
   const xlsUsrList = new ExcelJS.Workbook;
   const listSheet = xlsUsrList.addWorksheet('User List');
   const colHeaders = ['Username', 'Display', 'Last Posted'];
@@ -180,10 +186,13 @@ async function prunePrep(args, message, client) {
     
     // Make sure we can even manage this user
     if (!memberObj.manageable) {continue;}
-
     const usrObj = memberObj.user;
+
+    // Set defaults and intialize
     let dateLastActive = 'N/A';
     let formattedDateLastActive;
+
+    // If the user's last post date isn't "never", format in general and for the spreadsheet
     if (usr[1] != 0) {
       const lastPostUnixDate = Number((BigInt(usr[1]) >> BigInt(22)) + discordEpoch);
       dateLastActive = moment(lastPostUnixDate);
@@ -192,13 +201,16 @@ async function prunePrep(args, message, client) {
     else {
       formattedDateLastActive = dateLastActive;
     }
+
+    // If the last active date isn't n/a, check it against the inactivity limit set
     if (dateLastActive !== 'N/A') {
       const timeSinceLastActive = moment.duration(currentTime.diff(dateLastActive)).asMonths();
       if (timeSinceLastActive < maxTimeSinceActive) {break;}
     }
-    // Add each user to the spreadsheet
+
+    // Add each member that's made it this ifarto the spreadsheet
     listSheet.addRow({ Username: usrObj.tag, Display: memberObj.nickname, 'Last Posted': formattedDateLastActive });
-    // Add each userID to an array in case we go ahead with the prune
+    // Add each ID to an array to use later
     usersToPrune.push((usr[0]));
   }
   await xlsUsrList.xlsx.writeFile('./usrs.xlsx');
@@ -207,7 +219,7 @@ async function prunePrep(args, message, client) {
   message.author.send({ files: ['./usrs.xlsx'] });
   // message.channel.send({ files: ['./usrs.xlsx'] });
 
-  // Ask if the user wants to proceed, having had a chance to look at the XLS
+  // Let them look at the XLS, check if they want to proceed
   message.channel.send('This will affect the **' + usersToPrune.length + '** people in the spreadsheet above. Are you sure you want to move ahead with removing all their roles (excluding pronoun roles) and put them in a pruning channel?');
   let reply = await msgCollector(message);
   if (!reply) { return; }
@@ -413,12 +425,11 @@ Options:
         pruneFinish(args, message);
         break;
     }
-
   },
 };
 
 /* 
-    // prune dry run we aren't going to use
+    // prune dry run we aren't going to use because discord's maxes out at 30 days
     const roleList = message.guild.roles.cache
             .map(r => r.id)
             .join(",");
