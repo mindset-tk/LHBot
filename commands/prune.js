@@ -8,20 +8,20 @@ const pruneStoragePath = path.resolve('./prunestorage.json');
 
 fs.existsSync(pruneStoragePath, (err) => {
   if (err) {
-    return message.channel.send('There are no users pending prune to restore the roles for!');
+    return console.log('There are no users pending prune to restore the roles for!');
   }
 });
 
 // function to create a message collector.
 async function msgCollector(message) {
-let reply = false;
-// create a filter to ensure output is only accepted from the author who initiated the command.
-const filter = input => (input.author.id === message.author.id);
-await message.channel.awaitMessages(filter, { max: 1, time: 60000, errors: ['time'] })
-  // this method creates a collection; since there is only one entry we get the data from collected.first
-  .then(collected => reply = collected.first())
-  .catch(collected => message.channel.send('Sorry, I waited 60 seconds with no response, please run the command again.'));
-return reply;
+  let reply = false;
+  // create a filter to ensure output is only accepted from the author who initiated the command.
+  const filter = input => (input.author.id === message.author.id);
+  await message.channel.awaitMessages(filter, { max: 1, time: 60000, errors: ['time'] })
+    // this method creates a collection; since there is only one entry we get the data from collected.first
+    .then(collected => reply = collected.first())
+    .catch(collected => message.channel.send('Sorry, I waited 60 seconds with no response, please run the command again.'));
+  return reply;
 }
 
 // save disk space and increase readability
@@ -75,9 +75,9 @@ async function pruneRestore(args, message) {
   // If the prune list is empty, do clean-up!
   if (Object.keys(pruneStorage).length === 0) {
     pruneCleanup(message, pruneTitle);
-    return message.channel.send(`There doesn't appear to be an ongoing prune. Any necessary clean-up is completed`);
+    return message.channel.send('There doesn\'t appear to be an ongoing prune. Any necessary clean-up is completed');
   }
-  
+
   // Pull the args so we know what we're working with
   if (!args || args.length === 0) {
     // Do they intend to restore all people in limbo?
@@ -95,16 +95,16 @@ async function pruneRestore(args, message) {
 
   // Setup variables for the numbers of successfully restored members and ones where there's an error
   let erroredMembers = 0;
-  let restoredMembers = new Array();
-  for(arg of args) {
+  const restoredMembers = new Array();
+  for(const arg of args) {
     const member = await getUser(arg, message);
 
     // If the member doesn't exist, isn't manageable, or isn't in the prunestore, increase 'error' count
-    if (member === null || !member.manageable || !pruneStorage[member.user.id]) { 
+    if (member === null || !member.manageable || !pruneStorage[member.user.id]) {
       erroredMembers += 1;
       continue;
     }
-    
+
     // Restore the roles of the selected people
     await member.roles.set(pruneStorage[member.user.id], 'Restoring user roles');
 
@@ -113,12 +113,12 @@ async function pruneRestore(args, message) {
     writeData(pruneStoragePath, pruneStorage);
     restoredMembers.push(`<@${member.user.id}>`);
   }
-  
+
   // If we've emptied out the prunestorage, then clean-up the prune!
   if (Object.keys(pruneStorage).length === 0) {
     pruneCleanup(message, pruneTitle);
   }
-  
+
   // List out the results
   let resultMsg = '';
   if (restoredMembers.length > 0) {
@@ -152,7 +152,7 @@ async function prunePrep(args, message, client) {
   const pruneStorage = new Map();
 
   // Only proceed if there isn't a prune in process
-    if (message.guild.roles.cache.find(role => role.name === pruneTitle) || message.guild.channels.cache.find(channel => channel.name === pruneTitle)) {
+  if (message.guild.roles.cache.find(role => role.name === pruneTitle) || message.guild.channels.cache.find(channel => channel.name === pruneTitle)) {
     return message.channel.send('It looks like there was already a prune in process. You should finish that out first using `.prunekick confirm` or `.prunekick abandon`');
   }
 
@@ -183,7 +183,7 @@ async function prunePrep(args, message, client) {
   // Loop through the prune data, generating the spreadsheet and prune array for later
   for (const usr of pruneData) {
     const memberObj = await message.guild.member(usr[0]);
-    
+
     // Make sure we can even manage this user
     if (!memberObj.manageable) {continue;}
     const usrObj = memberObj.user;
@@ -216,8 +216,8 @@ async function prunePrep(args, message, client) {
   await xlsUsrList.xlsx.writeFile('./usrs.xlsx');
 
   // Send the XLS out!
-  message.author.send({ files: ['./usrs.xlsx'] });
-  // message.channel.send({ files: ['./usrs.xlsx'] });
+  // message.author.send({ files: ['./usrs.xlsx'] });
+  message.channel.send({ files: ['./usrs.xlsx'] });
 
   // Let them look at the XLS, check if they want to proceed
   message.channel.send('This will affect the **' + usersToPrune.length + '** people in the spreadsheet above. Are you sure you want to move ahead with removing all their roles (excluding pronoun roles) and put them in a pruning channel?');
@@ -273,7 +273,7 @@ async function prunePrep(args, message, client) {
           // Get the user collection
             const thisUser = await message.guild.members.cache.get(usr);
             if (thisUser.manageable) {
-              let thisUserPruneRoles = [pruneRole];
+              const thisUserPruneRoles = [pruneRole];
               // Initialize a section of pruneStorage for this user
               pruneStorage[thisUser.id] = new Array();
               // Store the user's roles in their pruneStorage array
@@ -284,11 +284,11 @@ async function prunePrep(args, message, client) {
                 }
               });
 
-              const fullMemberList = await message.guild.members.fetch();
+              // Refresh member cache
+              await message.guild.members.fetch();
 
+              // Set the user's roles
               await thisUser.roles.set(thisUserPruneRoles, 'User prune prep');
-              // restore roles for now, delete channel, etc
-                //await thisUser.roles.set(pruneStorage[thisUser.id], 'Restoring user roles');
             }
           }
           writeData(pruneStoragePath, pruneStorage);
@@ -304,62 +304,62 @@ async function prunePrep(args, message, client) {
 }
 
 async function pruneFinish(args, message) {
-    // Set the name of the role/channel to be used for prunes
-    const pruneTitle = 'prune-limbo';
+  // Set the name of the role/channel to be used for prunes
+  const pruneTitle = 'prune-limbo';
 
-    const toPrune = Object.keys(requireUncached(pruneStoragePath));
-    const PRUNE_USER_KICKMSG = `Pruned for inactivity.`;
-    const PRUNE_USER_DMREASON = `Pruned for inactivity. You can find another invite code at https://lefthome.info/`;
-    const canKick = await message.guild.me.hasPermission('KICK_MEMBERS');
-    
-    // Make sure we have the necessary permissions
-    if (!canKick) {return message.channel.send(`You'll need to give me kick permissions to proceed`);}
+  const toPrune = Object.keys(requireUncached(pruneStoragePath));
+  const PRUNE_USER_KICKMSG = 'Pruned for inactivity.';
+  const PRUNE_USER_DMREASON = 'Pruned for inactivity. You can find another invite code at https://lefthome.info/';
+  const canKick = await message.guild.me.hasPermission('KICK_MEMBERS');
 
-    // Make sure there's anyone to prune
+  // Make sure we have the necessary permissions
+  if (!canKick) {return message.channel.send('You\'ll need to give me kick permissions to proceed');}
+
+  // Make sure there's anyone to prune
+  if (toPrune.length === 0) {
+    return message.channel.send('There doesn\'t appear to be an ongoing prune');
+  }
+
+  // Make sure they want to kick for sure!
+  message.channel.send(`Are you 100% sure you want to kick **${toPrune.length} member(s)** with the **${pruneTitle}** role and clean up?`);
+  let reply = await msgCollector(message);
+  if (!reply) { return; }
+  if (reply.content.toLowerCase() !== 'y' && reply.content.toLowerCase() !== 'yes') {
+    return message.channel.send('Okay! No changes were made.');
+  }
+
+  // If we're here, we're pruning
+  message.channel.send('Beginning prune! Another message will be sent when the prune is complete.');
+
+  // Set up up one kick per 30 seconds to avoid angering the API
+  let i = 0;
+  const toKick = setInterval(async function() {
+
+    // If we've reached finished out the final kick already, then clear the timer, clean up, and report in
     if (toPrune.length === 0) {
-      return message.channel.send(`There doesn't appear to be an ongoing prune`);
+      clearInterval(toKick);
+      pruneCleanup(message, pruneTitle);
+      writeData(pruneStoragePath, '{}');
+      return message.channel.send(`**${i} member(s)** successfully pruned`);
     }
 
-    // Make sure they want to kick for sure!
-    message.channel.send(`Are you 100% sure you want to kick **${toPrune.length} member(s)** with the **${pruneTitle}** role and clean up?`);
-    let reply = await msgCollector(message);
-    if (!reply) { return; }
-    if (reply.content.toLowerCase() !== 'y' && reply.content.toLowerCase() !== 'yes') {
-      return message.channel.send('Okay! No changes were made.');
-    }
+    // Get the next userid in the array, plus the member and user objects
+    const userid = toPrune.shift();
+    const memberObj = message.guild.member(userid);
+    const usrObj = memberObj.user;
 
-    // If we're here, we're pruning
-    message.channel.send('Beginning prune! Another message will be sent when the prune is complete.');
+    // Make sure we can actually kick the person! Just in case
+    if (!memberObj.kickable) {return console.log(`Couldn't kick ${usrObj.username}#${usrObj.discriminator}`);}
 
-    // Set up up one kick per 30 seconds to avoid angering the API
-    let i = 0;
-    let toKick = setInterval(async function() {
-      
-      // If we've reached finished out the final kick already, then clear the timer, clean up, and report in
-      if (toPrune.length === 0) {
-        clearInterval(toKick);
-        pruneCleanup(message, pruneTitle)
-        writeData(pruneStoragePath, "{}");
-        return message.channel.send(`**${i} member(s)** successfully pruned`);
-      }
-      
-      // Get the next userid in the array, plus the member and user objects
-      const userid = toPrune.shift();
-      const memberObj = message.guild.member(userid);
-      const usrObj = memberObj.user;
+    // Send a DM leting them know what we've done, thn wait one second and kick them
+    usrObj.send(`You've been kicked from **${message.guild.name}** with reason:\n> ${PRUNE_USER_DMREASON}`);
+    setTimeout(function() {
+      memberObj.kick(PRUNE_USER_KICKMSG);
+    }, 1000);
 
-      // Make sure we can actually kick the person! Just in case
-      if (!memberObj.kickable) {return console.log(`Couldn't kick ${usrObj.username}#${usrObj.discriminator}`);}
-
-      // Send a DM leting them know what we've done, thn wait one second and kick them
-      usrObj.send(`You've been kicked from **${message.guild.name}** with reason:\n> ${PRUNE_USER_DMREASON}`);
-      setTimeout(function() {
-        memberObj.kick(PRUNE_USER_KICKMSG);
-      }, 1000);
-
-      // Increment the counter for the end-message
-      i++;
-    }, 30000);
+    // Increment the counter for the end-message
+    i++;
+  }, 30000);
 }
 
 async function pruneCleanup(message, pruneTitle) {
@@ -397,38 +397,37 @@ Options:
 > - usage: \`.prune restore\` offers to restore all users
 .prune finish
 > - alias: "f"
-> - usage: \`.prune finish\``
-      );
-  }
-    
+> - usage: \`.prune finish\``);
+    }
+
     // Get the first arg, leaving the rest for whatever else we're going to do
     const firstArg = args.shift();
     switch (firstArg) {
-      case 'r':
-      case 'restore':
-      case 'c':
-      case 'cancel':
-        pruneRestore(args, message);
-        break;
-      case 'p':
-      case 'prep':
-      case 's':
-      case 'start':
-      case 'b':
-      case 'begin':
-        prunePrep(args, message, client);
-        break;
-      case 'k':
-      case 'kick':
-      case 'f':
-      case 'finish':
-        pruneFinish(args, message);
-        break;
+    case 'r':
+    case 'restore':
+    case 'c':
+    case 'cancel':
+      pruneRestore(args, message);
+      break;
+    case 'p':
+    case 'prep':
+    case 's':
+    case 'start':
+    case 'b':
+    case 'begin':
+      prunePrep(args, message, client);
+      break;
+    case 'k':
+    case 'kick':
+    case 'f':
+    case 'finish':
+      pruneFinish(args, message);
+      break;
     }
   },
 };
 
-/* 
+/*
     // prune dry run we aren't going to use because discord's maxes out at 30 days
     const roleList = message.guild.roles.cache
             .map(r => r.id)
@@ -436,4 +435,4 @@ Options:
     message.guild.members.prune({ dry: true, days: 100, roles: [roleList], reason: PRUNE_USER_KICKMSG })
     .then(pruned => console.log(`This will prune ${pruned} people!`))
     .catch(console.error);
-    */ 
+    */
