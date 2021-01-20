@@ -130,6 +130,80 @@ async function pruneRestore(args, message) {
   return message.channel.send(resultMsg);
 }
 
+async function pruneExclude(args, message) {
+  // Make sure there's data to even process
+  if(!global.dataLog[message.guild.id].pruneData || global.dataLogLock == 1) {
+    return message.channel.send('There\'s either no prune data right now, or the datalog is still caching');
+  }
+
+  // If there are no args, error
+  if (!args || args.length === 0) {
+    return message.channel.send('You need to choose to either **add**, **remove**, or **list** exclusions');
+  }
+
+  // Get the prune data into a map and grab the first arg
+  const pruneData = new Map(global.dataLog[message.guild.id].pruneData);
+  const firstArg = (args.shift()).toLowerCase();
+
+  // If they want to list the current exclusions
+  if (firstArg === 'l' || firstArg === 'list') {
+
+    // Initialize the array, push each member with the exclusion flag onto it
+    const excluded = [];
+    for (const member of pruneData) {
+      if (member[1].length === 2) {
+        excluded.push(`<@${member[0]}>`);
+      }
+    }
+    message.channel.send(`Members currently excluded from pruning: ${excluded.join(', ')}`);
+  }
+
+  // If they want to add someone,
+  else if (firstArg === 'a' || firstArg === 'add') {
+
+    // Grab the member for the ID or mention
+    const member = await getUser(args[0], message);
+
+    // Make sure they exist as a member and are in the prunedata
+    if (member === null || !pruneData.has(member.user.id)) {
+      return message.channel.send('This doesn\'t seem to be a member on the server. Please make sure you entered everything correctly');
+    }
+
+    // If they're not yet excluded, exclude them and save what we've done
+    if (pruneData.get(member.user.id).length == 1) {
+      pruneData.get(member.user.id).push(1);
+      global.dataLog[message.guild.id].pruneData = [...pruneData];
+      return message.channel.send(`Success! <@${member.id}> is now excluded from being pruned`);
+    }
+    else {
+      return message.channel.send(`Hmm, it seems <@${member.id}> is already excluded from being pruned`);
+    }
+  }
+
+  // If they want to remove someone,
+  else if (firstArg === 'r' || firstArg === 'remove') {
+
+    // Make sure they exist as a member and are in the prunedata
+    const member = await getUser(args[0], message);
+    if (member === null || !pruneData.has(member.user.id)) {
+      return message.channel.send('This doesn\'t seem to be a member on the server. Please make sure you entered everything correctly');
+    }
+
+    // If they're excluded, remove that flag and save what we've done
+    if (pruneData.get(member.user.id).length == 2) {
+      pruneData.get(member.user.id).pop();
+      global.dataLog[message.guild.id].pruneData = [...pruneData];
+      return message.channel.send(`Success! <@${member.id}> is no longer excluded from being pruned`);
+    }
+    else {
+      return message.channel.send(`Hmm, it seems <@${member.id}> wasn't excluded from being pruned to begin with`);
+    }
+  }
+  else {
+    return message.channel.send('You need to choose to either **add**, **remove**, or **list** exclusions');
+  }
+}
+
 async function prunePrep(args, message, client) {
 
   // Setup the inactivity variable and intiailize the users-to-prune array
@@ -163,12 +237,12 @@ async function prunePrep(args, message, client) {
 
   // Get a current timestamp and user activity data
   const currentTime = moment();
-  const pruneData = new Map(global.dataLog[message.guild.id].pruneData.sort((a, b) => a[1] - b[1]).filter(userid => !args.includes(userid[0])));
+  const pruneData = new Map(global.dataLog[message.guild.id].pruneData.sort((a, b) => a[1] - b[1]));
 
   // Create and format the workbook
   const xlsUsrList = new ExcelJS.Workbook;
   const listSheet = xlsUsrList.addWorksheet('User List');
-  const colHeaders = ['Username', 'Display', 'Last Posted'];
+  const colHeaders = ['Username', 'Display', 'Last Posted', 'Excluded'];
   const colData = [];
   colHeaders.forEach(hdr => {
     if (hdr == 'Last Posted') {
@@ -186,6 +260,24 @@ async function prunePrep(args, message, client) {
 
     // Make sure we can even manage this user
     if (!memberObj.manageable) {continue;}
+
+    // Initialize the vars for the last post ID and whether this member is excluded
+    let lastPost;
+    let memberExcluded = '';
+
+    // If they're excluded, we'll include them in the spreadsheet but not the prune
+    if (usr[1].length === 2) {
+      lastPost = usr[1][0];
+      memberExcluded = 'Yes';
+    }
+    else {
+      lastPost = usr[1];
+      memberExcluded = '';
+
+      // Add ID to the toPrune array
+      usersToPrune.push((usr[0]));
+    }
+
     const usrObj = memberObj.user;
 
     // Set defaults and intialize
@@ -193,8 +285,8 @@ async function prunePrep(args, message, client) {
     let formattedDateLastActive;
 
     // If the user's last post date isn't "never", format in general and for the spreadsheet
-    if (usr[1] != 0) {
-      const lastPostUnixDate = Number((BigInt(usr[1]) >> BigInt(22)) + discordEpoch);
+    if (lastPost != 0) {
+      const lastPostUnixDate = Number((BigInt(lastPost) >> BigInt(22)) + discordEpoch);
       dateLastActive = moment(lastPostUnixDate);
       formattedDateLastActive = moment(lastPostUnixDate).toDate();
     }
@@ -209,9 +301,7 @@ async function prunePrep(args, message, client) {
     }
 
     // Add each member that's made it this ifarto the spreadsheet
-    listSheet.addRow({ Username: usrObj.tag, Display: memberObj.nickname, 'Last Posted': formattedDateLastActive });
-    // Add each ID to an array to use later
-    usersToPrune.push((usr[0]));
+    listSheet.addRow({ Username: usrObj.tag, Display: memberObj.nickname, 'Last Posted': formattedDateLastActive, Excluded: memberExcluded });
   }
   await xlsUsrList.xlsx.writeFile('./usrs.xlsx');
 
@@ -220,7 +310,7 @@ async function prunePrep(args, message, client) {
   message.channel.send({ files: ['./usrs.xlsx'] });
 
   // Let them look at the XLS, check if they want to proceed
-  message.channel.send('This will affect the **' + usersToPrune.length + '** people in the spreadsheet above. Are you sure you want to move ahead with removing all their roles (excluding pronoun roles) and put them in a pruning channel?');
+  message.channel.send('This will affect the **' + usersToPrune.length + '** people in the spreadsheet below. Are you sure you want to move ahead with removing all their roles (excluding pronoun roles) and put them in a pruning channel?');
   let reply = await msgCollector(message);
   if (!reply) { return; }
   if (reply.content.toLowerCase() !== 'y' && reply.content.toLowerCase() !== 'yes') {
@@ -385,19 +475,18 @@ module.exports = {
   async execute(message, args, client) {
 
     if(args.length === 0) {
-      return message.channel.send(`command: .prune (alias: .p)
-
-Options:
-.prune prep <months:default 6> <userids to exclude, separated by spaces>
-> - alias: "p"
-> - usage: \`.prune prep 6 ${message.author.id}\`
-.prune restore <@userOrUserIDs, separated by spaces>
-> - alias: "r"
+      return message.channel.send(`Options:
+.prune prep <months:default 6>
+> - usage: \`.prune prep 3\`
+.prune exclude [add/remove] [@user/UserID]
+> - usage: \`.prune exclude add ${message.author.id}\`
+> - List all current exclusions with \`.prune exclude list\`
+.prune restore <@users/UserIDs>
 > - usage: \`.prune restore @user1 @user2 userid3\` restores user1, 2, and 3
-> - usage: \`.prune restore\` offers to restore all users
+.prune cancel
+> - Offers to restore all users, canceling the prune
 .prune finish
-> - alias: "f"
-> - usage: \`.prune finish\``);
+> - Offers to finish the prune, kicking all users still in limbo`);
     }
 
     // Get the first arg, leaving the rest for whatever else we're going to do
@@ -422,6 +511,10 @@ Options:
     case 'f':
     case 'finish':
       pruneFinish(args, message);
+      break;
+    case 'e':
+    case 'exclude':
+      pruneExclude(args, message);
       break;
     }
   },
