@@ -65,12 +65,16 @@ function requireUncached(module) {
 }
 
 async function pruneRestore(args, message) {
+  if (!message.guild.me.hasPermission(['MANAGE_CHANNELS', 'MANAGE_ROLES'])) {
+    return message.channel.send('Sorry, I don\'t have the necessary permissions (manage channels and manage roles)');
+  }
 
   // Set the name of the role/channel to be used for prunes
-  const pruneTitle = 'prune-limbo';
+  const pruneTitle = config.pruneTitle ? config.pruneTitle : 'prune-limbo';
 
   // Get users' temporarily stored roles
   const pruneStorage = requireUncached(pruneStoragePath);
+  let fullRestore = 0;
 
   // If the prune list is empty, do clean-up!
   if (Object.keys(pruneStorage).length === 0) {
@@ -90,6 +94,7 @@ async function pruneRestore(args, message) {
     // If they say yes, then set the args to all users currently in limbo
     else if (reply.content.toLowerCase() == 'y' || reply.content.toLowerCase() == 'yes') {
       args = Object.keys(pruneStorage);
+      fullRestore = 1;
     }
   }
 
@@ -101,7 +106,13 @@ async function pruneRestore(args, message) {
 
     // If the member doesn't exist, isn't manageable, or isn't in the prunestore, increase 'error' count
     if (member === null || !member.manageable || !pruneStorage[member.user.id]) {
-      erroredMembers += 1;
+      if (fullRestore === 1) {
+        delete pruneStorage[arg];
+        writeData(pruneStoragePath, pruneStorage);
+      }
+      else {
+        erroredMembers += 1;
+      }
       continue;
     }
 
@@ -126,6 +137,9 @@ async function pruneRestore(args, message) {
   }
   if (erroredMembers > 0) {
     resultMsg += `\n**${erroredMembers}** member(s) were entered in error and not restored`;
+  }
+  if (resultMsg === '') {
+    resultMsg += 'The only members remaining in the list have already left the server';
   }
   return message.channel.send(resultMsg);
 }
@@ -155,7 +169,12 @@ async function pruneExclude(args, message) {
         excluded.push(`<@${member[0]}>`);
       }
     }
-    message.channel.send(`Members currently excluded from pruning: ${excluded.join(', ')}`);
+    if (excluded.length > 0) {
+      message.channel.send(`Members currently excluded from pruning: ${excluded.join(', ')}`);
+    }
+    else {
+      message.channel.send('There are no members currently excluded from being pruned.');
+    }
   }
 
   // If they want to add someone,
@@ -205,6 +224,9 @@ async function pruneExclude(args, message) {
 }
 
 async function prunePrep(args, message, client) {
+  if (!message.guild.me.hasPermission(['MANAGE_CHANNELS', 'MANAGE_ROLES'])) {
+    return message.channel.send('Sorry, I don\'t have the necessary permissions (manage channels and manage roles)');
+  }
 
   // Setup the inactivity variable and intiailize the users-to-prune array
   let maxTimeSinceActive = 0;
@@ -212,12 +234,21 @@ async function prunePrep(args, message, client) {
 
   // Pull the first arg so we know what we're working with
   const firstArg = args.shift();
-  maxTimeSinceActive = (parseInt(firstArg) ? parseInt(firstArg) : 6);
+  if (parseFloat(firstArg)) {
+    maxTimeSinceActive = (parseFloat(firstArg));
+  }
+  else if (firstArg && firstArg.toLowerCase() === 'all') {
+    maxTimeSinceActive = 0;
+  }
+  else {
+    maxTimeSinceActive = 6;
+  }
+
 
   // Set the name of the role/channel to be used for prunes. Probably will go in a config soon?
-  const pruneTitle = 'prune-limbo';
+  const pruneTitle = config.pruneTitle ? config.pruneTitle : 'prune-limbo';
   // Sets the intro message and description for the prune channel
-  const pruneIntro = `If you're in this channel, you've been inactive in the server for at least ${maxTimeSinceActive} months! Rather than kick you outright, we want to give people a chance to potentially rejoin the community`;
+  const pruneIntro = `If you're in this channel, you've been inactive in the server for at least ${Math.round(maxTimeSinceActive)} months! Rather than kick you outright, we want to give people a chance to potentially rejoin the community`;
 
   // For discord snowflake processing
   const discordEpoch = BigInt(1420070400000);
@@ -227,7 +258,7 @@ async function prunePrep(args, message, client) {
 
   // Only proceed if there isn't a prune in process
   if (message.guild.roles.cache.find(role => role.name === pruneTitle) || message.guild.channels.cache.find(channel => channel.name === pruneTitle)) {
-    return message.channel.send('It looks like there was already a prune in process. You should finish that out first using `.prunekick confirm` or `.prunekick abandon`');
+    return message.channel.send('It looks like there was already a prune in process. You should finish that out or cancel it first using `.prune finish` or `.prune cancel`');
   }
 
   // Make sure there's data to even process
@@ -237,7 +268,7 @@ async function prunePrep(args, message, client) {
 
   // Get a current timestamp and user activity data
   const currentTime = moment();
-  const pruneData = new Map(global.dataLog[message.guild.id].pruneData.sort((a, b) => a[1] - b[1]));
+  const pruneData = new Map(global.dataLog[message.guild.id].pruneData.sort((a, b) => a[1][0] - b[1][0]));
 
   // Create and format the workbook
   const xlsUsrList = new ExcelJS.Workbook;
@@ -259,24 +290,11 @@ async function prunePrep(args, message, client) {
     const memberObj = await message.guild.member(usr[0]);
 
     // Make sure we can even manage this user
-    if (!memberObj.manageable) {continue;}
+    if ((!memberObj.manageable || (config.roleComrade && !memberObj.roles.cache.has(config.roleComrade))) && maxTimeSinceActive !== 0) {continue;}
 
     // Initialize the vars for the last post ID and whether this member is excluded
-    let lastPost;
-    let memberExcluded = '';
-
-    // If they're excluded, we'll include them in the spreadsheet but not the prune
-    if (usr[1].length === 2) {
-      lastPost = usr[1][0];
-      memberExcluded = 'Yes';
-    }
-    else {
-      lastPost = usr[1];
-      memberExcluded = '';
-
-      // Add ID to the toPrune array
-      usersToPrune.push((usr[0]));
-    }
+    const lastPost = usr[1][0];
+    const memberExcluded = (usr[1].length === 2) ? 'Yes' : '';
 
     const usrObj = memberObj.user;
 
@@ -285,7 +303,7 @@ async function prunePrep(args, message, client) {
     let formattedDateLastActive;
 
     // If the user's last post date isn't "never", format in general and for the spreadsheet
-    if (lastPost != 0) {
+    if (lastPost !== 0) {
       const lastPostUnixDate = Number((BigInt(lastPost) >> BigInt(22)) + discordEpoch);
       dateLastActive = moment(lastPostUnixDate);
       formattedDateLastActive = moment(lastPostUnixDate).toDate();
@@ -300,7 +318,12 @@ async function prunePrep(args, message, client) {
       if (timeSinceLastActive < maxTimeSinceActive) {break;}
     }
 
-    // Add each member that's made it this ifarto the spreadsheet
+    // Only add them to the actual prune if they're not manually excluded. Otherwise, spreadsheet only
+    if (usr[1].length !== 2) {
+      usersToPrune.push((usr[0]));
+    }
+
+    // Add them to the spreadsheet regardless of if they're manually excluded
     listSheet.addRow({ Username: usrObj.tag, Display: memberObj.nickname, 'Last Posted': formattedDateLastActive, Excluded: memberExcluded });
   }
   await xlsUsrList.xlsx.writeFile('./usrs.xlsx');
@@ -309,17 +332,18 @@ async function prunePrep(args, message, client) {
   // message.author.send({ files: ['./usrs.xlsx'] });
   message.channel.send({ files: ['./usrs.xlsx'] });
 
-  // Let them look at the XLS, check if they want to proceed
-  message.channel.send('This will affect the **' + usersToPrune.length + '** people in the spreadsheet below. Are you sure you want to move ahead with removing all their roles (excluding pronoun roles) and put them in a pruning channel?');
-  let reply = await msgCollector(message);
-  if (!reply) { return; }
-  if (reply.content.toLowerCase() !== 'y' && reply.content.toLowerCase() !== 'yes') {
-    return message.channel.send('Prune canceled');
+  // Let them look at the XLS, check if they want to proceed (if it's time specified is anything but '0' or 'all')
+  if (maxTimeSinceActive !== 0) {
+    message.channel.send(`This will affect the **${usersToPrune.length}** people in the spreadsheet below that haven't posted in at least **${maxTimeSinceActive} month(s)**. Are you sure you want to move ahead with removing all their (non-pronoun) roles and put them in a pruning channel?`);
+    let reply = await msgCollector(message);
+    if (!reply) { return; }
+    if (reply.content.toLowerCase() !== 'y' && reply.content.toLowerCase() !== 'yes') {
+      return message.channel.send('Prune canceled');
+    }
   }
-
-  /* todo next:
-  - check for bot permissions (adding roles, channels, https://discordjs.guide/popular-topics/permissions.html#roles-as-bot-permissions, https://discord.js.org/#/docs/main/stable/class/Permissions?scrollTo=s-FLAGS)
-  */
+  else {
+    return message.channel.send('Here\'s a full list of the last post dates of everyone in the server.');
+  }
 
   // Create the to-prune temp role
   message.guild.roles.create({
@@ -356,8 +380,6 @@ async function prunePrep(args, message, client) {
         ],
       })
         .then(async (pruneChannel) => {
-        // Set slow mode so they can't spam
-          await pruneChannel.send(`@rolepinglater: ${pruneIntro}`);
           // Assign the new role to each user
           for (const usr of usersToPrune) {
           // Get the user collection
@@ -381,6 +403,9 @@ async function prunePrep(args, message, client) {
               await thisUser.roles.set(thisUserPruneRoles, 'User prune prep');
             }
           }
+          // Send the intro message, pinging the prune role
+          await pruneChannel.send(`${pruneRole}: ${pruneIntro}`);
+
           writeData(pruneStoragePath, pruneStorage);
           return message.channel.send(`Okay, ${usersToPrune.length} members have been prepared for pruning`);
 
@@ -388,6 +413,7 @@ async function prunePrep(args, message, client) {
     })
     .catch (e => {
       console.log('Error:', e);
+      pruneCleanup(message, pruneTitle);
       return message.channel.send('There was an error creating the prune channel, contact the bot owner.');
     });
   return;
@@ -395,7 +421,7 @@ async function prunePrep(args, message, client) {
 
 async function pruneFinish(args, message) {
   // Set the name of the role/channel to be used for prunes
-  const pruneTitle = 'prune-limbo';
+  const pruneTitle = config.pruneTitle ? config.pruneTitle : 'prune-limbo';
 
   const toPrune = Object.keys(requireUncached(pruneStoragePath));
   const PRUNE_USER_KICKMSG = 'Pruned for inactivity.';
@@ -466,8 +492,8 @@ async function pruneCleanup(message, pruneTitle) {
 module.exports = {
   name: 'prune',
   aliases: ['p'],
-  description: 'Handles pruning inactive memberes of the server',
-  usage: '',
+  description: 'Handles pruning inactive members of the server',
+  usage: 'with no arguments will show the command options',
   cooldown: 0,
   guildOnly: true,
   staffOnly: true,
@@ -478,6 +504,8 @@ module.exports = {
       return message.channel.send(`Options:
 .prune prep <months:default 6>
 > - usage: \`.prune prep 3\`
+.prune list
+> - Shows the last post date for all server members without beginning a prune
 .prune exclude [add/remove] [@user/UserID]
 > - usage: \`.prune exclude add ${message.author.id}\`
 > - List all current exclusions with \`.prune exclude list\`
@@ -486,7 +514,9 @@ module.exports = {
 .prune cancel
 > - Offers to restore all users, canceling the prune
 .prune finish
-> - Offers to finish the prune, kicking all users still in limbo`);
+> - Offers to finish the prune, kicking all users still in limbo
+
+Note: All commands and arguments can also be shortened to just the first letter (e.g. \`.p p 6\` or \`.p r USERID\`)`);
     }
 
     // Get the first arg, leaving the rest for whatever else we're going to do
@@ -506,6 +536,10 @@ module.exports = {
     case 'begin':
       prunePrep(args, message, client);
       break;
+    case 'list':
+    case 'l':
+      prunePrep(['all'], message, client);
+      break;
     case 'k':
     case 'kick':
     case 'f':
@@ -514,6 +548,8 @@ module.exports = {
       break;
     case 'e':
     case 'exclude':
+    case 'exclusion':
+    case 'exclusions':
       pruneExclude(args, message);
       break;
     }
