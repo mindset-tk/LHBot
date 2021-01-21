@@ -53,6 +53,7 @@ CONFIG_FILENAMES.forEach(filename => {
       freshConfig.roleAirlock = '';
       freshConfig.airlockPruneDays = '';
       freshConfig.airlockPruneMessage = '';
+      freshConfig.pruneTitle = '';
       freshConfig.invLogToggle = false;
       freshConfig.channelInvLogs = '';
       freshConfig.countingToggle = false;
