@@ -110,19 +110,25 @@ function publicOnMessage(message, config) {
   // get pruneData array as an ES6 map
   const pruneData = new Map(global.dataLog[message.guild.id].pruneData);
   // If a non-bot user isn't in the pruneData array yet, or has a last-active entry older than this one, then update it
-  if ((!pruneData.get(message.author.id) || (parseInt(message.id) > parseInt(pruneData.get(message.author.id)[0]))) && !message.author.bot) {
-    if (!message.guild.member(message.author.id)) {
-      pruneData.delete(message.author.id);
-    }
-    else if (pruneData.get(message.author.id).length === 2) {
-      pruneData.set(message.author.id, [message.id, 1]);
-    }
-    else {
+  if(!message.author.bot)
+  {
+    if(!pruneData.get(message.author.id)) {
       pruneData.set(message.author.id, [message.id]);
+    }
+    else if(parseInt(message.id) > parseInt(pruneData.get(message.author.id)[0])) {
+      if (!message.guild.member(message.author.id)) {
+        pruneData.delete(message.author.id);
+      }
+      else if (pruneData.get(message.author.id).length === 2) {
+        pruneData.set(message.author.id, [message.id, 1]);
+      }
+      else {
+        pruneData.set(message.author.id, [message.id]);
+      }
     }
     global.dataLog[message.guild.id].pruneData = [...pruneData];
   }
-
+  
   writeData();
 }
 
