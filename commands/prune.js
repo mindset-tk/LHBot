@@ -74,6 +74,7 @@ async function pruneRestore(args, message) {
 
   // Get users' temporarily stored roles
   const pruneStorage = requireUncached(pruneStoragePath);
+  let fullRestore = 0;
 
   // If the prune list is empty, do clean-up!
   if (Object.keys(pruneStorage).length === 0) {
@@ -93,6 +94,7 @@ async function pruneRestore(args, message) {
     // If they say yes, then set the args to all users currently in limbo
     else if (reply.content.toLowerCase() == 'y' || reply.content.toLowerCase() == 'yes') {
       args = Object.keys(pruneStorage);
+      fullRestore = 1;
     }
   }
 
@@ -104,7 +106,13 @@ async function pruneRestore(args, message) {
 
     // If the member doesn't exist, isn't manageable, or isn't in the prunestore, increase 'error' count
     if (member === null || !member.manageable || !pruneStorage[member.user.id]) {
-      erroredMembers += 1;
+      if (fullRestore === 1) {
+        delete pruneStorage[arg];
+        writeData(pruneStoragePath, pruneStorage);
+      }
+      else {
+        erroredMembers += 1;
+      }
       continue;
     }
 
@@ -129,6 +137,9 @@ async function pruneRestore(args, message) {
   }
   if (erroredMembers > 0) {
     resultMsg += `\n**${erroredMembers}** member(s) were entered in error and not restored`;
+  }
+  if (resultMsg === '') {
+    resultMsg += 'The only members remaining in the list have already left the server';
   }
   return message.channel.send(resultMsg);
 }
@@ -247,7 +258,7 @@ async function prunePrep(args, message, client) {
 
   // Only proceed if there isn't a prune in process
   if (message.guild.roles.cache.find(role => role.name === pruneTitle) || message.guild.channels.cache.find(channel => channel.name === pruneTitle)) {
-    return message.channel.send('It looks like there was already a prune in process. You should finish that out first using `.prunekick confirm` or `.prunekick abandon`');
+    return message.channel.send('It looks like there was already a prune in process. You should finish that out or cancel it first using `.prune finish` or `.prune cancel`');
   }
 
   // Make sure there's data to even process
@@ -257,7 +268,7 @@ async function prunePrep(args, message, client) {
 
   // Get a current timestamp and user activity data
   const currentTime = moment();
-  const pruneData = new Map(global.dataLog[message.guild.id].pruneData.sort((a, b) => a[1] - b[1]));
+  const pruneData = new Map(global.dataLog[message.guild.id].pruneData.sort((a, b) => a[1][0] - b[1][0]));
 
   // Create and format the workbook
   const xlsUsrList = new ExcelJS.Workbook;
@@ -282,21 +293,8 @@ async function prunePrep(args, message, client) {
     if ((!memberObj.manageable || (config.roleComrade && !memberObj.roles.cache.has(config.roleComrade))) && maxTimeSinceActive !== 0) {continue;}
 
     // Initialize the vars for the last post ID and whether this member is excluded
-    let lastPost;
-    let memberExcluded = '';
-
-    // If they're excluded, we'll include them in the spreadsheet but not the prune
-    if (usr[1].length === 2) {
-      lastPost = usr[1][0];
-      memberExcluded = 'Yes';
-    }
-    else {
-      lastPost = usr[1];
-      memberExcluded = '';
-
-      // Add ID to the toPrune array
-      usersToPrune.push((usr[0]));
-    }
+    const lastPost = usr[1][0];
+    const memberExcluded = (usr[1].length === 2) ? 'Yes' : '';
 
     const usrObj = memberObj.user;
 
@@ -305,7 +303,7 @@ async function prunePrep(args, message, client) {
     let formattedDateLastActive;
 
     // If the user's last post date isn't "never", format in general and for the spreadsheet
-    if (lastPost != 0) {
+    if (lastPost !== 0) {
       const lastPostUnixDate = Number((BigInt(lastPost) >> BigInt(22)) + discordEpoch);
       dateLastActive = moment(lastPostUnixDate);
       formattedDateLastActive = moment(lastPostUnixDate).toDate();
@@ -320,7 +318,12 @@ async function prunePrep(args, message, client) {
       if (timeSinceLastActive < maxTimeSinceActive) {break;}
     }
 
-    // Add each member that's made it this ifarto the spreadsheet
+    // Only add them to the actual prune if they're not manually excluded. Otherwise, spreadsheet only
+    if (usr[1].length !== 2) {
+      usersToPrune.push((usr[0]));
+    }
+
+    // Add them to the spreadsheet regardless of if they're manually excluded
     listSheet.addRow({ Username: usrObj.tag, Display: memberObj.nickname, 'Last Posted': formattedDateLastActive, Excluded: memberExcluded });
   }
   await xlsUsrList.xlsx.writeFile('./usrs.xlsx');
@@ -341,9 +344,6 @@ async function prunePrep(args, message, client) {
   else {
     return message.channel.send('Here\'s a full list of the last post dates of everyone in the server.');
   }
-  /* todo next:
-  - check for bot permissions (adding roles, channels, https://discordjs.guide/popular-topics/permissions.html#roles-as-bot-permissions, https://discord.js.org/#/docs/main/stable/class/Permissions?scrollTo=s-FLAGS)
-  */
 
   // Create the to-prune temp role
   message.guild.roles.create({
@@ -380,8 +380,6 @@ async function prunePrep(args, message, client) {
         ],
       })
         .then(async (pruneChannel) => {
-        // Set slow mode so they can't spam
-          await pruneChannel.send(`<@&${pruneTitle}: ${pruneIntro}`);
           // Assign the new role to each user
           for (const usr of usersToPrune) {
           // Get the user collection
@@ -405,6 +403,9 @@ async function prunePrep(args, message, client) {
               await thisUser.roles.set(thisUserPruneRoles, 'User prune prep');
             }
           }
+          // Send the intro message, pinging the prune role
+          await pruneChannel.send(`${pruneRole}: ${pruneIntro}`);
+
           writeData(pruneStoragePath, pruneStorage);
           return message.channel.send(`Okay, ${usersToPrune.length} members have been prepared for pruning`);
 
