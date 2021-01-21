@@ -41,6 +41,8 @@ module.exports = {
       ['airlockChannel', 'Airlock Channel(s) Name/Prefix', 'string'],
       ['airlockPruneDays', 'Max Inactivity for __airlock prune eligibility__', 'integer'],
       ['airlockPruneMessage', 'Airlock prune kick message', 'string'],
+      ['pruneTitle', 'Prune Channel/Role Name', 'string'],
+      //  ['pruneIntroMessage', 'Prune Channel Intro Message', 'string'],
       ['invLogToggle', 'Toggle __Invite Iogging__', 'boolean'],
       ['channelInvLogs', 'Channel for logging joins/leaves', 'channel'],
       ['knownInvites', 'Invite Code Descriptions', 'inviteCodesArray'],
@@ -154,6 +156,7 @@ Disboard Bump Channel: **${config.disboardChannelId ? ('#' + getChannelName(conf
 Event announcement channel: **${config.eventInfoChannelId ? ('#' + getChannelName(config.eventInfoChannelId)) : 'not set.'}**
 Airlock Channel Name/Prefix: **${config.airlockChannel ? config.airlockChannel : 'Not set'}**
 Lobby channel: **${config.channelLobby ? ('#' + getChannelName(config.channelLobby)) : 'not set.'}**
+Prune Channel/Role Name: **${config.pruneTitle ? config.pruneTitle : 'Default (prune-limbo)'}**
 
 __Logging/Notification Settings:__
 User join/exit notifications: **${config.invLogToggle ? ('On!** In: **#' + getChannelName(config.channelInvLogs)) : 'off.'}**
@@ -165,8 +168,8 @@ Text channel(s) for voice commands: **${(config.voiceTextChannelIds[0]) ? '#' + 
 Configured user-limited voice channels: **${(cfgVoiceChans[0]) ? cfgVoiceChans.join(', ') : 'None'}**
 Configured VC Snapback Delay: **${config.voiceChamberSnapbackDelay ? config.voiceChamberSnapbackDelay : 'Not set, defaulting to 5min'}**
 
-__Airlock/Lobby Settings__
-Inactivity limit before prune eligibility: **${config.airlockPruneDays ? config.airlockPruneDays + 'day(s)' : 'Not set, defaulting to 7 days'}**
+__Airlock/Lobby Settings:__
+Airlock Prune Inactivity Limit: **${config.airlockPruneDays ? config.airlockPruneDays + 'day(s)' : 'Not set, defaulting to 7 days'}**
 Airlock Prune Message: **${config.airlockPruneMessage ? config.airlockPruneMessage : 'Not set'}**
 
 __Pins:__

@@ -70,7 +70,7 @@ async function pruneRestore(args, message) {
   }
 
   // Set the name of the role/channel to be used for prunes
-  const pruneTitle = 'prune-limbo';
+  const pruneTitle = config.pruneTitle ? config.pruneTitle : 'prune-limbo';
 
   // Get users' temporarily stored roles
   const pruneStorage = requireUncached(pruneStoragePath);
@@ -235,9 +235,9 @@ async function prunePrep(args, message, client) {
 
 
   // Set the name of the role/channel to be used for prunes. Probably will go in a config soon?
-  const pruneTitle = 'prune-limbo';
+  const pruneTitle = config.pruneTitle ? config.pruneTitle : 'prune-limbo';
   // Sets the intro message and description for the prune channel
-  const pruneIntro = `If you're in this channel, you've been inactive in the server for at least ${maxTimeSinceActive} months! Rather than kick you outright, we want to give people a chance to potentially rejoin the community`;
+  const pruneIntro = `If you're in this channel, you've been inactive in the server for at least ${Math.round(maxTimeSinceActive)} months! Rather than kick you outright, we want to give people a chance to potentially rejoin the community`;
 
   // For discord snowflake processing
   const discordEpoch = BigInt(1420070400000);
@@ -381,7 +381,7 @@ async function prunePrep(args, message, client) {
       })
         .then(async (pruneChannel) => {
         // Set slow mode so they can't spam
-          await pruneChannel.send(`@rolepinglater: ${pruneIntro}`);
+          await pruneChannel.send(`<@&${pruneTitle}: ${pruneIntro}`);
           // Assign the new role to each user
           for (const usr of usersToPrune) {
           // Get the user collection
@@ -412,6 +412,7 @@ async function prunePrep(args, message, client) {
     })
     .catch (e => {
       console.log('Error:', e);
+      pruneCleanup(message, pruneTitle);
       return message.channel.send('There was an error creating the prune channel, contact the bot owner.');
     });
   return;
@@ -419,7 +420,7 @@ async function prunePrep(args, message, client) {
 
 async function pruneFinish(args, message) {
   // Set the name of the role/channel to be used for prunes
-  const pruneTitle = 'prune-limbo';
+  const pruneTitle = config.pruneTitle ? config.pruneTitle : 'prune-limbo';
 
   const toPrune = Object.keys(requireUncached(pruneStoragePath));
   const PRUNE_USER_KICKMSG = 'Pruned for inactivity.';

@@ -13,19 +13,19 @@ module.exports = {
   args: true,
   execute(message, args, client) {
 
-    var isStaff = message.member.roles.cache.has(config.roleStaff);
+    const isStaff = message.member.roles.cache.has(config.roleStaff);
 
     if (!isStaff && !config.voiceTextChannelIds.includes(message.channel.id)) {
-      var outMsg = 'Please use this command only in these channels:';
+      let outMsg = 'Please use this command only in these channels:';
       config.voiceTextChannelIds.forEach(channelId => outMsg += ' <#' + message.guild.channels.resolve(channelId).id + '>');
       return message.channel.send(outMsg);
     }
 
     // Find the channel
-    var voiceChannel;
+    let voiceChannel;
     if (args[args.length - 1].match('^[0-9]{18}$')) {
       // Check for second argument
-      var vcArg = message.guild.channels.resolve(args[args.length - 1]);
+      const vcArg = message.guild.channels.resolve(args[args.length - 1]);
       if(vcArg && vcArg.type == 'voice') {
         voiceChannel = vcArg;
         args.pop();
