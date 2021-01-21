@@ -155,7 +155,12 @@ async function pruneExclude(args, message) {
         excluded.push(`<@${member[0]}>`);
       }
     }
-    message.channel.send(`Members currently excluded from pruning: ${excluded.join(', ')}`);
+    if (excluded.length > 0) {
+      message.channel.send(`Members currently excluded from pruning: ${excluded.join(', ')}`);
+    }
+    else {
+      message.channel.send('There are no members currently excluded from being pruned.');
+    }
   }
 
   // If they want to add someone,
@@ -259,7 +264,7 @@ async function prunePrep(args, message, client) {
     const memberObj = await message.guild.member(usr[0]);
 
     // Make sure we can even manage this user
-    if (!memberObj.manageable) {continue;}
+    if (!memberObj.manageable || (config.roleComrade && !memberObj.roles.cache.has(config.roleComrade))) {continue;}
 
     // Initialize the vars for the last post ID and whether this member is excluded
     let lastPost;
@@ -514,6 +519,8 @@ module.exports = {
       break;
     case 'e':
     case 'exclude':
+    case 'exclusion':
+    case 'exclusions':
       pruneExclude(args, message);
       break;
     }
