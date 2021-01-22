@@ -233,21 +233,25 @@ async function prunePrep(args, message, client) {
   dataLogger.PruneDataMaintenance(client);
 
   // Setup the inactivity variable and intiailize the users-to-prune array
-  let maxTimeSinceActive = 0;
+  let maxTimeSinceActive = 6;
+  let kickNow = 0;
   const usersToPrune = new Array();
 
   // Pull the first arg so we know what we're working with
-  const firstArg = args.shift();
-  if (parseFloat(firstArg)) {
-    maxTimeSinceActive = (parseFloat(firstArg));
-  }
-  else if (firstArg && firstArg.toLowerCase() === 'all') {
-    maxTimeSinceActive = 0;
-  }
-  else {
-    maxTimeSinceActive = 6;
-  }
+  let firstArg = args.shift();
 
+  if (firstArg) {
+    if (firstArg.toLowerCase() === 'kick') {
+      kickNow = 1;
+      firstArg = args.shift();
+    }
+    if (parseFloat(firstArg)) {
+      maxTimeSinceActive = (parseFloat(firstArg));
+    }
+    else if (firstArg && firstArg.toLowerCase() === 'all') {
+      maxTimeSinceActive = 0;
+    }
+  }
 
   // Set the name of the role/channel to be used for prunes. Probably will go in a config soon?
   const pruneTitle = config.pruneTitle ? config.pruneTitle : 'prune-limbo';
@@ -330,6 +334,13 @@ async function prunePrep(args, message, client) {
     // Add them to the spreadsheet regardless of if they're manually excluded
     listSheet.addRow({ Username: usrObj.tag, Display: memberObj.nickname, 'Last Posted': formattedDateLastActive, Excluded: memberExcluded });
   }
+
+  // If nobody is in the list, there's nothing else to do
+  if (usersToPrune.length === 0) {
+    return message.channel.send(`It seems no members have been inactive for at least **${maxTimeSinceActive} month(s)**.`);
+  }
+
+  // Otherwise, continue and write out the spreadsheet
   await xlsUsrList.xlsx.writeFile('./usrs.xlsx');
 
   // Send the XLS out!
@@ -338,11 +349,35 @@ async function prunePrep(args, message, client) {
 
   // Let them look at the XLS, check if they want to proceed (if it's time specified is anything but '0' or 'all')
   if (maxTimeSinceActive !== 0) {
-    message.channel.send(`This will affect the **${usersToPrune.length}** people in the spreadsheet below that haven't posted in at least **${maxTimeSinceActive} month(s)**. Are you sure you want to move ahead with removing all their (non-pronoun) roles and put them in a pruning channel?`);
+    // Use a different message if we're kicking immediately rather than using the limbo system
+    if (kickNow === 1) {
+      message.channel.send(`This will affect **${usersToPrune.length}** member(s) in this spreadsheet that haven't posted in at least **${maxTimeSinceActive} month(s)**. Are you sure you want to move ahead with kicking them?`);
+    }
+    else {
+      message.channel.send(`This will affect **${usersToPrune.length}** member(s) in this spreadsheet that haven't posted in at least **${maxTimeSinceActive} month(s)**. Are you sure you want to move ahead with removing all their (non-pronoun) roles and put them in a pruning channel?`);
+    }
     let reply = await msgCollector(message);
     if (!reply) { return; }
     if (reply.content.toLowerCase() !== 'y' && reply.content.toLowerCase() !== 'yes') {
       return message.channel.send('Prune canceled');
+    }
+
+    // If we're kicking immediately, then let's go straight there
+    if (kickNow === 1) {
+      for (const usr of usersToPrune) {
+      // Get the user collection
+        const thisUser = await message.guild.members.cache.get(usr);
+        if (thisUser.manageable) {
+          // Initialize a section of pruneStorage for this user
+          pruneStorage[thisUser.id] = '';
+        }
+      }
+      // Write out the file, give it a moment, and then kick the inactive members now
+      writeData(pruneStoragePath, pruneStorage);
+      setTimeout(function() {
+        pruneFinish(message);
+      }, 1000);
+      return;
     }
   }
   else {
@@ -423,7 +458,7 @@ async function prunePrep(args, message, client) {
   return;
 }
 
-async function pruneFinish(args, message) {
+async function pruneFinish(message) {
   // Set the name of the role/channel to be used for prunes
   const pruneTitle = config.pruneTitle ? config.pruneTitle : 'prune-limbo';
 
@@ -441,7 +476,7 @@ async function pruneFinish(args, message) {
   }
 
   // Make sure they want to kick for sure!
-  message.channel.send(`Are you 100% sure you want to kick **${toPrune.length} member(s)** with the **${pruneTitle}** role and clean up?`);
+  message.channel.send(`Are you 100% sure you want to kick **${toPrune.length} member(s) now**?`);
   let reply = await msgCollector(message);
   if (!reply) { return; }
   if (reply.content.toLowerCase() !== 'y' && reply.content.toLowerCase() !== 'yes') {
@@ -507,7 +542,11 @@ module.exports = {
     if(args.length === 0) {
       return message.channel.send(`Options:
 .prune prep <months:default 6>
+> - Posts  a spreadsheet of inactive members and offers to place them into a temp channel and role until the \`.prune finish\` command is run
 > - usage: \`.prune prep 3\`
+.prune kick <months:default 6>
+> - Posts a spreadsheet of inactive members and offers to begin kicking them
+> - usage: \`.prune kick 3\`
 .prune list
 > - Shows the last post date for all server members without beginning a prune
 .prune exclude [add/remove] [@user/UserID]
@@ -546,9 +585,12 @@ Note: All commands and arguments can also be shortened to just the first letter 
       break;
     case 'k':
     case 'kick':
+      args.unshift('kick');
+      prunePrep(args, message, client);
+      break;
     case 'f':
     case 'finish':
-      pruneFinish(args, message);
+      pruneFinish(message);
       break;
     case 'e':
     case 'exclude':
