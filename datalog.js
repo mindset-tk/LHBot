@@ -384,5 +384,6 @@ function publicOnReady(config, client, callback) {
   getTotalServerUsers (client);
 }
 
+exports.PruneDataMaintenance = pruneDataMaintenance;
 exports.OnReady = publicOnReady;
 exports.OnMessage = publicOnMessage;
