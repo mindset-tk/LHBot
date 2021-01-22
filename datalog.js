@@ -5,7 +5,6 @@ if(global.dataLog == null) {
   global.dataLog = require(dataLogPath);
 }
 const wait = require('util').promisify(setTimeout);
-/* global BigInt */
 
 // Function to take a timestamp and convert to YYYY-MM format.
 function formatDate(timestamp) {
@@ -385,5 +384,6 @@ function publicOnReady(config, client, callback) {
   getTotalServerUsers (client);
 }
 
+exports.PruneDataMaintenance = pruneDataMaintenance;
 exports.OnReady = publicOnReady;
 exports.OnMessage = publicOnMessage;

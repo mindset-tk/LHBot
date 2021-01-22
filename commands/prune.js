@@ -228,6 +228,10 @@ async function prunePrep(args, message, client) {
     return message.channel.send('Sorry, I don\'t have the necessary permissions (manage channels and manage roles)');
   }
 
+  // Make sure that all the prune data's up to date if anyone has joined or left the server
+  const dataLogger = require(path.resolve('./datalog.js'));
+  dataLogger.PruneDataMaintenance(client);
+
   // Setup the inactivity variable and intiailize the users-to-prune array
   let maxTimeSinceActive = 0;
   const usersToPrune = new Array();
