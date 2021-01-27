@@ -12,15 +12,15 @@ module.exports = {
   staffOnly: false,
   args: true,
   execute(message, args, client) {
-    var isStaff = message.member.roles.cache.has(config.roleStaff);
+    let isStaff = message.member.roles.cache.has(config.roleStaff);
 
     if (!isStaff && !config.voiceTextChannelIds.includes(message.channel.id)) {
-      var outMsg = 'Please use this command only in these channels:';
+      let outMsg = 'Please use this command only in these channels:';
       config.voiceTextChannelIds.forEach(channelId => outMsg += ' <#' + message.guild.channels.resolve(channelId).id + '>');
       return message.channel.send(outMsg);
     }
 
-    let newSize = parseInt(args[0]);
+    const newSize = parseInt(args[0]);
 
     if (isNaN(newSize)) {
       return message.channel.send('You\'ll need to give me a number to set the user limit to');
@@ -35,10 +35,10 @@ module.exports = {
     }
 
     // Find the channel
-    var voiceChannel;
+    let voiceChannel;
     if(args.length > 1 && isStaff) {
       // Check for second argument
-      var vcArg = message.guild.channels.resolve(args[1]);
+      const vcArg = message.guild.channels.resolve(args[1]);
       if(vcArg && vcArg.type == 'voice') {
         voiceChannel = vcArg;
       }
