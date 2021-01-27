@@ -3,7 +3,7 @@ const configPath = path.resolve('./config.json');
 const config = require(configPath);
 const wait = require('util').promisify(setTimeout);
 
-function updateChannel(type, args, message) {
+async function updateChannel(type, args, message) {
   const isStaff = message.member.roles.cache.has(config.roleStaff);
 
   if (!isStaff && !config.voiceTextChannelIds.includes(message.channel.id)) {
@@ -56,9 +56,13 @@ function updateChannel(type, args, message) {
   if (type === 'name') {
     const oldName = voiceChannel.name;
     const newName = args.join(' ');
+    if (oldName === newName) {
+      return message.channel.send('Please choose a name different from the current one');
+    }
     voiceChannel.setName(newName);
+    await wait(1000);
     if (oldName === voiceChannel.name) {
-      return message.channel.send('Please try again in a few minutes. Discord limits how often I can make channel name changes');  
+      return message.channel.send('Please try again in a few minutes. Discord limits how often I can change the name of voice channels');
     }
     return message.channel.send(`Set the temporary name of **${config.voiceChamberDefaultSizes[voiceChannel.id].Name}** to **${newName}**.`);
   }
@@ -134,7 +138,7 @@ module.exports = {
     case 'check':
       if (message.member.roles.cache.has(config.roleStaff)) {
         PublicOnReady(client);
-        message.channel.send('Ok! Snapping back names/sizes of any configured voice channels back to their defaults')
+        message.channel.send('Ok! Snapping back names/sizes of any configured voice channels back to their defaults');
       }
       else {
         message.channel.send('Sorry, only moderators can use this command');
