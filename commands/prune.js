@@ -111,6 +111,7 @@ async function pruneRestore(args, message) {
         writeData(pruneStoragePath, pruneStorage);
       }
       else {
+        // console.log(member);
         erroredMembers += 1;
       }
       continue;
@@ -224,9 +225,6 @@ async function pruneExclude(args, message) {
 }
 
 async function prunePrep(args, message, client) {
-  if (!message.guild.me.hasPermission(['MANAGE_CHANNELS', 'MANAGE_ROLES'])) {
-    return message.channel.send('Sorry, I don\'t have the necessary permissions (manage channels and manage roles)');
-  }
 
   // Make sure that all the prune data's up to date if anyone has joined or left the server
   const dataLogger = require(path.resolve('./datalog.js'));
@@ -253,10 +251,15 @@ async function prunePrep(args, message, client) {
     }
   }
 
+  const permsRequired = ['VIEW_CHANNEL', 'MANAGE_CHANNELS', 'MANAGE_ROLES', 'SEND_MESSAGES', 'READ_MESSAGE_HISTORY', 'MANAGE_MESSAGES', 'MENTION_EVERYONE'];
+  if (kickNow === 0 && !message.guild.me.hasPermission(permsRequired)) {
+    return message.channel.send('Sorry, I don\'t have all the necessary permissions (' + permsRequired.join(',') + ')');
+  }
+
   // Set the name of the role/channel to be used for prunes. Probably will go in a config soon?
   const pruneTitle = config.pruneTitle ? config.pruneTitle : 'prune-limbo';
   // Sets the intro message and description for the prune channel
-  const pruneIntro = `If you're in this channel, you've been inactive in the server for at least ${Math.round(maxTimeSinceActive)} months! Rather than kick you outright, we want to give people a chance to potentially rejoin the community`;
+  const pruneIntro = `If you're in this channel, you've been inactive in the server for at least ${Math.round(maxTimeSinceActive)} months! Rather than kick you outright, this process offers a chance to potentially rejoin the community. This channel will be around for __72 hours__ to let you chime in and express that interest.`;
 
   // For discord snowflake processing
   const discordEpoch = BigInt(1420070400000);
@@ -264,8 +267,8 @@ async function prunePrep(args, message, client) {
   // Initialize the pruneStorage map. No need to import an "old one"- we'll be starting anew either way? maybe i'll change my mind and check for the file instead
   const pruneStorage = new Map();
 
-  // Only proceed if there isn't a prune in process
-  if (message.guild.roles.cache.find(role => role.name === pruneTitle) || message.guild.channels.cache.find(channel => channel.name === pruneTitle)) {
+  // Only proceed if there isn't a prune in process, or we're doing a full list
+  if ((message.guild.roles.cache.find(role => role.name === pruneTitle) || message.guild.channels.cache.find(channel => channel.name === pruneTitle)) && maxTimeSinceActive !== 0) {
     return message.channel.send('It looks like there was already a prune in process. You should finish that out or cancel it first using `.prune finish` or `.prune cancel`');
   }
 
@@ -406,15 +409,15 @@ async function prunePrep(args, message, client) {
         permissionOverwrites: [
           {
             id: client.user.id,
-            allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'EMBED_LINKS', 'USE_EXTERNAL_EMOJIS', 'ADD_REACTIONS', 'MENTION_EVERYONE', 'MANAGE_CHANNELS', 'MANAGE_MESSAGES'],
+            allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'READ_MESSAGE_HISTORY', 'MANAGE_CHANNELS', 'MANAGE_MESSAGES', 'MENTION_EVERYONE'],
           },
           {
             id: pruneRole.id,
-            allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'EMBED_LINKS', 'USE_EXTERNAL_EMOJIS'],
+            allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'READ_MESSAGE_HISTORY'],
           },
           {
             id: config.roleStaff,
-            allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'EMBED_LINKS', 'USE_EXTERNAL_EMOJIS', 'ADD_REACTIONS', 'MENTION_EVERYONE'],
+            allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'READ_MESSAGE_HISTORY', 'MANAGE_CHANNELS', 'MANAGE_MESSAGES', 'MENTION_EVERYONE'],
           },
         ],
       })
@@ -453,6 +456,7 @@ async function prunePrep(args, message, client) {
     .catch (e => {
       console.log('Error:', e);
       pruneCleanup(message, pruneTitle);
+      console.log(e);
       return message.channel.send('There was an error creating the prune channel, contact the bot owner.');
     });
   return;
