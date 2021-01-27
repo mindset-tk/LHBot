@@ -6,11 +6,13 @@ const configPath = path.resolve('./config.json');
 const config = require(configPath);
 const pruneStoragePath = path.resolve('./prunestorage.json');
 
+/*
 fs.existsSync(pruneStoragePath, (err) => {
   if (err) {
     return console.log('There are no users pending prune to restore the roles for!');
   }
 });
+*/
 
 // function to create a message collector.
 async function msgCollector(message) {
@@ -222,6 +224,7 @@ async function pruneRestore(args, message) {
     // Clear the member out of prunestorage, write it, and add them to the array for the end-report
     delete pruneStorage[member.user.id];
     writeData(pruneStoragePath, pruneStorage);
+    member.user.send('Hi there! This is a message to let you know you\'ve been let out of the ongoing prune process in **' + message.guild.name + '**');
     restoredMembers.push(`<@${member.user.id}>`);
   }
 
