@@ -64,6 +64,43 @@ function requireUncached(module) {
   return require(module);
 }
 
+async function showRoles(args, message) {
+
+  // Set the name of the role/channel to be used for prunes
+  const pruneTitle = config.pruneTitle ? config.pruneTitle : 'prune-limbo';
+
+  // Get users' temporarily stored roles
+  const pruneStorage = requireUncached(pruneStoragePath);
+
+  // If the prune list is empty, do clean-up!
+  if (Object.keys(pruneStorage).length === 0) {
+    pruneCleanup(message, pruneTitle);
+    return message.channel.send('There doesn\'t appear to be an ongoing prune.');
+  }
+
+  // Pull the args so we know what we're working with
+  if (!args || args.length === 0) {
+    return message.channel.send('You need to specify someone\'s roles to list');
+  }
+
+  const member = await getUser(args[0], message);
+
+  // If the member doesn't exist or isn't in the prunestore, we can't proceed
+  if (member === null || !pruneStorage[member.user.id]) {
+    return message.channel.send('I can\'t seem to find the member you\'re asking me to get the roles for');
+  }
+
+  const roleNames = [];
+  for (const thisRoleID of pruneStorage[member.user.id]) {
+    const thisRole = message.guild.roles.cache.find(role => role.id === thisRoleID);
+    if (thisRole.name === '@everyone') {continue;}
+    roleNames.push('`' + thisRole.name + '`');
+  }
+
+  // List out the roles
+  return message.channel.send(`<@${member.user.id}>'s applied roles were: ${roleNames.join(', ')}`);
+}
+
 async function pruneRestore(args, message) {
   if (!message.guild.me.hasPermission(['MANAGE_CHANNELS', 'MANAGE_ROLES'])) {
     return message.channel.send('Sorry, I don\'t have the necessary permissions (manage channels and manage roles)');
@@ -253,7 +290,7 @@ async function prunePrep(args, message, client) {
 
   const permsRequired = ['VIEW_CHANNEL', 'MANAGE_CHANNELS', 'MANAGE_ROLES', 'SEND_MESSAGES', 'READ_MESSAGE_HISTORY', 'MANAGE_MESSAGES', 'MENTION_EVERYONE'];
   if (kickNow === 0 && !message.guild.me.hasPermission(permsRequired)) {
-    return message.channel.send('Sorry, I don\'t have all the necessary permissions (' + permsRequired.join(',') + ')');
+    return message.channel.send('Sorry, I don\'t have all the necessary permissions (' + permsRequired.join(', ') + ')');
   }
 
   // Set the name of the role/channel to be used for prunes. Probably will go in a config soon?
@@ -553,6 +590,9 @@ module.exports = {
 > - usage: \`.prune kick 3\`
 .prune list
 > - Shows the last post date for all server members without beginning a prune
+.prune showroles [@user/UserID]
+> - usage: \`.prune showroles ${message.author.id}\`
+> - List the roles a member had before being put in limbo
 .prune exclude [add/remove] [@user/UserID]
 > - usage: \`.prune exclude add ${message.author.id}\`
 > - List all current exclusions with \`.prune exclude list\`
@@ -575,10 +615,12 @@ Note: All commands and arguments can also be shortened to just the first letter 
     case 'cancel':
       pruneRestore(args, message);
       break;
+    case 's':
+    case 'showroles':
+      showRoles(args, message);
+      break;
     case 'p':
     case 'prep':
-    case 's':
-    case 'start':
     case 'b':
     case 'begin':
       prunePrep(args, message, client);
