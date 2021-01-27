@@ -1,4 +1,3 @@
-const fs = require('fs');
 const path = require('path');
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
@@ -6,28 +5,34 @@ const config = require(configPath);
 
 function PublicChannelSnapbackCheck(oldState, newState, client) {
   if (!config.voiceChamberDefaultSizes) {return;}
-  let newUserChannel = newState.channelID;
-  let oldUserChannel = oldState.channelID;
-  let lastVoiceChannel = client.channels.resolve(oldUserChannel);
-  //  if(!oldUserChannel && newUserChannel) {     // User Joins a voice channel after not being in one (not currently needed)
-  if((!newUserChannel || (oldUserChannel && newUserChannel)) && // leaving voice or changing channels AND
-      lastVoiceChannel.members.size == 0 && // channel is empty AND
-      config.voiceChamberDefaultSizes[oldUserChannel] &&  // channel being left is configured AND
-      (lastVoiceChannel.userLimit != config.voiceChamberDefaultSizes[oldUserChannel].Size || // (the current userlimit is different from the default OR
-      lastVoiceChannel.name != config.voiceChamberDefaultSizes[oldUserChannel].Name)) // the current name is different from the default)
-  {
-    let snapbackDelay = ((config.voiceChamberSnapbackDelay) ? (config.voiceChamberSnapbackDelay * 60000) : 300000);
-    setTimeout(StillEmpty, snapbackDelay, lastVoiceChannel, client);
+  const newUserChannel = newState.channelID;
+  const oldUserChannel = oldState.channelID;
+  const lastVoiceChannel = client.channels.resolve(oldUserChannel);
+  // Conditionsl for when user joins a voice channel after not being in one (not currently needed)
+  //  if(!oldUserChannel && newUserChannel) {
+
+  // If leaving or changing channels, and the old chanenl is empty
+  if((!newUserChannel || (oldUserChannel && newUserChannel)) && lastVoiceChannel.members.size === 0 &&
+      // And the channel is configured
+      config.voiceChamberDefaultSizes[oldUserChannel] &&
+      // And the channel's userlimit or name aren't the default
+      (lastVoiceChannel.userLimit !== config.voiceChamberDefaultSizes[oldUserChannel].Size ||
+      lastVoiceChannel.name !== config.voiceChamberDefaultSizes[oldUserChannel].Name)) {
+    // const snapbackDelay = ((config.voiceChamberSnapbackDelay) ? (config.voiceChamberSnapbackDelay * 60000) : 300000);
+    const snapbackDelay = ((config.voiceChamberSnapbackDelay) ? (config.voiceChamberSnapbackDelay * 60000) : 300000);
+    setTimeout(StillEmpty, snapbackDelay, lastVoiceChannel);
   }
 }
 
-function StillEmpty(channel, client) {
-  if (channel.members.size == 0 && config.voiceChamberDefaultSizes[channel.id]) {
-    // if the channel is still empty, and is in the list of configged VCs
-    if (channel.userLimit != config.voiceChamberDefaultSizes[channel.id].Size) { // is the current userlimit is different from the default?
+function StillEmpty(channel) {
+  // if channel's configured, and still empty
+  if (channel.members.size === 0 && config.voiceChamberDefaultSizes[channel.id]) {
+    // with a user-limit other than the default
+    if (channel.userLimit !== config.voiceChamberDefaultSizes[channel.id].Size) {
       channel.setUserLimit(config.voiceChamberDefaultSizes[channel.id].Size);
     }
-    if (channel.name !== config.voiceChamberDefaultSizes[channel.id].Name) { // is the current name is different from the default?
+    // with a name other than the default
+    if (channel.name !== config.voiceChamberDefaultSizes[channel.id].Name) {
       channel.setName(config.voiceChamberDefaultSizes[channel.id].Name);
     }
   }
@@ -38,11 +43,14 @@ function PublicOnReady(client) {
   for (const chanID in config.voiceChamberDefaultSizes) {
     const channel = client.channels.resolve(chanID);
     if (channel) {
-      if (channel.members.size == 0) { // is channel empty?
-        if (channel.userLimit != config.voiceChamberDefaultSizes[chanID].Size) { // is the current userlimit is different from the default?
+      // If the channel is empty
+      if (channel.members.size === 0) {
+        // with a user-limit other than the default
+        if (channel.userLimit !== config.voiceChamberDefaultSizes[chanID].Size) {
           channel.setUserLimit(config.voiceChamberDefaultSizes[chanID].Size);
         }
-        if (channel.name !== config.voiceChamberDefaultSizes[chanID].Name) { // is the current name is different from the default?
+        // with a name other than the default
+        if (channel.name !== config.voiceChamberDefaultSizes[chanID].Name) {
           channel.setName(config.voiceChamberDefaultSizes[chanID].Name);
         }
       }

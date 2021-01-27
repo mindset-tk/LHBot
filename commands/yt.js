@@ -42,7 +42,24 @@ If the bot is the only user in a voice channel when it finishes playback of the 
       const seconds = ((ms % 60000) / 1000).toFixed(0);
       return minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
     }
-
+    function resizeIfNeeded(voiceChannel, direction) {
+      if (voiceChannel.userLimit === 0) { return; }
+      const myPermissions = message.guild.me.permissionsIn(voiceChannel);
+      if (!myPermissions.has(['MANAGE_CHANNELS'])) {
+        if (direction === 'decrement') {
+          console.log('Wasn\'t able to adjust user-limited channel size when leaving one we already incremented?');
+        }
+        return 0;
+      }
+      else {
+        if (direction === 'increment') {
+          voiceChannel.setUserLimit(voiceChannel.userLimit + 1);
+        }
+        if (direction === 'decrement') {
+          voiceChannel.setUserLimit(voiceChannel.userLimit - 1);
+        }
+      }
+    }
     // timeout checking
     let waitTime;
     const now = Date.now();
@@ -72,7 +89,9 @@ If the bot is the only user in a voice channel when it finishes playback of the 
         message.guild.musicData.nowPlaying = null;
         message.guild.musicData.isPlaying = false;
         if (message.guild.musicData.voiceChannel) {
-          return message.guild.musicData.voiceChannel.leave();
+          message.guild.musicData.voiceChannel.leave();
+          resizeIfNeeded(message.guild.musicData.voiceChannel, 'decrement');
+          return;
         }
         return;
       }
@@ -113,9 +132,11 @@ If the bot is the only user in a voice channel when it finishes playback of the 
     if (!mypermissions.has(['VIEW_CHANNEL', 'CONNECT', 'SPEAK'])) {
       return message.channel.send(`Sorry, I don't have permissions to join ${voiceChannel}.`);
     }
+    /*
     else if (voiceChannel.full) {
       return message.channel.send(`Sorry, ${voiceChannel} is full!`);
     }
+    */
     else if (!voiceChannel.joinable) {
       try { voiceChannel.join(); }
       catch(err) { console.log(`Unable to join voice channel ID ${voiceChannel.id} due to following error: ${err}`); }
@@ -184,7 +205,9 @@ If the bot is the only user in a voice channel when it finishes playback of the 
                 await wait(60000);
                 if (!message.guild.musicData.isPlaying) {
                   message.guild.musicData.volume = 0.2;
-                  return message.guild.musicData.voiceChannel.leave();
+                  message.guild.musicData.voiceChannel.leave();
+                  resizeIfNeeded(message.guild.musicData.voiceChannel, 'decrement');
+                  return;
                 }
               }
             })
@@ -212,7 +235,9 @@ If the bot is the only user in a voice channel when it finishes playback of the 
           message.guild.musicData.songDispatcher = null;
           message.guild.musicData.nowPlaying = null;
           message.guild.musicData.isPlaying = false;
-          return message.guild.musicData.voiceChannel.leave();
+          message.guild.musicData.voiceChannel.leave();
+          resizeIfNeeded(message.guild.musicData.voiceChannel, 'decrement');
+          return;
         }
       });
     }
@@ -262,6 +287,11 @@ If the bot is the only user in a voice channel when it finishes playback of the 
       // if nothing is playing yet
       if (!message.guild.musicData.isPlaying) {
         message.guild.musicData.volume = 0.2;
+        // If the bot is being called to a user-capped voice channel, try to increment it.
+        // Returning false means "it's limited but I can't increment the users"
+        if (resizeIfNeeded(voiceChannel, 'increment') === 0) {
+          return message.channel.send('Sorry, I don\'t have the permissions I need to join user-limited channels');
+        }
         // edge case if staff initiated video play from outside of the #voice-chat channels, bot will default to the first voice chat channel.
         if (!config.voiceTextChannelIds.includes(message.channel.id)) {
           message.guild.musicData.voiceTextChannel = await client.channels.fetch(config.voiceTextChannelIds[0]);
@@ -341,6 +371,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
         message.guild.musicData.nowPlaying = null;
         message.guild.musicData.isPlaying = false;
         message.guild.musicData.voiceChannel.leave();
+        resizeIfNeeded(message.guild.musicData.voiceChannel, 'decrement');
         message.guild.musicData.voiceChannel = null;
         return;
       }
@@ -365,7 +396,9 @@ If the bot is the only user in a voice channel when it finishes playback of the 
           message.guild.musicData.songDispatcher = null;
           message.guild.musicData.nowPlaying = null;
           message.guild.musicData.isPlaying = false;
-          return message.guild.musicData.voiceChannel.leave();
+          message.guild.musicData.voiceChannel.leave();
+          resizeIfNeeded(message.guild.musicData.voiceChannel, 'decrement');
+          return;
         }
       }
       return playSong(message.guild.musicData.queue);
@@ -379,7 +412,9 @@ If the bot is the only user in a voice channel when it finishes playback of the 
       message.guild.musicData.nowPlaying = null;
       message.guild.musicData.isPlaying = false;
       if (message.guild.musicData.voiceChannel) {
-        return message.guild.musicData.voiceChannel.leave();
+        message.guild.musicData.voiceChannel.leave();
+        resizeIfNeeded(message.guild.musicData.voiceChannel, 'decrement');
+        return;
       }
       return;
     }
