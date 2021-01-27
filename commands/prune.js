@@ -64,6 +64,68 @@ function requireUncached(module) {
   return require(module);
 }
 
+async function addToPrune(args, message, client) {
+
+  // Get users' temporarily stored roles
+  const pruneStorage = requireUncached(pruneStoragePath);
+
+  // If the prune list is empty, there's no prune going on yet
+  if (Object.keys(pruneStorage).length === 0) {
+    return message.channel.send('There doesn\'t appear to be an ongoing prune.');
+  }
+
+  const permsRequired = ['MANAGE_ROLES'];
+  if (!message.guild.me.hasPermission(permsRequired)) {
+    return message.channel.send('Sorry, I don\'t have all the necessary permissions (' + permsRequired.join(', ') + ')');
+  }
+
+  if (!args || args.length === 0) {
+    message.channel.send('You need to specify at least one person to add to the ongoing prune');
+  }
+
+  // Get the name of the role used for prunes
+  const pruneTitle = config.pruneTitle ? config.pruneTitle : 'prune-limbo';
+  const pruneRole = message.guild.roles.cache.find(role => role.name === pruneTitle);
+
+  // Setup variables for the numbers of successfully prepped  members and ones where there's an error
+  let erroredMembers = 0;
+  const preppedMembers = [];
+
+  // Assign the new role to each member
+  for (const usr of args) {
+    // Get the user collection
+    const thisUser = await getUser(usr, message);
+    if (!thisUser || !thisUser.manageable || pruneStorage[thisUser.user.id]) {
+      erroredMembers += 1;
+      continue;
+    }
+    const thisUserPruneRoles = [pruneRole];
+    // Initialize a section of pruneStorage for this user
+    pruneStorage[thisUser.id] = new Array();
+    // Store the user's roles in their pruneStorage array
+    thisUser.roles.cache.forEach(role => {
+      pruneStorage[thisUser.id].push(role.id);
+      if (role.name.includes('/') || role.name.toLowerCase().includes('pronoun')) {
+        thisUserPruneRoles.push(role.id);
+      }
+    });
+
+    // Set the user's roles
+    await thisUser.roles.set(thisUserPruneRoles, 'Adding to prune limbo');
+    preppedMembers.push(`<@${thisUser.user.id}>`);
+  }
+
+  writeData(pruneStoragePath, pruneStorage);
+  let resultMsg = '';
+  if (preppedMembers.length > 0) {
+    resultMsg += `Prepped for pruning: ${preppedMembers.join(', ')}. `;
+  }
+  if (erroredMembers > 0) {
+    resultMsg += `\n**${erroredMembers}** member(s) were invalid entries or already prepped, and not processed.`;
+  }
+  return message.channel.send(resultMsg);
+}
+
 async function showRoles(args, message) {
 
   // Set the name of the role/channel to be used for prunes
@@ -582,25 +644,27 @@ module.exports = {
 
     if(args.length === 0) {
       return message.channel.send(`Options:
-.prune prep <months:default 6>
-> - Posts  a spreadsheet of inactive members and offers to place them into a temp channel and role until the \`.prune finish\` command is run
+.prune **prep** <months:default 6>
+> - Posts a spreadsheet of inactive members and offers to place them into a temp channel and role until the \`.prune finish\` command is run
 > - usage: \`.prune prep 3\`
-.prune kick <months:default 6>
+.prune **kick** <months:default 6>
 > - Posts a spreadsheet of inactive members and offers to begin kicking them
 > - usage: \`.prune kick 3\`
-.prune list
+.prune **list**
 > - Shows the last post date for all server members without beginning a prune
-.prune showroles [@user/UserID]
+.prune **showroles** [@user/UserID]
 > - usage: \`.prune showroles ${message.author.id}\`
 > - List the roles a member had before being put in limbo
-.prune exclude [add/remove] [@user/UserID]
+.prune **exclude** [add/remove] [@user/UserID]
 > - usage: \`.prune exclude add ${message.author.id}\`
 > - List all current exclusions with \`.prune exclude list\`
-.prune restore <@users/UserIDs>
+.prune **add** <@users/UserIDs>
+> - usage: \`.prune add @user1 @user2 userid3\` adds user1, 2, and 3 to an ongoing prune
+.prune **restore** <@users/UserIDs>
 > - usage: \`.prune restore @user1 @user2 userid3\` restores user1, 2, and 3
-.prune cancel
+.prune **cancel**
 > - Offers to restore all users, canceling the prune
-.prune finish
+.prune **finish**
 > - Offers to finish the prune, kicking all users still in limbo
 
 Note: All commands and arguments can also be shortened to just the first letter (e.g. \`.p p 6\` or \`.p r USERID\`)`);
@@ -609,6 +673,10 @@ Note: All commands and arguments can also be shortened to just the first letter 
     // Get the first arg, leaving the rest for whatever else we're going to do
     const firstArg = args.shift();
     switch (firstArg) {
+    case 'a':
+    case 'adduser':
+      addToPrune(args, message);
+      break;
     case 'r':
     case 'restore':
     case 'c':
