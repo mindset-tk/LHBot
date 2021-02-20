@@ -55,11 +55,14 @@ module.exports = {
       ['voiceTextChannelIds', 'Text channel(s) for voice commands', 'channelArray'],
       ['voiceChamberDefaultSizes', 'Default limits for size-limited channels', 'voiceChamberSettings'],
       ['voiceChamberSnapbackDelay', 'Minutes before cofigured voice channels revert once empty', 'integer'],
-      ['pinsToPin', 'Number of pin reacts to auto-pin a message', 'integer'],
+      ['pinsToPin', 'Number of pin reacts to pin a message', 'integer'],
       ['pinIgnoreChannels', 'Channel(s) to ignore for pinning', 'channelArray'],
       ['botChannelId', 'Bot stuff channel', 'channel'],
       ['disboardChannelId', 'Disboard Bumping Channel', 'channel'],
-      ['eventInfoChannelId', 'Event announce channel', 'channel']];
+      ['eventInfoChannelId', 'Event announce channel', 'channel'],
+      ['starboardChannelId', 'Starboard channel', 'channel'],
+      ['starThreshold', 'Number of stars to starboard a message', 'integer'],
+      ['starboardIgnoreChannels', 'Channel(s) to ignore for starboarding', 'channelArray']];
     // declaring some useful functions.
     // function to pretty print the config data so that arrays show on one line, so it's easier to visually parse the config file when hand opening it. Purely cosmetic.
     function prettyPrintConfig() {
@@ -135,9 +138,11 @@ module.exports = {
       const ignoreChans = [];
       const voiceTextChans = [];
       const cfgVoiceChans = [];
+      const starboardIgnoreChans = [];
       const knownInv = [];
       config.pinIgnoreChannels.forEach(chanID => ignoreChans.push(getChannelName(chanID)));
       config.voiceTextChannelIds.forEach(chanID => voiceTextChans.push(getChannelName(chanID)));
+      config.starboardIgnoreChannels.forEach(chanID => starboardIgnoreChans.push(getChannelName(chanID)));
       if (config.knownInvites) {config.knownInvites.forEach(inv => knownInv.push('**' + inv[1] + '** (' + inv[0] + ')'));}
       //      console.log((Object.keys(config[voiceChamberDefaultSizes]).length == 0));
       if(typeof config.voiceChamberDefaultSizes == 'object') Object.keys(config.voiceChamberDefaultSizes).forEach(chanID => cfgVoiceChans.push('#' + config.voiceChamberDefaultSizes[chanID].Name + ' (Size: ' + config.voiceChamberDefaultSizes[chanID].Size + ')'));
@@ -174,7 +179,12 @@ Airlock Prune Message: **${config.airlockPruneMessage ? config.airlockPruneMessa
 
 __Pins:__
 Pin reacts needed to pin a message: **${config.pinsToPin}**
-Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + ignoreChans.join(', #') : 'None'}**`;
+Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + ignoreChans.join(', #') : 'None'}**
+
+__Starboard:__
+Starboard channel: **${(config.starboardChannelId) ? `#${getChannelName(config.starboardChannelId)}` : 'Not set.'}**
+Star reaction threshold to post starboard: **${(config.starThreshold) ? config.starThreshold : 'Not set.'}**
+Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '#' + starboardIgnoreChans.join(', #') : 'None'}**`;
     }
     // initialize disallowed prefix characters. None of these will be permitted in any part of the command prefix.
     const disallowedPrefix = ['@', '#', '/', '\\', '\\\\', '*', '~', '_'];
@@ -270,6 +280,9 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
               await event.regenMsgs(oldChannelID, newChannel.id, message.guild);
               return message.channel.send(`${changeDesc} is now ${newChannel}. Deleting info messages from old channel (if applicable) and recreating.`);
             }
+            if (changeName == 'starboardChannelId') {
+              return message.channel.send(`${changeDesc} is now ${newChannel}. Defaulting starboard threshold to 5 stars. This can be changed with the config command.`);
+            }
             return message.channel.send(`${changeDesc} is now ${newChannel}.`);
           }
           else {return message.channel.send(`Sorry, I couldn't parse '${reply.content}' into a channel. Please #mention the channel or copy/paste the channel ID.`);}
@@ -283,7 +296,7 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
           if (newRole) {
             config[changeName] = newRole.id;
             writeConfig();
-            return message.channel.send(`${changeDesc} is now **${newRole.name}**`);
+            return message.channel.send(`${changeDesc} is now **${newRole.name}**.`);
           }
           else {return message.channel.send(`Sorry, I couldn't parse '${reply.content}' into a role. Please @mention the role or copy/paste the role ID.`);}
         }
@@ -295,7 +308,7 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
           if (!reply.content.includes('.') && parseInt(reply.content)) {
             config[changeName] = parseInt(reply.content);
             writeConfig();
-            return message.channel.send(`${changeDesc} is now **${parseInt(reply.content)}**`);
+            return message.channel.send(`${changeDesc} is now **${parseInt(reply.content)}**.`);
           }
           else {return message.channel.send(`Sorry, I couldn't parse '${reply.content}' into a count. Please enter an integer (no decimals).`);}
         }
@@ -306,7 +319,7 @@ Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + igno
           if(!reply) {return;}
           config[changeName] = reply.content.replace(/"/g, '');
           writeConfig();
-          return message.channel.send(`${changeDesc} is now **${reply.content.replace(/"/g, '')}**`);
+          return message.channel.send(`${changeDesc} is now **${reply.content.replace(/"/g, '')}**.`);
         }
 
 

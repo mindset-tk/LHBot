@@ -11,3 +11,6 @@ vettinglimit.json
 *CSV*
 .editorconfig
 *.xlsx
+/db/*
+/.idea/*
+/.vscode/*
