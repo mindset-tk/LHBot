@@ -17,6 +17,68 @@ function writeCounting() {
     }
   });
 }
+// function to pretty print the config data so that arrays show on one line, so it's easier to visually parse the config file when hand opening it. Purely cosmetic.
+function prettyPrintConfig() {
+  const output = JSON.stringify(config, function(k, v) {
+    if (v instanceof Array) {
+      return JSON.stringify(v);
+    }
+    return v;
+  }, 2).replace(/\\/g, '')
+    .replace(/"\[/g, '[')
+    .replace(/\]"/g, ']')
+    .replace(/"\{/g, '{')
+    .replace(/\}"/g, '}');
+  return output;
+}
+// function to write config to file.
+function writeConfig(message) {
+  fs.writeFileSync(configPath, prettyPrintConfig(), function(err) {
+    if (err) {
+      if (message) { message.channel.send('There was an error saving the config file!'); }
+      else { console.error('Error saving config!'); }
+      return console.error(err);
+    }
+  });
+}
+
+// initializing configurable parts of config.json
+// each entry: [varname in config.json, info string, type of entry]
+// current entry types are boolean, integer, channel, role, channelArray, inviteCodesArray, and prefix
+// prefix is specifically for command prefixes. It gets run through a special filter.
+// channel and role are a single ID for their respective type and are stored as strings.
+// channelArray is an array of channelIDs.
+// inviteCodesArray is an array of known invite codes that have been given descriptors.
+// boolean and integer are as labeled.
+const configurableProps = [['prefix', 'Command Prefix', 'prefix'],
+  ['roleStaff', 'Staff Role', 'role'],
+  ['roleComrade', 'Comrade Role', 'role'],
+  ['roleAirlock', 'Airlock Role', 'role'],
+  ['airlockChannel', 'Airlock Channel(s) Name/Prefix', 'string'],
+  ['airlockPruneDays', 'Max Inactivity for __airlock prune eligibility__', 'integer'],
+  ['airlockPruneMessage', 'Airlock prune kick message', 'string'],
+  ['pruneTitle', 'Prune Channel/Role Name', 'string'],
+  //  ['pruneIntroMessage', 'Prune Channel Intro Message', 'string'],
+  ['invLogToggle', 'Toggle __Invite Iogging__', 'boolean'],
+  ['channelInvLogs', 'Channel for logging joins/leaves', 'channel'],
+  ['knownInvites', 'Invite Code Descriptions', 'inviteCodesArray'],
+  ['avatarLogToggle', 'Toggle __avatar change__ logging/reporting', 'boolean'],
+  ['channelAvatarLogs', 'Channel for logging avatar changes', 'channel'],
+  ['avatarLogAirlockOnlyToggle', 'Toggle __airlock exclusive__ avatar logging/reporting', 'boolean'],
+  ['channelLobby', 'Lobby channel', 'channel'],
+  ['countingToggle', 'Toggle counting', 'boolean'],
+  ['countingChannelId', 'Counting channel', 'channel'],
+  ['voiceTextChannelIds', 'Text channel(s) for voice commands', 'channelArray'],
+  ['voiceChamberDefaultSizes', 'Default limits for size-limited channels', 'voiceChamberSettings'],
+  ['voiceChamberSnapbackDelay', 'Minutes before cofigured voice channels revert once empty', 'integer'],
+  ['pinsToPin', 'Number of pin reacts to pin a message', 'integer'],
+  ['pinIgnoreChannels', 'Channel(s) to ignore for pinning', 'channelArray'],
+  ['botChannelId', 'Bot stuff channel', 'channel'],
+  ['disboardChannelId', 'Disboard Bumping Channel', 'channel'],
+  ['eventInfoChannelId', 'Event announce channel', 'channel'],
+  ['starboardChannelId', 'Starboard channel', 'channel'],
+  ['starThreshold', 'Number of stars to starboard a message', 'integer'],
+  ['starboardIgnoreChannels', 'Channel(s) to ignore for starboarding', 'channelArray']];
 
 module.exports = {
   name: 'config',
@@ -27,66 +89,8 @@ module.exports = {
   staffOnly: true,
   args: false,
   async execute(message, args, client) {
-    // initializing configurable parts of config.json
-    // each entry: [varname in config.json, info string, type of entry]
-    // current entry types are boolean, integer, channel, role, channelArray, and prefix
-    // prefix is specifically for command prefixes. It gets run through a special filter.
-    // channel and role are a single ID for their respective type and are stored as strings.
-    // channelArray is an array of channelIDs.
-    // boolean and integer are as labeled.
-    const configurableProps = [['prefix', 'Command Prefix', 'prefix'],
-      ['roleStaff', 'Staff Role', 'role'],
-      ['roleComrade', 'Comrade Role', 'role'],
-      ['roleAirlock', 'Airlock Role', 'role'],
-      ['airlockChannel', 'Airlock Channel(s) Name/Prefix', 'string'],
-      ['airlockPruneDays', 'Max Inactivity for __airlock prune eligibility__', 'integer'],
-      ['airlockPruneMessage', 'Airlock prune kick message', 'string'],
-      ['pruneTitle', 'Prune Channel/Role Name', 'string'],
-      //  ['pruneIntroMessage', 'Prune Channel Intro Message', 'string'],
-      ['invLogToggle', 'Toggle __Invite Iogging__', 'boolean'],
-      ['channelInvLogs', 'Channel for logging joins/leaves', 'channel'],
-      ['knownInvites', 'Invite Code Descriptions', 'inviteCodesArray'],
-      ['avatarLogToggle', 'Toggle __avatar change__ logging/reporting', 'boolean'],
-      ['channelAvatarLogs', 'Channel for logging avatar changes', 'channel'],
-      ['avatarLogAirlockOnlyToggle', 'Toggle __airlock exclusive__ avatar logging/reporting', 'boolean'],
-      ['channelLobby', 'Lobby channel', 'channel'],
-      ['countingToggle', 'Toggle counting', 'boolean'],
-      ['countingChannelId', 'Counting channel', 'channel'],
-      ['voiceTextChannelIds', 'Text channel(s) for voice commands', 'channelArray'],
-      ['voiceChamberDefaultSizes', 'Default limits for size-limited channels', 'voiceChamberSettings'],
-      ['voiceChamberSnapbackDelay', 'Minutes before cofigured voice channels revert once empty', 'integer'],
-      ['pinsToPin', 'Number of pin reacts to pin a message', 'integer'],
-      ['pinIgnoreChannels', 'Channel(s) to ignore for pinning', 'channelArray'],
-      ['botChannelId', 'Bot stuff channel', 'channel'],
-      ['disboardChannelId', 'Disboard Bumping Channel', 'channel'],
-      ['eventInfoChannelId', 'Event announce channel', 'channel'],
-      ['starboardChannelId', 'Starboard channel', 'channel'],
-      ['starThreshold', 'Number of stars to starboard a message', 'integer'],
-      ['starboardIgnoreChannels', 'Channel(s) to ignore for starboarding', 'channelArray']];
     // declaring some useful functions.
-    // function to pretty print the config data so that arrays show on one line, so it's easier to visually parse the config file when hand opening it. Purely cosmetic.
-    function prettyPrintConfig() {
-      const output = JSON.stringify(config, function(k, v) {
-        if (v instanceof Array) {
-          return JSON.stringify(v);
-        }
-        return v;
-      }, 2).replace(/\\/g, '')
-        .replace(/"\[/g, '[')
-        .replace(/\]"/g, ']')
-        .replace(/"\{/g, '{')
-        .replace(/\}"/g, '}');
-      return output;
-    }
-    // function to write config to file.
-    function writeConfig() {
-      fs.writeFile(configPath, prettyPrintConfig(), function(err) {
-        if (err) {
-          message.channel.send('There was an error saving the config file!');
-          return console.log(err);
-        }
-      });
-    }
+
     // function to get a channel name from a chanID
     function getChannelName(channelID) {
       const channelObj = client.channels.cache.get(channelID);
@@ -234,7 +238,7 @@ Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '
           else if (disallowedPrefix.some(noPrefix => reply.content.toLowerCase().includes(noPrefix.toLowerCase()))) { return message.channel.send('Sorry, the characters ' + disallowedPrefix.join('') + ' cannot be used in a prefix as each will conflict with some functionality of Discord.'); }
           else {
             config[changeName] = reply.content;
-            writeConfig();
+            writeConfig(message);
             return message.channel.send(`Setting ${changeDesc} to '**${reply.content}**'.`);
           }
         }
@@ -248,13 +252,13 @@ Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '
           case 'true':
           case 'yes':
             config[changeName] = true;
-            writeConfig();
+            writeConfig(message);
             return message.channel.send(`${changeDesc} is now '**ON**'.`);
           case 'off':
           case 'false':
           case 'no':
             config[changeName] = false;
-            writeConfig();
+            writeConfig(message);
             return message.channel.send(`${changeDesc} is now '**OFF**'.`);
           default:
             return message.channel.send(`I'm sorry, I couldn't parse "${reply.content}". Please use 'on' or 'off' to set this setting.`);
@@ -269,7 +273,7 @@ Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '
           const oldChannelID = config[changeName] || null;
           if (newChannel) {
             config[changeName] = newChannel.id;
-            writeConfig();
+            writeConfig(message);
             if (changeName == 'countingChannelId') {
               global.countingData.lastCount = 0;
               global.countingData.lastMessage = message.id;
@@ -295,7 +299,7 @@ Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '
           const newRole = await getRole(reply.content);
           if (newRole) {
             config[changeName] = newRole.id;
-            writeConfig();
+            writeConfig(message);
             return message.channel.send(`${changeDesc} is now **${newRole.name}**.`);
           }
           else {return message.channel.send(`Sorry, I couldn't parse '${reply.content}' into a role. Please @mention the role or copy/paste the role ID.`);}
@@ -307,7 +311,7 @@ Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '
           if(!reply) {return;}
           if (!reply.content.includes('.') && parseInt(reply.content)) {
             config[changeName] = parseInt(reply.content);
-            writeConfig();
+            writeConfig(message);
             return message.channel.send(`${changeDesc} is now **${parseInt(reply.content)}**.`);
           }
           else {return message.channel.send(`Sorry, I couldn't parse '${reply.content}' into a count. Please enter an integer (no decimals).`);}
@@ -318,7 +322,7 @@ Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '
           reply = await msgCollector();
           if(!reply) {return;}
           config[changeName] = reply.content.replace(/"/g, '');
-          writeConfig();
+          writeConfig(message);
           return message.channel.send(`${changeDesc} is now **${reply.content.replace(/"/g, '')}**.`);
         }
 
@@ -352,7 +356,7 @@ Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '
               if(!reply) {return;}
               if (!reply.content.includes('.') && parseInt(reply.content) && reply.content <= 99) {
                 config[changeName][newChannel.id]['Size'] = reply.content;
-                writeConfig();
+                writeConfig(message);
                 return message.channel.send(`Added ${newChannel} to the list of voice chambers with a default size of **${parseInt(reply.content)}**`);
               }
               else {return message.channel.send(`Sorry, I couldn't parse '${reply.content}' into a count or the entry was over 99 (discord's max). Please enter an integer (no decimals) 99 or under.`);}
@@ -384,7 +388,7 @@ Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '
             if (!reply) { return; }
             else if (reply.content.toLowerCase() == 'all') {
               config[changeName] = {};
-              writeConfig();
+              writeConfig(message);
               return message.channel.send(`Cleared all *${changeDesc}* entries.`);
             }
             else if (parseInt(reply.content) > Object.keys(config[changeName]).length) {
@@ -400,7 +404,7 @@ Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '
               const indexToRemove = parseInt(reply.content) - 1;
               const removedChan = await getChannel(Object.keys(config[changeName])[indexToRemove]);
               delete config[changeName][Object.keys(config[changeName])[indexToRemove]];
-              writeConfig();
+              writeConfig(message);
               if (removedChan) { return message.channel.send(`Removed ${removedChan} from *${changeDesc}*.`); }
               else { return message.channel.send(`Removed bad entry ${config[changeName][indexToRemove]} from *${changeDesc}*`); }
             }
@@ -466,7 +470,7 @@ Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '
                 }
               }
 
-              writeConfig();
+              writeConfig(message);
               return message.channel.send(`Updated ${config[changeName][chanID]['Name']}'s defaults. The default size is **${config[changeName][chanID]['Size']}**`);
             }
           }
@@ -495,7 +499,7 @@ Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '
                   reply = await msgCollector();
                   if(!reply) {return;}
                   config[changeName].push([invite.code, reply.content.replace(/"/g, '')]);
-                  writeConfig();
+                  writeConfig(message);
                   return message.channel.send(`Ok! **${reply.content.replace(/"/g, '')}** (${invite.code}) by <@${inviter.id}> (${inviter.username}#${inviter.discriminator} / ${inviter.id}) has been added to the *${changeDesc}*`);
                 }
                 else {
@@ -524,7 +528,7 @@ Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '
             if (!reply) { return; }
             else if (reply.content.toLowerCase() == 'all' && action == 'remove') {
               config[changeName] = [];
-              writeConfig();
+              writeConfig(message);
               return message.channel.send(`Cleared all *${changeDesc}* entries.`);
             }
             else if (parseInt(reply.content) > config[changeName].length) {
@@ -542,7 +546,7 @@ Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '
               const selectedInv = config[changeName][index];
               if (action == 'remove') {
                 config[changeName].splice(index, 1);
-                writeConfig();
+                writeConfig(message);
                 return message.channel.send(`Removed ${selectedInv[1]} (${selectedInv[0]}) from *${changeDesc}*.`);
               }
               else if (action == 'change') {
@@ -550,7 +554,7 @@ Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '
                 reply = await msgCollector();
                 if(!reply) {return;}
                 config[changeName][index][1] = reply.content.replace(/"/g, '');
-                writeConfig();
+                writeConfig(message);
                 return message.channel.send(`Changed the description for ${selectedInv[0]} from ${selectedInv[1]} to ${config[changeName][index][1]} in the *${changeDesc}*.`);
               }
             }
@@ -569,7 +573,7 @@ Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '
             const newChannel = await getChannel(reply.content);
             if (!config[changeName].includes(newChannel.id)) {
               config[changeName].push(newChannel.id);
-              writeConfig();
+              writeConfig(message);
               return message.channel.send(`Added ${newChannel} to *${changeDesc}*`);
             }
             else {return message.channel.send(`${newChannel} is already a part of *${changeDesc}*`);}
@@ -595,7 +599,7 @@ Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '
             if (!reply) { return; }
             else if (reply.content.toLowerCase() == 'all') {
               config[changeName] = [];
-              writeConfig();
+              writeConfig(message);
               return message.channel.send(`Cleared all *${changeDesc}* entries.`);
             }
             else if (parseInt(reply.content) > config[changeName].length) {
@@ -611,7 +615,7 @@ Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '
               const indexToRemove = parseInt(reply.content) - 1;
               const removedChan = await getChannel(config[changeName][indexToRemove]);
               config[changeName].splice(indexToRemove, 1);
-              writeConfig();
+              writeConfig(message);
               if (removedChan) { return message.channel.send(`Removed ${removedChan} from *${changeDesc}*.`); }
               else { return message.channel.send(`Removed bad entry ${config[changeName][indexToRemove]} from *${changeDesc}*`); }
             }
@@ -620,5 +624,29 @@ Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '
       }
     }
     // else { message.channel.send('hmm, check your input'); }
+  },
+  init() {
+    const updatedProps = [];
+    // each entry: [varname in config.json, info string, type of entry]
+    // current entry types are boolean, integer, channel, role, channelArray, and prefix
+    // prefix is specifically for command prefixes. It gets run through a special filter.
+    // channel and role are a single ID for their respective type and are stored as strings.
+    // channelArray is an array of channelIDs.
+    // boolean and integer are as labeled
+    configurableProps.forEach(prop => {
+      if(!config[prop[0]] && config[prop[0]] !== '' && config[prop[0]] !== []) {
+        updatedProps.push(prop[0]);
+        if (prop[2] == 'boolean' || prop[2] == 'string' || prop[2] == 'integer' || prop[2] == 'channel' || prop[2] == 'role' || prop[2] == 'voiceChamberSettings') {
+          config[prop[0]] = '';
+        }
+        else if (prop[2] == 'channelArray' || prop[2] == 'inviteCodesArray') {
+          config[prop[0]] = [];
+        }
+      }
+    });
+    if (updatedProps.length > 0) {
+      console.log(`config was missing ${updatedProps.join(', ')}. Initializing these to blank or empty values. Please use config commands or fill these in by hand.`);
+      writeConfig();
+    }
   },
 };

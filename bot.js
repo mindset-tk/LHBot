@@ -178,7 +178,12 @@ let dataLogLock = 0;
 // when the client is ready, run this code.
 client.on('ready', async () => {
   console.log('Ready!');
-  client.user.setActivity(config.currentActivity.Name, { type: config.currentActivity.Type });
+  if (!config.prefix) {
+    config.prefix = '.';
+    console.log('No command prefix was set! Defaulting to \'.\' (single period)');
+    writeConfig(config);
+  }
+  if (config.currentActivity) { client.user.setActivity(config.currentActivity.Name, { type: config.currentActivity.Type }); }
   Counting.OnReady(config, client);
   vc.OnReady(client);
   // Lock datalog while caching offline messages. When that finishes, the callback will unlock the log.

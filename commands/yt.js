@@ -7,8 +7,12 @@ const ytdl = require('ytdl-core');
 const path = require('path');
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
-const YT = new YouTube(config.youTubeAPIKey);
 const wait = require('util').promisify(setTimeout);
+let YT;
+if (!config.youTubeAPIKey) {
+  console.log('No youtube API Key set! until it is set by editing config.json, the YT voice features will not work.');
+}
+else { YT = new YouTube(config.youTubeAPIKey); }
 
 module.exports = {
   name: 'yt',
@@ -37,6 +41,9 @@ If the bot is the only user in a voice channel when it finishes playback of the 
   guildOnly: true,
   cooldown: 0.1,
   async execute(message, args, client) {
+
+    if (!YT) { return message.channel.send('I can\'t perform that function until a Youtube API Key is set in the config file.'); }
+
     function minsAndSeconds(ms) {
       const minutes = Math.floor(ms / 60000);
       const seconds = ((ms % 60000) / 1000).toFixed(0);
