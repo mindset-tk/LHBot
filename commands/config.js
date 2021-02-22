@@ -159,36 +159,37 @@ Member role: **${config.roleComrade ? '@' + getRoleName(config.roleComrade) : 'N
 Airlock role: **${config.roleAirlock ? '@' + getRoleName(config.roleAirlock) : 'Not set'}**
 
 __Special Channels:__
-Counting: **${config.countingToggle ? ('#' + getChannelName(config.countingChannelId)) : 'off.'}**
-Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'not set.'}**
-Disboard Bump Channel: **${config.disboardChannelId ? ('#' + getChannelName(config.disboardChannelId)) : 'not set.'}**
-Event announcement channel: **${config.eventInfoChannelId ? ('#' + getChannelName(config.eventInfoChannelId)) : 'not set.'}**
+Counting: **${config.countingToggle ? ('#' + getChannelName(config.countingChannelId)) : 'Off.'}**
+Bot channel: **${config.botChannelId ? ('#' + getChannelName(config.botChannelId)) : 'Not set.'}**
+Disboard Bump Channel: **${config.disboardChannelId ? ('#' + getChannelName(config.disboardChannelId)) : 'Not set.'}**
+Event announcement channel: **${config.eventInfoChannelId ? ('#' + getChannelName(config.eventInfoChannelId)) : 'Not set.'}**
 Airlock Channel Name/Prefix: **${config.airlockChannel ? config.airlockChannel : 'Not set'}**
-Lobby channel: **${config.channelLobby ? ('#' + getChannelName(config.channelLobby)) : 'not set.'}**
+Lobby channel: **${config.channelLobby ? ('#' + getChannelName(config.channelLobby)) : 'Not set.'}**
 Prune Channel/Role Name: **${config.pruneTitle ? config.pruneTitle : 'Default (prune-limbo)'}**
 
 __Logging/Notification Settings:__
-User join/exit notifications: **${config.invLogToggle ? ('On!** In: **#' + getChannelName(config.channelInvLogs)) : 'off.'}**
-Log avatar changes: **${config.avatarLogToggle ? 'On!** In: ' + (config.channelAvatarLogs ? '**#' + getChannelName(config.channelAvatarLogs) + '**' : 'Not Set') + ' (for: ' + (config.avatarLogAirlockOnlyToggle ? '**airlock role only**)' : '**all members**)') : 'off.**'}
-Defined Invite Codes: ${(knownInv[0]) ? knownInv.join(', ') : '**None**'}
+User join/exit notifications: **${config.invLogToggle ? ('On!** In: **#' + getChannelName(config.channelInvLogs)) : 'Off.'}**
+Log avatar changes: **${config.avatarLogToggle ? 'On!** In: ' + (config.channelAvatarLogs ? '**#' + getChannelName(config.channelAvatarLogs) + '**' : 'Not Set') + ' (for: ' + (config.avatarLogAirlockOnlyToggle ? '**airlock role only**)' : '**all members**)') : 'Off.**'}
+Defined Invite Codes: ${(knownInv[0]) ? knownInv.join(', ') : '**None.**'}
 
 __Voice Channel & Command Settings:__
-Text channel(s) for voice commands: **${(config.voiceTextChannelIds[0]) ? '#' + voiceTextChans.join(', #') : 'None'}**
-Configured user-limited voice channels: **${(cfgVoiceChans[0]) ? cfgVoiceChans.join(', ') : 'None'}**
-Configured VC Snapback Delay: **${config.voiceChamberSnapbackDelay ? config.voiceChamberSnapbackDelay : 'Not set, defaulting to 5min'}**
+Text channel(s) for voice commands: **${(config.voiceTextChannelIds[0]) ? '#' + voiceTextChans.join(', #') : 'None.'}**
+Configured user-limited voice channels: **${(cfgVoiceChans[0]) ? cfgVoiceChans.join(', ') : 'None.'}**
+Configured VC Snapback Delay: **${config.voiceChamberSnapbackDelay ? config.voiceChamberSnapbackDelay : 'Not set, defaulting to 5min.'}**
 
 __Airlock/Lobby Settings:__
-Airlock Prune Inactivity Limit: **${config.airlockPruneDays ? config.airlockPruneDays + 'day(s)' : 'Not set, defaulting to 7 days'}**
-Airlock Prune Message: **${config.airlockPruneMessage ? config.airlockPruneMessage : 'Not set'}**
+Airlock Prune Inactivity Limit: **${config.airlockPruneDays ? config.airlockPruneDays + 'day(s)' : 'Not set, defaulting to 7 days.'}**
+Airlock Prune Message: **${config.airlockPruneMessage ? config.airlockPruneMessage : 'Not set.'}**
 
 __Pins:__
 Pin reacts needed to pin a message: **${config.pinsToPin}**
-Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + ignoreChans.join(', #') : 'None'}**
+Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + ignoreChans.join(', #') : 'None.'}**
 
 __Starboard:__
-Starboard channel: **${(config.starboardChannelId) ? `#${getChannelName(config.starboardChannelId)}` : 'Not set.'}**
-Star reaction threshold to post starboard: **${(config.starThreshold) ? config.starThreshold : 'Not set.'}**
-Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '#' + starboardIgnoreChans.join(', #') : 'None'}**`;
+Starboard channel: **${(config.starboardChannelId) ? `#${getChannelName(config.starboardChannelId)}` : 'Not set. Starboard functionality disabled.'}**
+Star reaction threshold to post starboard: **${(config.starThreshold) ? config.starThreshold : (config.starboardChannelId) ? 'Not set. Starboard functionality disabled.' : 'N/A'}**`;
+      // Item not yet implemented.
+      // Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '#' + starboardIgnoreChans.join(', #') : 'None.'}**
     }
     // initialize disallowed prefix characters. None of these will be permitted in any part of the command prefix.
     const disallowedPrefix = ['@', '#', '/', '\\', '\\\\', '*', '~', '_'];
