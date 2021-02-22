@@ -469,8 +469,6 @@ Star reaction threshold to post starboard: **${(config.starThreshold) ? config.s
             }
           }
         }
-
-
         else if (change.varType == 'inviteCodesArray') {
           if (!config[change.varName]) {config[change.varName] = [];}
           replyContent += ' Would you like to **add**, **remove**, or **change** an invite code description from the list?';
@@ -478,10 +476,10 @@ Star reaction threshold to post starboard: **${(config.starThreshold) ? config.s
           reply = await msgCollector();
           if(!reply) {return;}
           if (reply.content.toLowerCase() == 'add') {
-            message.channel.send('Please say the invite code you would like to add to the list');
+            message.channel.send('Please say the invite code you would like to add to the list.');
             reply = await msgCollector();
             if(!reply) {return;}
-            const response = reply.content.slice(-7);
+            const response = reply.content.split('/').pop();
             const knownInvites = new Map(config.knownInvites);
             if (!knownInvites.has(response)) {
               message.guild.fetchInvites().then(async guildInvites => {
