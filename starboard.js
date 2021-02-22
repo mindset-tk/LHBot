@@ -72,18 +72,38 @@ function embedColor(starcount, threshold) {
 async function generateEmbed(config, message, starcount, starThreshold) {
   const guildmember = message.guild.member(message.author);
   let image = '';
-  if (message.attachments.size > 0) {
-    const isimage = /(jpg|jpeg|png|gif)/gi.test((message.attachments.array()[0].url).split('.'));
-    if (isimage) { image = message.attachments.array()[0].url; }
-  }
   const embed = new Discord.MessageEmbed()
     .setColor(embedColor(starcount, starThreshold))
     .setAuthor(guildmember.displayName, message.author.displayAvatarURL())
     .setDescription(message.content)
     .addField('Source', '[Jump!](' + message.url + ')')
     .setFooter(message.id)
-    .setTimestamp(message.createdTimestamp)
-    .setImage(image);
+    .setTimestamp(message.createdTimestamp);
+  if (message.attachments.size > 0) {
+    // will only work on the first image, currently.
+    const isimage = /(jpg|jpeg|png|gif)/gi.test((message.attachments.array()[0].url).split('.').pop());
+    // don't add spoilered images to the embed as rich embeds cannot currently contain spoilered images. Prevents unspoilered NSFW/CW content from hitting starboard.
+    if (isimage && !message.attachments.array()[0].spoiler && message.attachments.size == 1) {
+      image = message.attachments.array()[0].url;
+      embed.setImage(image);
+    }
+    else if (message.attachments.array()[0].spoiler) {
+      embed.addField('Attachment', `||[${message.attachments.array()[0].name}](${message.attachments.array()[0].url})||`);
+    }
+    else if (message.attachments.size == 1) {
+      embed.addField('Attachment', `[${message.attachments.array()[0].name}](${message.attachments.array()[0].url})`);
+    }
+    else if (message.attachments.size > 1) {
+      const descarr = [];
+      message.attachments.array().forEach(attach => {
+        if (attach.spoiler) {
+          descarr.push(`||[${attach.name}](${attach.url})||`);
+        }
+        else { descarr.push(`[${attach.name}](${attach.url})`); }
+      });
+      embed.addField('Attachments', descarr.join('\n'));
+    }
+  }
   return embed;
 }
 
