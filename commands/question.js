@@ -5,6 +5,9 @@ module.exports = {
     cooldown: 10,
 
     execute(message, _arguments, _client, config) {
-        message.channel.send(start.evaluate())
+        // Are we allowed to respond in this channel?
+        if (config.questionChannelIds.includes(message.channel.id)) {
+            message.channel.send(start.evaluate())
+        }
     },
 }
