@@ -70,6 +70,7 @@ CONFIG_FILENAMES.forEach(filename => {
       freshConfig.disboardChannelId = '';
       freshConfig.eventInfoChannelId = '';
       freshConfig.pinIgnoreChannels = [];
+      freshConfig.questionChannelIds = [];
       freshConfig.voiceTextChannelIds = [];
       freshConfig.voiceChamberDefaultSizes = new Object();
       freshConfig.voiceChamberSnapbackDelay = '';
