@@ -71,6 +71,7 @@ CONFIG_FILENAMES.forEach(filename => {
       freshConfig.eventInfoChannelId = '';
       freshConfig.pinIgnoreChannels = [];
       freshConfig.pinsToPin = 5;
+      freshConfig.questionChannelIds = [];
       freshConfig.voiceTextChannelIds = [];
       freshConfig.voiceChamberDefaultSizes = new Object();
       freshConfig.voiceChamberSnapbackDelay = '';
