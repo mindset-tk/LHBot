@@ -18,7 +18,7 @@ module.exports = {
     let targetChannel = message.channel;
     const channelMatch = args[0].match(/^<#(\d+)>$/);
     if (channelMatch) {
-      targetChannel = message.guild.channels.get(channelMatch[1]);
+      targetChannel = message.guild.channels.cache.get(channelMatch[1]);
       args.shift();
     }
     if (args[0].toUpperCase() === 'PLAYING' || args[0].toUpperCase() === 'LISTENING' || args[0].toUpperCase() === 'WATCHING') {
