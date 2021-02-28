@@ -159,7 +159,7 @@ function RestoreCountingState(client) {
 function InitConfig(lrConfig) {
   config = lrConfig;
   if(config.countingFailMessages == null) {
-    config.countingFailMessages = ['I think $user broke counting!', 'That\'s not right, $user', 'Here\'s $user, ruining it for everyone', 'Oh dear, $user. Oh dear.', 'It\'s ok $user, I love you anyway'];
+    config.countingFailMessages = ['Oh my.', 'Hmm, that\'s not right.', 'No no no, that\'s not how it goes.', 'Oh dear, oh dear.', 'Wait a moment! That\'s out of order!', 'Heck!'];
   }
   if(config.countingFailRepeatMessages == null) {
     config.countingFailRepeatMessages = ['Sorry $user, you\'re not allowed to count twice in a row'];

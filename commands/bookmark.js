@@ -33,7 +33,7 @@ exports.HandleEvent = async function(client, config, packet) {
     }
     const bookmarkEmbed = new Discord.MessageEmbed()
       .setColor('#0099ff')
-      .setAuthor(guildmember.displayName, message.author.displayAvatarURL)
+      .setAuthor(guildmember.displayName, message.author.displayAvatarURL())
       .setDescription(message.content + '\n\n [jump to message](' + message.url + ')')
       .setFooter('Bookmarked message was sent at ' + messagesent + ' UTC')
       .setImage(image);

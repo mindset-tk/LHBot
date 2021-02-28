@@ -70,6 +70,8 @@ CONFIG_FILENAMES.forEach(filename => {
       freshConfig.disboardChannelId = '';
       freshConfig.eventInfoChannelId = '';
       freshConfig.pinIgnoreChannels = [];
+      freshConfig.pinsToPin = 5;
+      freshConfig.questionChannelIds = [];
       freshConfig.voiceTextChannelIds = [];
       freshConfig.voiceChamberDefaultSizes = new Object();
       freshConfig.voiceChamberSnapbackDelay = '';
@@ -77,6 +79,9 @@ CONFIG_FILENAMES.forEach(filename => {
       freshConfig.currentActivity.Type = '';
       freshConfig.currentActivity.Name = '';
       freshConfig.youTubeAPIKey = '';
+      freshConfig.starboardChannelId = '';
+      freshConfig.starThreshold = 5;
+      freshConfig.starboardIgnoreChannels = [];
       writeConfig(freshConfig);
       console.log('You haven\'t setup your \'config.json\' file yet. A fresh one has been generated for you!');
     }
@@ -111,6 +116,7 @@ const eventDataPath = './events.json';
 if (fs.existsSync(eventDataPath)) { global.eventData = require(eventDataPath);}
 const moment = require('moment-timezone');
 const vettingLimitPath = './commands/vettinglimit.js';
+const starboard = require('./starboard.js');
 
 Discord.Structures.extend('Guild', Guild => {
   class MusicGuild extends Guild {
@@ -159,6 +165,7 @@ for (const file of commandFiles) {
 const events = {
   // reaction events
   MESSAGE_REACTION_ADD: 'messageReactionAdd',
+  MESSAGE_REACTION_REMOVE: 'messageReactionRemove',
   RESUMED: 'Resumed',
 };
 
@@ -172,7 +179,12 @@ let dataLogLock = 0;
 // when the client is ready, run this code.
 client.on('ready', async () => {
   console.log('Ready!');
-  client.user.setActivity(config.currentActivity.Name, { type: config.currentActivity.Type });
+  if (!config.prefix) {
+    config.prefix = '.';
+    console.log('No command prefix was set! Defaulting to \'.\' (single period)');
+    writeConfig(config);
+  }
+  if (config.currentActivity) { client.user.setActivity(config.currentActivity.Name, { type: config.currentActivity.Type }); }
   Counting.OnReady(config, client);
   vc.OnReady(client);
   // Lock datalog while caching offline messages. When that finishes, the callback will unlock the log.
@@ -182,6 +194,7 @@ client.on('ready', async () => {
     dataLogLock = 0;
     console.log('Offline message fetch complete!');
   });
+  starboard.onReady(config);
   // wait 1000ms without holding up the rest of the script. This way we can ensure recieving all guild invite info.
   await wait(1000);
   client.guilds.cache.forEach(g => {
