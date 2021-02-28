@@ -23,6 +23,7 @@ function PublicBumpReminder(config,message) {
       'Disboard Bump Cooldown');
       }, 28800*1000);
     return;
+  }
 }
 
 exports.BumpReminder = PublicBumpReminder;
