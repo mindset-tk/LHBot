@@ -6,8 +6,8 @@ function PublicBumpReminder(config,message) {
       const bumpChannel = message.guild.channels.resolve(config.disboardChannelId);
       bumpChannel.send(`Server bumped! The next reminder will be in 2 hours`);
       setTimeout(function() {
-        bumpChannel.send(`It's been 2 hours! The server can be bumped on Disboard again using \`!d bump\` in <#${config.botChannelId}>`);
-      }, 7200*1000);
+        bumpChannel.send(`It's been 8 hours! The server can be bumped on Disboard again using \`!d bump\` in <#${config.botChannelId}>`);
+      }, 28800*1000);
     }
     return;
 }
