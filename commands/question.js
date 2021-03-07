@@ -2,7 +2,7 @@ const {start} = require('thoughtful-question-generator')
 
 module.exports = {
     name: 'question',
-    description: 'Generate a thoughtful question.'
+    description: 'Generate a thoughtful question.',
     cooldown: 10,
 
     execute(message, _arguments, _client, config) {
