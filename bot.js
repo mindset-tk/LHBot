@@ -141,7 +141,6 @@ myIntents.add(Discord.Intents.NON_PRIVILEGED, 'GUILD_MEMBERS');
 const client = new Discord.Client({ ws: { intents: myIntents } });
 client.commands = new Discord.Collection();
 const cooldowns = new Discord.Collection();
-client.eventHandlers = [];
 
 // read command files (maybe rename? plugins, features?)
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
@@ -153,21 +152,10 @@ for (const file of commandFiles) {
   if (command.name) {
     client.commands.set(command.name, command);
   }
-  if (command.HandleEvent) {
-    client.eventHandlers.push(command);
-  }
   if (command.init) {
-    command.init(client);
+    command.init(client, config);
   }
 }
-
-// initialize raw events to listen for
-const events = {
-  // reaction events
-  MESSAGE_REACTION_ADD: 'messageReactionAdd',
-  MESSAGE_REACTION_REMOVE: 'messageReactionRemove',
-  RESUMED: 'Resumed',
-};
 
 // initialize invite cache
 const invites = {};
@@ -186,7 +174,6 @@ client.on('ready', async () => {
   }
   if (config.currentActivity) { client.user.setActivity(config.currentActivity.Name, { type: config.currentActivity.Type }); }
   Counting.OnReady(config, client);
-  vc.OnReady(client);
   // Lock datalog while caching offline messages. When that finishes, the callback will unlock the log.
   dataLogLock = 1;
   console.log('Fetching offline messages...');
@@ -210,13 +197,6 @@ client.on('ready', async () => {
       });
     }
   });
-});
-
-// set up listener to revert configured game chambers to their default sizes
-client.on('voiceStateUpdate', (oldState, newState) => {
-  if (vc.SnapbackCheck) {
-    vc.SnapbackCheck (oldState, newState, client);
-  }
 });
 
 // set up listener for channel creation events
@@ -379,45 +359,6 @@ client.on('message', async message => {
     await message.reply('there was an error trying to execute that command!');
   }
 
-});
-
-
-// Raw packet listener. This listens to all actions in discord then emits specialized events for the bot to work with.
-client.on('raw', async packet => {
-  // ensure the 't' field matches one of the raw events that we are listening for.
-  if (!events.hasOwnProperty(packet.t)) return;
-  // check if it is a reconnect packet and emit reconnection event.
-  if (packet.t === 'RESUMED') {
-    client.emit(events[packet.t]);
-    return;
-  }
-
-  // Forward the event to any command that handles events
-  client.eventHandlers.forEach(handler => handler.HandleEvent(client, config, packet));
-});
-
-// whenever client completes session resume, run this code.
-client.on('Resumed', async () => {
-  // Lock datalog while caching offline messages. When that finishes, the callback will unlock the log.
-  dataLogLock = 1;
-  dataLogger.OnReady(config, client, function() {
-    dataLogLock = 0;
-  });
-  await wait(1000);
-  // update invite cache from server.
-  client.guilds.cache.forEach(g => {
-    g.fetchInvites().then(guildInvites => {
-      invites[g.id] = guildInvites;
-    });
-    if (g.vanityURLCode) {
-      g.fetchVanityData().then(vanityData => {
-        vanityInvites[g.id] = {
-          code: vanityData.code,
-          uses: vanityData.uses,
-        };
-      });
-    }
-  });
 });
 
 // update invite cache from server when invites are created/deleted
