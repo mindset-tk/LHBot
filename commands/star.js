@@ -3,7 +3,7 @@ const starboardpath = path.resolve('./starboard.js');
 const starboard = require(starboardpath);
 
 exports.init = function(client, config) {
-  client.on('raw', async(packet) => {
+  client.on('raw', async (packet) => {
     // return if the event isn't a reaction add or remove.
     if (packet.t !== 'MESSAGE_REACTION_ADD' && packet.t !== 'MESSAGE_REACTION_REMOVE') {
       return;

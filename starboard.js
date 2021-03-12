@@ -22,6 +22,7 @@ catch (error) { console.error(error); }
 
 
 /*
+TODO UPDATE THIS SCHEMA - CURRENTLY OUT OF DATE
 starboard.db schema:
 starboard - contains data for starboarded posts
   columns:
@@ -115,41 +116,74 @@ function generateEmoji(starcount, threshold) {
   else if (ratio >= 3) {return '✨';}
 }
 
-// function to pull star count from a message and optional starboard message, but exclude stars from the original author
-async function starCounter(message, starboardMsg) {
+// function to get stars a message and optional starboard message, but exclude stars from the original author.
+// returns an array of userids
+async function retrieveStarGivers(message, starboardMsg) {
   const starreacts = await message.reactions.cache.get('⭐');
   const usrArr = [];
   if (starreacts) {
     await starreacts.users.fetch();
     starreacts.users.cache.forEach(user => {
-    // add '&& user.id != message.author.id' to conditional to exclude self-stars.
+    // TODO before push: add '&& user.id != message.author.id' to conditional to exclude self-stars;
       if (!usrArr.includes(user.id)) usrArr.push(user.id);
     });
   }
   if (starboardMsg) {
     const starboardreacts = await starboardMsg.reactions.cache.get('⭐');
-    if (!starboardreacts) return usrArr.length;
+    if (!starboardreacts) return usrArr;
     await starboardreacts.users.fetch();
     starboardreacts.users.cache.forEach(user => {
-      // add '&& user.id != message.author.id' to conditional to exclude self-stars.
+      // TODO before push: add '&& user.id != message.author.id' to conditional to exclude self-stars.
       if (!usrArr.includes(user.id)) usrArr.push(user.id);
     });
   }
-  return usrArr.length;
+  return usrArr;
 }
 
-// query main starboard by original message id. returns undefined if item is not in starboard db.
+// function to manage starsgiven DB entries and make necessary updates to starsgiven db.
+// origMessage = original message object, usrArr = array of userids that have starred the item
+async function starsGivenUpdater(origMessage, usrArr) {
+  let starsChanged = false;
+  // retrieve all items from starsgiven table associated with the given msg. returns array of objects in format { stargiver: userid }.
+  const starArr = await stardb.all(`SELECT stargiver FROM starsgiven WHERE original_msg = ${origMessage.id}`);
+  for (const { stargiver } of starArr) {
+    // for each item of this the array from the starsgiven table, compare to usrArr...
+    if (!usrArr.includes(stargiver)) {
+      // if usrArr passed to this function does not contain a stargiver item, that must mean the user has removed their star.
+      await stardb.run(`DELETE FROM starsgiven WHERE original_msg = ${origMessage.id} AND stargiver = ${stargiver}`).then((result) => {
+        if (result.changes > 0) starsChanged = true;
+      });
+    }
+    else {
+      // else if usrarr DOES contain the item, discard it.
+      usrArr.splice(usrArr.indexOf(stargiver), 1);
+    }
+  }
+  if (usrArr.length > 0) {
+    // remaining items in usrArr do not exist in starsgiven table. attempt to insert into starsgiven.
+    for (const usr of usrArr) {
+      await stardb.run(`INSERT OR IGNORE INTO starsgiven(original_msg, stargiver) VALUES(${origMessage.id},${usr})`).then((result) => {
+        if (result.changes > 0) starsChanged = true;
+      });
+    }
+  }
+  console.log(`stars changed ${starsChanged}`);
+  return starsChanged;
+}
+
+// query main starboard table by original message id. returns undefined if item is not in starboard db.
 async function queryByOriginal(id) {
-  const dbData = await stardb.get(`SELECT * FROM starboard WHERE original_id = ${id}`);
+  const dbData = await stardb.get(`SELECT * FROM starboard WHERE original_msg = ${id}`);
   return dbData;
 }
 
+// query main starboard table by starboard message id. returns undefined if item not in starboard db.
 async function queryByStarboard(id) {
-  const dbData = await stardb.get(`SELECT * FROM starboard WHERE starboard_id = ${id}`);
+  const dbData = await stardb.get(`SELECT * FROM starboard WHERE starboard_msg = ${id}`);
   return dbData;
 }
 
-function publicOnReady(config) {
+async function publicOnReady(config) {
   if (!config.starboardChannelId) {
     console.log('No starboard channel set! Starboard functions disabled.');
     return;
@@ -158,46 +192,69 @@ function publicOnReady(config) {
     console.log('Star threshold not set! Starboard functions disabled.');
     return;
   }
-  stardb.run('CREATE TABLE IF NOT EXISTS starboard (original_id text PRIMARY KEY, channel_id text, starboard_id text NOT NULL, starcount integer, starthreshold integer, user_id text)');
-  stardb.run('CREATE TABLE IF NOT EXISTS starboard_blocked (original_id text PRIMARY KEY)');
+  // uncomment to drop tables at bot start (for debugging purposes)
+  // await stardb.run('DROP TABLE IF EXISTS starboard');
+  // await stardb.run('DROP TABLE IF EXISTS starsgiven');
+  // await stardb.run('DROP TABLE IF EXISTS blockedmsgs');
+  // await stardb.run('DROP TABLE IF EXISTS blockedusers');
+  await stardb.run('CREATE TABLE IF NOT EXISTS starboard (original_msg text NOT NULL UNIQUE, starboard_msg text NOT NULL UNIQUE, channel text NOT NULL, author text NOT NULL, starthreshold integer NOT NULL, PRIMARY KEY(original_msg, starboard_msg)) ');
+  await stardb.run('CREATE TABLE IF NOT EXISTS starsgiven (original_msg text NOT NULL, stargiver text NOT NULL, UNIQUE(original_msg, stargiver))');
+  await stardb.run('CREATE INDEX IF NOT EXISTS idx_starsgiven_originals ON starsgiven(original_msg)');
+  await stardb.run('CREATE INDEX IF NOT EXISTS idx_stargiver ON starsgiven(stargiver)');
+  await stardb.run('CREATE TABLE IF NOT EXISTS blocked (original_msg text UNIQUE, user UNIQUE)');
 }
 
 async function publicOnStar(client, config, message) {
-  if (!config.starboardChannelId || message.bot) return;
+  if (!config.starboardChannelId) return;
+  let isBlocked = false;
+  // check if user or message are on the blocklist
+  await stardb.get(`SELECT * FROM blocked WHERE user = ${message.author.id} || original_msg = ${message.id}`)
+    .then(result => { if(result != null) {isBlocked = true;}});
+  if (isBlocked) return;
   const starboardChannel = await client.channels.fetch(config.starboardChannelId);
   let dbdata;
-  if (message.channel != starboardChannel) {dbdata = await queryByOriginal(message.id);}
-  else {
-    // if the starred item was in the starboard, we look up the starboard entry for that message, then change 'message' to point to the original message instead of the starboard message.
+  // if the starred item was in the starboard, we look up the starboard entry for that message, then change 'message' to point to the original message instead of the starboard message.
+  if (message.channel == starboardChannel) {
     dbdata = await queryByStarboard(message.id);
-    message = await client.channels.fetch(dbdata.channel_id).then(channel => {return channel.messages.fetch(dbdata.original_id);});
+    message = await client.channels.fetch(dbdata.channel).then(channel => {return channel.messages.fetch(dbdata.original_msg);});
+  }
+  // ...otherwise we can just search by the original id
+  else {
+    dbdata = await queryByOriginal(message.id);
   }
   if (dbdata) {
-    // item is in star db. get starboard message.
-    const starboardMsg = await starboardChannel.messages.fetch(dbdata.starboard_id);
+    // item is already in star db; starboard message should exist. Get starboard message.
+    const starboardMsg = await starboardChannel.messages.fetch(dbdata.starboard_msg);
     // pass original message and starboard message to starcounter
-    const starcount = await starCounter(message, starboardMsg);
-    if (starcount >= dbdata.starthreshold && starcount != dbdata.starcount) {
+    const usrArr = await retrieveStarGivers(message, starboardMsg);
+    const starcount = usrArr.length;
+    const starsChanged = await starsGivenUpdater(message, usrArr);
+    if (starcount >= dbdata.starthreshold && starsChanged == true) {
       // starcount is above the threshold from when it was starboarded and star count has changed. generate new embed and add data to db.
       const starboardEmbed = await generateEmbed(config, message, starcount, dbdata.starthreshold);
       const starboardEmoji = generateEmoji(starcount, dbdata.starthreshold);
       starboardMsg.edit(`${starboardEmoji} **${starcount}** ${message.channel}`, starboardEmbed);
-      await stardb.run(`UPDATE starboard Set starcount = ${starcount} WHERE original_id = ${message.id}`);
+      // console.log(starboardMsg.embeds[0].footer.text);
+      // await stardb.run(`UPDATE starboard Set starcount = ${starcount} WHERE original_id = ${message.id}`);
     }
     else if (starcount < dbdata.starthreshold) {
       // item has dropped below its original threshold of star reacts. Delete from starboard and db.
       starboardMsg.delete();
-      await stardb.run(`DELETE FROM starboard WHERE original_id = ${message.id}`);
+      await stardb.run(`DELETE FROM starboard WHERE original_msg = ${message.id}`);
+      await stardb.run(`DELETE FROM starsgiven WHERE original_msg = ${message.id}`);
     }
   }
   else if (!dbdata) {
-    const starcount = await starCounter(message);
+    const usrArr = await retrieveStarGivers(message);
+    const starcount = usrArr.length;
     if (starcount >= config.starThreshold) {
-      // item is new starboard candidate. generate embed and message and add data to db.
+      // item is new starboard candidate. generate embed and message
       const starboardEmbed = await generateEmbed(config, message, starcount, config.starThreshold);
       const starboardEmoji = generateEmoji(starcount, config.starThreshold);
       const starboardMsg = await starboardChannel.send(`${starboardEmoji} **${starcount}** ${message.channel}`, starboardEmbed);
-      await stardb.run(`INSERT INTO starboard(original_id,channel_id,starboard_id,starcount,starthreshold,user_id) VALUES(${message.id},${message.channel.id},${starboardMsg.id},${starcount},${config.starThreshold},${message.author.id})`);
+      // update starsgiven table and starboard table
+      await starsGivenUpdater(message, usrArr);
+      await stardb.run(`INSERT INTO starboard(original_msg,starboard_msg,channel,author,starthreshold) VALUES(${message.id},${starboardMsg.id},${message.channel.id},${message.author.id},${config.starThreshold})`);
     }
     else if (!dbdata && (starcount < config.starThreshold)) {
       // item is not in db and has fewer stars than threshold. do nothing.
