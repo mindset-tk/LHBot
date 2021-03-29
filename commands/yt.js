@@ -160,18 +160,18 @@ If the bot is the only user in a voice channel when it finishes playback of the 
         try {
           const dispatcher = connection
             .play(
+              dispatcher.setVolume(message.guild.musicData.volume),
               ytdl(queue[0].url, {
                 // pass the url to .ytdl()
                 quality: 'highestaudio',
                 // buffer 32MB prior to playing.
                 highWaterMark: 1024 * 1024 * 32,
               }),
-              // set the discord.js highWaterMark to 1; it's not needed versus ytdl's and seems to cause some stutter issues.
-              { highWaterMark: 1 })
+            )
             .on('start', () => {
               message.guild.musicData.songDispatcher = dispatcher;
               message.guild.musicData.songDispatcher.pausedTime = null;
-              dispatcher.setVolume(message.guild.musicData.volume);
+              // dispatcher.setVolume(message.guild.musicData.volume);
               // ugly spacer line in the .setDescription in order to account for a known discord issue where mobile clients see embeds as long and 0-width
               const videoEmbed = new Discord.MessageEmbed()
                 .setThumbnail(queue[0].thumbnail)
