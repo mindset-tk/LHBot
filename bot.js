@@ -291,7 +291,7 @@ client.on('message', async message => {
       pkResponse = await pkResponse.json();
       // set message author to NOT be a bot.
       message.author.bot = false;
-      console.log(await message.guild.members.fetch(pkResponse.sender));
+      // console.log(await message.guild.members.fetch(pkResponse.sender));
       await message.guild.members.fetch(pkResponse.sender).then(pkMbrData => message.member = pkMbrData);
       // now the message object doesn't look like a bot, and the message.member property holds data for the discord account
       // that caused the PK request to occur.
