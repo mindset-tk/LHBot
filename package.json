@@ -17,9 +17,8 @@
     "sqlite3": "^5.0.2",
     "thoughtful-question-generator": "github:HeladoDeBrownie/Thoughtful-Question-Generator#b47e03059d1a00601e4ad8c02ebfdac8dd4bf9c3",
     "ytdl": "^1.4.1",
-    "ytdl-core": "^4.4.5"
+    "ytdl-core": "^4.5.0"
   },
-  "devDependencies": {},
   "scripts": {
     "test": "ping",
     "watch": "nodemon -e js . bot.js",

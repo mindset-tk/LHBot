@@ -68,12 +68,12 @@ async function updateChannel(type, args, message) {
   }
 }
 
-function PublicVCSnapbackCheck(oldState, newState, client) {
+function SnapbackCheck(oldState, newState, client) {
   if (!config.voiceChamberDefaultSizes) {return;}
   const newUserChannel = newState.channelID;
   const oldUserChannel = oldState.channelID;
   const lastVoiceChannel = client.channels.resolve(oldUserChannel);
-  // Conditionsl for when user joins a voice channel after not being in one (not currently needed)
+  // Conditions for when user joins a voice channel after not being in one (not currently needed)
   //  if(!oldUserChannel && newUserChannel) {
 
   // If leaving or changing channels, and the old chanenl is empty
@@ -83,7 +83,6 @@ function PublicVCSnapbackCheck(oldState, newState, client) {
       // And the channel's userlimit or name aren't the default
       (lastVoiceChannel.userLimit !== config.voiceChamberDefaultSizes[oldUserChannel].Size ||
       lastVoiceChannel.name !== config.voiceChamberDefaultSizes[oldUserChannel].Name)) {
-    // const snapbackDelay = ((config.voiceChamberSnapbackDelay) ? (config.voiceChamberSnapbackDelay * 60000) : 300000);
     const snapbackDelay = ((config.voiceChamberSnapbackDelay) ? (config.voiceChamberSnapbackDelay * 60000) : 300000);
     setTimeout(snapbackIfEmpty, snapbackDelay, lastVoiceChannel);
   }
@@ -105,7 +104,7 @@ async function snapbackIfEmpty(channel) {
   return;
 }
 
-function PublicOnReady(client) {
+function OnReady(client) {
   if (!config.voiceChamberDefaultSizes) {return;}
   for (const chanID in config.voiceChamberDefaultSizes) {
     const channel = client.channels.resolve(chanID);
@@ -137,7 +136,7 @@ module.exports = {
       break;
     case 'check':
       if (message.member.roles.cache.has(config.roleStaff)) {
-        PublicOnReady(client);
+        OnReady(client);
         message.channel.send('Ok! Snapping back names/sizes of any configured voice channels back to their defaults');
       }
       else {
@@ -147,7 +146,11 @@ module.exports = {
     }
     return;
   },
+  init(client) {
+    client.on('ready', async () => { OnReady(client); });
+    // set up listener to revert configured game chambers to their default sizes
+    client.on('voiceStateUpdate', (oldState, newState) => {
+        SnapbackCheck (oldState, newState, client);
+    });
+  }
 };
-
-module.exports.OnReady = PublicOnReady;
-module.exports.SnapbackCheck = PublicVCSnapbackCheck;
