@@ -189,7 +189,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
               return message.guild.musicData.nowPlaying = queue.shift();
             })
             .on('finish', async () => {
-              // if there are more songs in queue, continue playing
+              // if there are more songs in queue, and the voice channel has at least one user other than the bot, continue playing
               const VCUsersNotMe = [];
               message.guild.musicData.voiceChannel.members.forEach((value, key) => {
                 if (key != client.user.id) {
