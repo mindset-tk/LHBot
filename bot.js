@@ -141,6 +141,8 @@ myIntents.add(Discord.Intents.NON_PRIVILEGED, 'GUILD_MEMBERS');
 const client = new Discord.Client({ ws: { intents: myIntents } });
 client.commands = new Discord.Collection();
 const cooldowns = new Discord.Collection();
+// since the datalogger takes some time to cache messages, especially on larger servers, create a global check digit to block unwanted processing of new messages during datalogging
+client.dataLogLock = 0;
 
 // read command files (maybe rename? plugins, features?)
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
@@ -157,12 +159,11 @@ for (const file of commandFiles) {
   }
 }
 
+dataLogger.init(client, config);
+
 // initialize invite cache
 const invites = {};
 const vanityInvites = {};
-
-// since the datalogger takes some time to cache messages, especially on larger servers, create a global check digit to block unwanted processing of new messages during datalogging
-let dataLogLock = 0;
 
 // when the client is ready, run this code.
 client.on('ready', async () => {
@@ -175,10 +176,10 @@ client.on('ready', async () => {
   if (config.currentActivity) { client.user.setActivity(config.currentActivity.Name, { type: config.currentActivity.Type }); }
   Counting.OnReady(config, client);
   // Lock datalog while caching offline messages. When that finishes, the callback will unlock the log.
-  dataLogLock = 1;
+  client.dataLogLock = 1;
   console.log('Fetching offline messages...');
   dataLogger.OnReady(config, client, function() {
-    dataLogLock = 0;
+    client.dataLogLock = 0;
     console.log('Offline message fetch complete!');
   });
   starboard.onReady(config);
@@ -274,7 +275,7 @@ client.on('message', async message => {
   // console.log(message.author);
   // only do datalogging on non-DM text channels. Don't log messages while offline retrieval is proceeding.
   // (offline logging will loop and catch new messages on the fly.)
-  if (message.channel.type === 'text' && dataLogLock != 1) { dataLogger.OnMessage(message, config); }
+  if (message.channel.type === 'text' && client.dataLogLock != 1) { dataLogger.OnMessage(message, config); }
   if(Counting.HandleMessage(message)) {
     return;
   }

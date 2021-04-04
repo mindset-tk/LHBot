@@ -337,6 +337,7 @@ async function getTotalServerUsers(client) {
   const lastMonth = monthMinusOne(nowString);
   for (const gID of Object.keys(global.dataLog)) {
     const g = await client.guilds.cache.get(gID);
+    await g.members.fetch();
     const srvrUsrCount = await g.members.cache.filter(member => !member.user.bot).size;
     if (!global.dataLog[gID].guildTotalUsers) {
       global.dataLog[gID].guildTotalUsers = [];
@@ -387,3 +388,15 @@ function publicOnReady(config, client, callback) {
 exports.PruneDataMaintenance = pruneDataMaintenance;
 exports.OnReady = publicOnReady;
 exports.OnMessage = publicOnMessage;
+
+exports.init = async function(client, config) {
+  client.on('raw', async (packet) => {
+    if (packet.t === 'RESUMED') {
+      // console.log('sharding event!');
+      client.dataLogLock = 1;
+      publicOnReady(config, client, function() {
+        client.dataLogLock = 0;
+      });
+    }
+  });
+};
