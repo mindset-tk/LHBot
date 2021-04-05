@@ -160,13 +160,13 @@ If the bot is the only user in a voice channel when it finishes playback of the 
         try {
           const dispatcher = connection
             .play(
-              dispatcher.setVolume(message.guild.musicData.volume),
               ytdl(queue[0].url, {
                 // pass the url to .ytdl()
                 quality: 'highestaudio',
                 // buffer 32MB prior to playing.
                 highWaterMark: 1024 * 1024 * 32,
               }),
+              { volume: message.guild.musicData.volume },
             )
             .on('start', () => {
               message.guild.musicData.songDispatcher = dispatcher;

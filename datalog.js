@@ -109,8 +109,7 @@ function publicOnMessage(message, config) {
   // get pruneData array as an ES6 map
   const pruneData = new Map(global.dataLog[message.guild.id].pruneData);
   // If a non-bot user isn't in the pruneData array yet, or has a last-active entry older than this one, then update it
-  if(!message.author.bot)
-  {
+  if(!message.author.bot) {
     if(!pruneData.get(message.author.id)) {
       pruneData.set(message.author.id, [message.id]);
     }
@@ -127,7 +126,7 @@ function publicOnMessage(message, config) {
     }
     global.dataLog[message.guild.id].pruneData = [...pruneData];
   }
-  
+
   writeData();
 }
 
@@ -337,6 +336,7 @@ async function getTotalServerUsers(client) {
   const lastMonth = monthMinusOne(nowString);
   for (const gID of Object.keys(global.dataLog)) {
     const g = await client.guilds.cache.get(gID);
+    await g.members.fetch();
     const srvrUsrCount = await g.members.cache.filter(member => !member.user.bot).size;
     if (!global.dataLog[gID].guildTotalUsers) {
       global.dataLog[gID].guildTotalUsers = [];
@@ -387,3 +387,15 @@ function publicOnReady(config, client, callback) {
 exports.PruneDataMaintenance = pruneDataMaintenance;
 exports.OnReady = publicOnReady;
 exports.OnMessage = publicOnMessage;
+
+exports.init = async function(client, config) {
+  client.on('raw', async (packet) => {
+    if (packet.t === 'RESUMED') {
+      // console.log('sharding event!');
+      client.dataLogLock = 1;
+      publicOnReady(config, client, function() {
+        client.dataLogLock = 0;
+      });
+    }
+  });
+};
