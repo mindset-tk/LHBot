@@ -109,8 +109,7 @@ function publicOnMessage(message, config) {
   // get pruneData array as an ES6 map
   const pruneData = new Map(global.dataLog[message.guild.id].pruneData);
   // If a non-bot user isn't in the pruneData array yet, or has a last-active entry older than this one, then update it
-  if(!message.author.bot)
-  {
+  if(!message.author.bot) {
     if(!pruneData.get(message.author.id)) {
       pruneData.set(message.author.id, [message.id]);
     }
@@ -127,7 +126,7 @@ function publicOnMessage(message, config) {
     }
     global.dataLog[message.guild.id].pruneData = [...pruneData];
   }
-  
+
   writeData();
 }
 
