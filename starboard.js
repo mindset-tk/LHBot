@@ -1,8 +1,11 @@
+const path = require('path');
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 const fs = require('fs');
 const dbpath = ('./db/');
 const Discord = require('discord.js');
+const configPath = path.resolve('./config.json');
+const config = require(configPath);
 
 // Pull database into memory at program initiation.
 let stardb;
@@ -20,6 +23,7 @@ try {
 }
 catch (error) { console.error(error); }
 
+// temp code block for big skimmy to go here
 
 /*
 TODO UPDATE THIS SCHEMA - CURRENTLY OUT OF DATE
@@ -32,7 +36,7 @@ starboard - contains data for starboarded posts
     starcount = star count as of last update.
     starthreshold = starboard threshold as of the date the item was posted to starboard. Prevents starboard items from dropping off unexpectedly after the star threshold is changed by mods
     user_id = id of user that posted the original message. used to prevent self-starring.
-starboard_blocked - contains original ids of messages that were blocked from starboard by mods. only contains one column: original_id.
+blocked - contains ids of messages and users that were blocked from starboard. Columns: original_msg, user_id
 */
 
 // function for adjusting the color of the embed based on number of stars.
@@ -70,7 +74,7 @@ function embedColor(starcount, threshold) {
   return `#${r}${g}${b}`;
 }
 
-async function generateEmbed(config, message, starcount, starThreshold) {
+async function generateEmbed(message, starcount, starThreshold) {
   const guildmember = message.guild.member(message.author);
   let image = '';
   const embed = new Discord.MessageEmbed()
@@ -116,8 +120,8 @@ function generateEmoji(starcount, threshold) {
   else if (ratio >= 3) {return '✨';}
 }
 
-// function to get stars a message and optional starboard message, but exclude stars from the original author.
-// returns an array of userids
+// function to get stars on a message and optional starboard message, but exclude stars from the original author.
+// returns an array of userids (for use with starsGivenUpdater())
 async function retrieveStarGivers(message, starboardMsg) {
   const starreacts = await message.reactions.cache.get('⭐');
   const usrArr = [];
@@ -167,6 +171,7 @@ async function starsGivenUpdater(origMessage, usrArr) {
       });
     }
   }
+  // debug text;
   console.log(`stars changed ${starsChanged}`);
   return starsChanged;
 }
@@ -183,7 +188,7 @@ async function queryByStarboard(id) {
   return dbData;
 }
 
-async function publicOnReady(config) {
+async function publicOnReady() {
   if (!config.starboardChannelId) {
     console.log('No starboard channel set! Starboard functions disabled.');
     return;
@@ -195,21 +200,23 @@ async function publicOnReady(config) {
   // uncomment to drop tables at bot start (for debugging purposes)
   // await stardb.run('DROP TABLE IF EXISTS starboard');
   // await stardb.run('DROP TABLE IF EXISTS starsgiven');
-  // await stardb.run('DROP TABLE IF EXISTS blockedmsgs');
-  // await stardb.run('DROP TABLE IF EXISTS blockedusers');
-  await stardb.run('CREATE TABLE IF NOT EXISTS starboard (original_msg text NOT NULL UNIQUE, starboard_msg text NOT NULL UNIQUE, channel text NOT NULL, author text NOT NULL, starthreshold integer NOT NULL, PRIMARY KEY(original_msg, starboard_msg)) ');
+  // await stardb.run('DROP TABLE IF EXISTS blocked');
+  await stardb.run('CREATE TABLE IF NOT EXISTS starboard (original_msg text NOT NULL UNIQUE, starboard_msg text NOT NULL UNIQUE, channel text NOT NULL, author text NOT NULL, starthreshold integer NOT NULL, oldstarboardid, PRIMARY KEY(original_msg, starboard_msg)) ');
   await stardb.run('CREATE TABLE IF NOT EXISTS starsgiven (original_msg text NOT NULL, stargiver text NOT NULL, UNIQUE(original_msg, stargiver))');
   await stardb.run('CREATE INDEX IF NOT EXISTS idx_starsgiven_originals ON starsgiven(original_msg)');
   await stardb.run('CREATE INDEX IF NOT EXISTS idx_stargiver ON starsgiven(stargiver)');
-  await stardb.run('CREATE TABLE IF NOT EXISTS blocked (original_msg text UNIQUE, user UNIQUE)');
+  await stardb.run('CREATE TABLE IF NOT EXISTS blocked (original_msg text UNIQUE, user_id UNIQUE)');
 }
 
-async function publicOnStar(client, config, message) {
+async function publicOnStar(client, message) {
   if (!config.starboardChannelId) return;
   let isBlocked = false;
   // check if user or message are on the blocklist
-  await stardb.get(`SELECT * FROM blocked WHERE user = ${message.author.id} || original_msg = ${message.id}`)
-    .then(result => { if(result != null) {isBlocked = true;}});
+  await stardb.get(`SELECT * FROM blocked WHERE user_id = ${message.author.id} OR original_msg = ${message.id}`)
+    .then(result => {
+      console.log(result);
+      if(result != null) {isBlocked = true;}
+    });
   if (isBlocked) return;
   const starboardChannel = await client.channels.fetch(config.starboardChannelId);
   let dbdata;
@@ -231,7 +238,7 @@ async function publicOnStar(client, config, message) {
     const starsChanged = await starsGivenUpdater(message, usrArr);
     if (starcount >= dbdata.starthreshold && starsChanged == true) {
       // starcount is above the threshold from when it was starboarded and star count has changed. generate new embed and add data to db.
-      const starboardEmbed = await generateEmbed(config, message, starcount, dbdata.starthreshold);
+      const starboardEmbed = await generateEmbed(message, starcount, dbdata.starthreshold);
       const starboardEmoji = generateEmoji(starcount, dbdata.starthreshold);
       starboardMsg.edit(`${starboardEmoji} **${starcount}** ${message.channel}`, starboardEmbed);
       // console.log(starboardMsg.embeds[0].footer.text);
@@ -249,7 +256,7 @@ async function publicOnStar(client, config, message) {
     const starcount = usrArr.length;
     if (starcount >= config.starThreshold) {
       // item is new starboard candidate. generate embed and message
-      const starboardEmbed = await generateEmbed(config, message, starcount, config.starThreshold);
+      const starboardEmbed = await generateEmbed(message, starcount, config.starThreshold);
       const starboardEmoji = generateEmoji(starcount, config.starThreshold);
       const starboardMsg = await starboardChannel.send(`${starboardEmoji} **${starcount}** ${message.channel}`, starboardEmbed);
       // update starsgiven table and starboard table
@@ -264,5 +271,94 @@ async function publicOnStar(client, config, message) {
   return;
 }
 
-exports.onReady = publicOnReady;
-exports.onStar = publicOnStar;
+async function publicBlockUser(userid) {
+  // exempting/blocking users from starboard is easy since we don't need to go back and delete old starboard items from them.
+  let alreadyBlocked = false;
+  try {
+    await stardb.run(`INSERT OR IGNORE INTO blocked(user_id) VALUES(${userid})`)
+      .then(result => { if(result.changes == 0) {alreadyBlocked = true;}});
+    if (alreadyBlocked) { return 'alreadyblocked'; }
+    else {
+      return 'blocksuccessful';
+    }
+  }
+  catch(error) {
+    console.error(`Error adding user to starboard block list! Error details: ${error}`);
+    return 'error';
+  }
+}
+
+async function publicBlockMsg(message, client) {
+  // exempting/blocking a specific message requires us to check if there's a starboard message already.
+  try {
+    let dbdata;
+    let alreadyBlocked;
+    const starboardChannel = await client.channels.fetch(config.starboardChannelId);
+    if (message.channel == starboardChannel) {
+      dbdata = await queryByStarboard(message.id);
+      message = await message.guild.channels.fetch(dbdata.channel).then(channel => {return channel.messages.fetch(dbdata.original_msg);});
+    }
+    else {
+      dbdata = await queryByOriginal(message.id);
+    }
+    if (dbdata) {
+    // item is already in star db; starboard message should exist. Get starboard message and delete.
+      const starboardMsg = await starboardChannel.messages.fetch(dbdata.starboard_msg);
+      // use an if statement because this function is also called automatically when a starboard message is deleted.
+      if (starboardMsg) { starboardMsg.delete(); }
+      await stardb.run(`DELETE FROM starboard WHERE original_msg = ${message.id}`);
+      await stardb.run(`DELETE FROM starsgiven WHERE original_msg = ${message.id}`);
+    }
+    await stardb.run(`INSERT OR IGNORE INTO blocked(original_msg) VALUES(${message.id})`)
+      .then(result => { if(result.changes == 0) {alreadyBlocked = true;}});
+    if (alreadyBlocked) { return 'alreadyblocked'; }
+    else {
+      return 'blocksuccessful';
+    }
+  }
+  catch(error) {
+    console.error(`Error adding message to starboard block list! Error details: ${error}`);
+    return 'error';
+  }
+}
+
+async function publicUnblockUser(userid) {
+  let notBlocked = false;
+  try {
+    await stardb.run(`DELETE FROM blocked WHERE user_id = ${userid}`)
+      .then(result => { if(result.changes == 0) {notBlocked = true;}});
+    if (notBlocked) { return 'notblocked'; }
+    else {
+      return 'unblocksuccessful';
+    }
+  }
+  catch(error) {
+    console.error(`Error removing user from starboard block list! Error details: ${error}`);
+    return 'error';
+  }
+}
+
+async function publicUnblockMessage(message) {
+  let notBlocked = false;
+  try {
+    await stardb.run(`DELETE FROM blocked WHERE original_msg = ${message.id}`)
+      .then(result => { if(result.changes == 0) {notBlocked = true;}});
+    if (notBlocked) { return 'notblocked'; }
+    else {
+      return 'unblocksuccessful';
+    }
+  }
+  catch(error) {
+    console.error(`Error removing user from starboard block list! Error details: ${error}`);
+    return 'error';
+  }
+}
+
+module.exports = {
+  onReady: publicOnReady,
+  onStar: publicOnStar,
+  blockUser: publicBlockUser,
+  blockMsg: publicBlockMsg,
+  unblockUser: publicUnblockUser,
+  unblockMsg: publicUnblockMessage,
+};
