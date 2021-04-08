@@ -153,7 +153,7 @@ function getRelativeTime(date1, date2) {
 
   let humanized = '';
   let diffMS = date1.diff(date2);
-  console.log(diffMS);
+  // console.log(diffMS);
   diffMS = moment.duration(diffMS);
   const minutes = diffMS.minutes();
   const hours = diffMS.hours();
@@ -842,9 +842,9 @@ async function editCommand(message, client, name) {
               awaitingAnswer = false;
               awaitYN = false;
               return message.channel.send(
-                embedEvent(event, null, {
+                embedEvent(event, message.guild, {
                   title: `Event has changed: ${event.name}`,
-                  forUser: message.author.id,
+                  forUser: message.author,
                 }),
               );
             case 'cancel':
@@ -1463,7 +1463,7 @@ async function createWizard(message, channel) {
   DMChannel.send(
     DMembedEvent(eventData, message.guild, {
       title: `New event: ${eventData.name}`,
-      forUser: message.author.id,
+      forUser: message.author,
     }),
   );
   DMChannel.send('Great! Does this look OK? **Y/N**');
