@@ -1,7 +1,7 @@
 const Discord = require('discord.js');
 
 exports.init = function(client) {
-  client.on('raw', async(packet) => {
+  client.on('raw', async (packet) => {
     if (packet.t !== 'MESSAGE_REACTION_ADD') {
       return;
     }
