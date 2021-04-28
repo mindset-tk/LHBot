@@ -5,6 +5,26 @@ const configPath = './config.json';
 let config = undefined;
 const wait = require('util').promisify(setTimeout);
 const fsp = fs.promises;
+const sqlite3 = require('sqlite3');
+const { open } = require('sqlite');
+const dbpath = ('./db/');
+
+let botdb;
+(async () => {
+  try {
+    if (!fs.existsSync(dbpath)) {
+      fs.mkdirSync(dbpath);
+    }
+    await open({
+      filename: `${dbpath}botdata.db`,
+      driver: sqlite3.Database,
+    }).then((value) => {
+      console.log('Bot data db opened.');
+      return botdb = value;
+    });
+  }
+  catch (error) { console.error(error); }
+})();
 
 // function to pretty print the config data so that arrays show on one line, so it's easier to visually parse the config file when hand opening it. Purely cosmetic.
 function prettyPrintConfig(cfg) {
@@ -155,7 +175,7 @@ for (const file of commandFiles) {
     client.commands.set(command.name, command);
   }
   if (command.init) {
-    command.init(client, config);
+    command.init(client, config, botdb);
   }
 }
 
@@ -182,7 +202,7 @@ client.on('ready', async () => {
     client.dataLogLock = 0;
     console.log('Offline message fetch complete!');
   });
-  starboard.onReady(config);
+  starboard.onReady(botdb);
   // wait 1000ms without holding up the rest of the script. This way we can ensure recieving all guild invite info.
   await wait(1000);
   client.guilds.cache.forEach(g => {
@@ -212,7 +232,7 @@ client.on('channelCreate', async channel => {
   }
 });
 
-// set up listener for channel creation events
+// set up listener for user update events
 client.on('userUpdate', async (oldUser, newUser) => {
   if (oldUser.avatar !== newUser.avatar && config.avatarLogToggle && config.channelAvatarLogs) {
     // If the toggle to make this feature airlock-role-only is on, then check if the user has that role
@@ -353,7 +373,7 @@ client.on('message', async message => {
 
   // Try to execute the command and return an error if it fails.
   try {
-    await command.execute(message, args, client, config);
+    await command.execute(message, args, client, config, botdb);
   }
   catch (error) {
     console.error(error);
