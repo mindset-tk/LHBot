@@ -9,23 +9,6 @@ const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 const dbpath = ('./db/');
 
-let botdb;
-(async () => {
-  try {
-    if (!fs.existsSync(dbpath)) {
-      fs.mkdirSync(dbpath);
-    }
-    await open({
-      filename: `${dbpath}botdata.db`,
-      driver: sqlite3.Database,
-    }).then((value) => {
-      console.log('Bot data db opened.');
-      return botdb = value;
-    });
-  }
-  catch (error) { console.error(error); }
-})();
-
 // function to pretty print the config data so that arrays show on one line, so it's easier to visually parse the config file when hand opening it. Purely cosmetic.
 function prettyPrintConfig(cfg) {
   const output = JSON.stringify(cfg, function(k, v) {
@@ -125,9 +108,8 @@ CONFIG_FILENAMES.forEach(filename => {
 
 const Discord = require('discord.js');
 const myIntents = new Discord.Intents();
-const Counting = require('./counting.js');
+const counting = require('./counting.js');
 const disboard = require('./disboard.js');
-const vc = require('./commands/vc.js');
 const listPath = './gamelist.json';
 const gameList = require(listPath);
 const dataLogger = require('./datalog.js');
@@ -164,22 +146,47 @@ const cooldowns = new Discord.Collection();
 // since the datalogger takes some time to cache messages, especially on larger servers, create a global check digit to block unwanted processing of new messages during datalogging
 client.dataLogLock = 0;
 
-// read command files (maybe rename? plugins, features?)
-const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
-
-for (const file of commandFiles) {
-  const command = require(`./commands/${file}`);
-  // set a new item in the Collection
-  // with the name attribute as the command name and the value as the exported module
-  if (command.name) {
-    client.commands.set(command.name, command);
+// initiate the sql db with various bot data, then initiate commands and modules
+let botdb;
+(async () => {
+  try {
+    if (!fs.existsSync(dbpath)) {
+      fs.mkdirSync(dbpath);
+    }
+    await open({
+      filename: `${dbpath}botdata.db`,
+      driver: sqlite3.Database,
+    }).then((value) => {
+      console.log('Bot data db opened.');
+      botdb = value;
+    });
+    const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
+    for (const file of commandFiles) {
+      const command = require(`./commands/${file}`);
+      // set a new item in the Collection
+      // with the name attribute as the command name and the value as the exported module
+      if (command.name) {
+        client.commands.set(command.name, command);
+      }
+      if (command.init) {
+        command.init(client, config, botdb);
+      }
+    }
+    const modules = fs.readdirSync('.').filter(file => file.endsWith('.js'));
+    for (const file of modules) {
+      if (file != 'bot.js') {
+        const module = require(`./${file}`);
+        if (module.init) {
+          module.init(client, config, botdb);
+        }
+      }
+    }
   }
-  if (command.init) {
-    command.init(client, config, botdb);
-  }
-}
+  catch (error) { console.error(error); }
+})();
 
-dataLogger.init(client, config);
+// login to Discord with your app's token
+client.login(config.authtoken);
 
 // initialize invite cache
 const invites = {};
@@ -194,7 +201,7 @@ client.on('ready', async () => {
     writeConfig(config);
   }
   if (config.currentActivity) { client.user.setActivity(config.currentActivity.Name, { type: config.currentActivity.Type }); }
-  Counting.OnReady(config, client);
+  counting.OnReady(config, client);
   // Lock datalog while caching offline messages. When that finishes, the callback will unlock the log.
   client.dataLogLock = 1;
   console.log('Fetching offline messages...');
@@ -273,9 +280,6 @@ client.on('userUpdate', async (oldUser, newUser) => {
   }
 });
 
-// login to Discord with your app's token
-client.login(config.authtoken);
-
 // command parser
 client.on('message', async message => {
 
@@ -296,7 +300,7 @@ client.on('message', async message => {
   // only do datalogging on non-DM text channels. Don't log messages while offline retrieval is proceeding.
   // (offline logging will loop and catch new messages on the fly.)
   if (message.channel.type === 'text' && client.dataLogLock != 1) { dataLogger.OnMessage(message, config); }
-  if(Counting.HandleMessage(message)) {
+  if(counting.HandleMessage(message)) {
     return;
   }
 

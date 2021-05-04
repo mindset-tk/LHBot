@@ -1,29 +1,7 @@
 const path = require('path');
-const sqlite3 = require('sqlite3');
-const { open } = require('sqlite');
-const fs = require('fs');
-const dbpath = ('./db/');
 const Discord = require('discord.js');
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
-
-// Pull database into memory at program initiation.
-let stardb;
-try {
-  if (!fs.existsSync(dbpath)) {
-    fs.mkdirSync(dbpath);
-  }
-  open({
-    filename: `${dbpath}starboard.db`,
-    driver: sqlite3.Database,
-  }).then((value) => {
-    stardb = value;
-    console.log('Stardb loaded.');
-  });
-}
-catch (error) { console.error(error); }
-
-// temp code block for big skimmy to go here
 
 /*
 TODO UPDATE THIS SCHEMA - CURRENTLY OUT OF DATE
@@ -38,6 +16,29 @@ starboard - contains data for starboarded posts
     user_id = id of user that posted the original message. used to prevent self-starring.
 blocked - contains ids of messages and users that were blocked from starboard. Columns: original_msg, user_id
 */
+async function publicOnReady(botdb) {
+  if (!config.starboardChannelId) {
+    console.log('No starboard channel set! Starboard functions disabled.');
+    return;
+  }
+  else if (!config.starThreshold) {
+    console.log('Star threshold not set! Starboard functions disabled.');
+    return;
+  }
+  console.log('starboard ready!');
+  // uncomment to drop tables at bot start (for debugging purposes)
+  // await botdb.run('DROP TABLE IF EXISTS starboard');
+  // await botdb.run('DROP TABLE IF EXISTS starsgiven');
+  // await botdb.run('DROP TABLE IF EXISTS starboard_blocked');
+  await botdb.run('DROP TABLE IF EXISTS starmigrator');
+  await botdb.run('DROP TABLE IF EXISTS starsgivenmigrator');
+  await botdb.run('DROP TABLE IF EXISTS newstarboard');
+  await botdb.run('CREATE TABLE IF NOT EXISTS starboard (original_msg text NOT NULL UNIQUE, starboard_msg text NOT NULL UNIQUE, channel text NOT NULL, author text NOT NULL, starthreshold integer NOT NULL, PRIMARY KEY(original_msg, starboard_msg)) ');
+  await botdb.run('CREATE TABLE IF NOT EXISTS starsgiven (original_msg text NOT NULL, stargiver text NOT NULL, UNIQUE(original_msg, stargiver))');
+  await botdb.run('CREATE INDEX IF NOT EXISTS idx_starsgiven_originals ON starsgiven(original_msg)');
+  await botdb.run('CREATE INDEX IF NOT EXISTS idx_stargiver ON starsgiven(stargiver)');
+  await botdb.run('CREATE TABLE IF NOT EXISTS starboard_blocked (original_msg text UNIQUE, user_id UNIQUE)');
+}
 
 // function for adjusting the color of the embed based on number of stars.
 // using HSL, it varies luminance of a yellow color based on how much greater starcount is than the threshold, maxing out at 2*threshold;
@@ -132,7 +133,7 @@ async function retrieveStarGivers(message, starboardMsg) {
       if (!usrArr.includes(user.id)) usrArr.push(user.id);
     });
   }
-  if (starboardMsg) {
+  if (starboardMsg && starboardMsg.reactions) {
     const starboardreacts = await starboardMsg.reactions.cache.get('⭐');
     if (!starboardreacts) return usrArr;
     await starboardreacts.users.fetch();
@@ -146,15 +147,15 @@ async function retrieveStarGivers(message, starboardMsg) {
 
 // function to manage starsgiven DB entries and make necessary updates to starsgiven db.
 // origMessage = original message object, usrArr = array of userids that have starred the item
-async function starsGivenUpdater(origMessage, usrArr) {
+async function starsGivenUpdater(origMessage, usrArr, botdb) {
   let starsChanged = false;
   // retrieve all items from starsgiven table associated with the given msg. returns array of objects in format { stargiver: userid }.
-  const starArr = await stardb.all(`SELECT stargiver FROM starsgiven WHERE original_msg = ${origMessage.id}`);
+  const starArr = await botdb.all('SELECT stargiver FROM starsgiven WHERE original_msg = ?', origMessage.id);
   for (const { stargiver } of starArr) {
     // for each item of this the array from the starsgiven table, compare to usrArr...
     if (!usrArr.includes(stargiver)) {
       // if usrArr passed to this function does not contain a stargiver item, that must mean the user has removed their star.
-      await stardb.run(`DELETE FROM starsgiven WHERE original_msg = ${origMessage.id} AND stargiver = ${stargiver}`).then((result) => {
+      await botdb.run('DELETE FROM starsgiven WHERE original_msg = ? AND stargiver = ?', origMessage.id, stargiver).then((result) => {
         if (result.changes > 0) starsChanged = true;
       });
     }
@@ -166,7 +167,7 @@ async function starsGivenUpdater(origMessage, usrArr) {
   if (usrArr.length > 0) {
     // remaining items in usrArr do not exist in starsgiven table. attempt to insert into starsgiven.
     for (const usr of usrArr) {
-      await stardb.run(`INSERT OR IGNORE INTO starsgiven(original_msg, stargiver) VALUES(${origMessage.id},${usr})`).then((result) => {
+      await botdb.run('INSERT OR IGNORE INTO starsgiven(original_msg, stargiver) VALUES(?, ?)', origMessage.id, usr).then((result) => {
         if (result.changes > 0) starsChanged = true;
       });
     }
@@ -177,44 +178,24 @@ async function starsGivenUpdater(origMessage, usrArr) {
 }
 
 // query main starboard table by original message id. returns undefined if item is not in starboard db.
-async function queryByOriginal(id) {
-  const dbData = await stardb.get(`SELECT * FROM starboard WHERE original_msg = ${id}`);
+async function queryByOriginal(id, botdb) {
+  const dbData = await botdb.get('SELECT * FROM starboard WHERE original_msg = ?', id);
   return dbData;
 }
 
 // query main starboard table by starboard message id. returns undefined if item not in starboard db.
-async function queryByStarboard(id) {
-  const dbData = await stardb.get(`SELECT * FROM starboard WHERE starboard_msg = ${id}`);
+async function queryByStarboard(id, botdb) {
+  const dbData = await botdb.get('SELECT * FROM starboard WHERE starboard_msg = ?', id);
   return dbData;
 }
 
-async function publicOnReady() {
-  if (!config.starboardChannelId) {
-    console.log('No starboard channel set! Starboard functions disabled.');
-    return;
-  }
-  else if (!config.starThreshold) {
-    console.log('Star threshold not set! Starboard functions disabled.');
-    return;
-  }
-  // uncomment to drop tables at bot start (for debugging purposes)
-  // await stardb.run('DROP TABLE IF EXISTS starboard');
-  // await stardb.run('DROP TABLE IF EXISTS starsgiven');
-  // await stardb.run('DROP TABLE IF EXISTS blocked');
-  await stardb.run('CREATE TABLE IF NOT EXISTS starboard (original_msg text NOT NULL UNIQUE, starboard_msg text NOT NULL UNIQUE, channel text NOT NULL, author text NOT NULL, starthreshold integer NOT NULL, oldstarboardid, PRIMARY KEY(original_msg, starboard_msg)) ');
-  await stardb.run('CREATE TABLE IF NOT EXISTS starsgiven (original_msg text NOT NULL, stargiver text NOT NULL, UNIQUE(original_msg, stargiver))');
-  await stardb.run('CREATE INDEX IF NOT EXISTS idx_starsgiven_originals ON starsgiven(original_msg)');
-  await stardb.run('CREATE INDEX IF NOT EXISTS idx_stargiver ON starsgiven(stargiver)');
-  await stardb.run('CREATE TABLE IF NOT EXISTS blocked (original_msg text UNIQUE, user_id UNIQUE)');
-}
 
-async function publicOnStar(client, message) {
-  if (!config.starboardChannelId) return;
+async function publicOnStar(client, message, botdb) {
+  if (!config.starboardChannelId || !config.starboardToggle || config.starboardIgnoreChannels.includes(message.channel.id)) return;
   let isBlocked = false;
   // check if user or message are on the blocklist
-  await stardb.get(`SELECT * FROM blocked WHERE user_id = ${message.author.id} OR original_msg = ${message.id}`)
+  await botdb.get('SELECT * FROM starboard_blocked WHERE user_id = ? OR original_msg = ?', message.author.id, message.id)
     .then(result => {
-      console.log(result);
       if(result != null) {isBlocked = true;}
     });
   if (isBlocked) return;
@@ -222,12 +203,27 @@ async function publicOnStar(client, message) {
   let dbdata;
   // if the starred item was in the starboard, we look up the starboard entry for that message, then change 'message' to point to the original message instead of the starboard message.
   if (message.channel == starboardChannel) {
-    dbdata = await queryByStarboard(message.id);
-    message = await client.channels.fetch(dbdata.channel).then(channel => {return channel.messages.fetch(dbdata.original_msg);});
+    dbdata = await queryByStarboard(message.id, botdb);
+    try {
+      message = await client.channels.fetch(dbdata.channel).then(channel => {
+        return channel.messages.fetch(dbdata.original_msg);
+      });
+    }
+    catch {
+      // edge case where e.g. original channel has been deleted, but we still want to leave the item in the starboard.
+      const messageRegEx = /(?:(?:https*:\/\/)*.*discord.*\/channels\/)\d+\/(\d+)\/(\d+)/;
+      const urlfield = message.embeds[0].fields.find(field => {
+        return field.name == 'Source';
+      });
+      const target = { chanID: messageRegEx.exec(urlfield.value)[1], msgID: messageRegEx.exec(urlfield.value)[2] };
+      await botdb.run('DELETE FROM starboard WHERE original_msg = ?', target.msgID);
+      await botdb.run('DELETE FROM starsgiven WHERE original_msg = ?', target.msgID);
+      return;
+    }
   }
   // ...otherwise we can just search by the original id
   else {
-    dbdata = await queryByOriginal(message.id);
+    dbdata = await queryByOriginal(message.id, botdb);
   }
   if (dbdata) {
     // item is already in star db; starboard message should exist. Get starboard message.
@@ -235,20 +231,20 @@ async function publicOnStar(client, message) {
     // pass original message and starboard message to starcounter
     const usrArr = await retrieveStarGivers(message, starboardMsg);
     const starcount = usrArr.length;
-    const starsChanged = await starsGivenUpdater(message, usrArr);
+    const starsChanged = await starsGivenUpdater(message, usrArr, botdb);
     if (starcount >= dbdata.starthreshold && starsChanged == true) {
       // starcount is above the threshold from when it was starboarded and star count has changed. generate new embed and add data to db.
       const starboardEmbed = await generateEmbed(message, starcount, dbdata.starthreshold);
       const starboardEmoji = generateEmoji(starcount, dbdata.starthreshold);
       starboardMsg.edit(`${starboardEmoji} **${starcount}** ${message.channel}`, starboardEmbed);
       // console.log(starboardMsg.embeds[0].footer.text);
-      // await stardb.run(`UPDATE starboard Set starcount = ${starcount} WHERE original_id = ${message.id}`);
+      // await botdb.run(`UPDATE starboard Set starcount = ? WHERE original_id = ?`, starcount, message.id);
     }
     else if (starcount < dbdata.starthreshold) {
       // item has dropped below its original threshold of star reacts. Delete from starboard and db.
       starboardMsg.delete();
-      await stardb.run(`DELETE FROM starboard WHERE original_msg = ${message.id}`);
-      await stardb.run(`DELETE FROM starsgiven WHERE original_msg = ${message.id}`);
+      await botdb.run('DELETE FROM starboard WHERE original_msg = ?', message.id);
+      await botdb.run('DELETE FROM starsgiven WHERE original_msg = ?', message.id);
     }
   }
   else if (!dbdata) {
@@ -260,8 +256,8 @@ async function publicOnStar(client, message) {
       const starboardEmoji = generateEmoji(starcount, config.starThreshold);
       const starboardMsg = await starboardChannel.send(`${starboardEmoji} **${starcount}** ${message.channel}`, starboardEmbed);
       // update starsgiven table and starboard table
-      await starsGivenUpdater(message, usrArr);
-      await stardb.run(`INSERT INTO starboard(original_msg,starboard_msg,channel,author,starthreshold) VALUES(${message.id},${starboardMsg.id},${message.channel.id},${message.author.id},${config.starThreshold})`);
+      await starsGivenUpdater(message, usrArr, botdb);
+      await botdb.run('INSERT INTO starboard(original_msg,starboard_msg,channel,author,starthreshold) VALUES(?,?,?,?,?)', message.id, starboardMsg.id, message.channel.id, message.author.id, config.starThreshold);
     }
     else if (!dbdata && (starcount < config.starThreshold)) {
       // item is not in db and has fewer stars than threshold. do nothing.
@@ -271,11 +267,11 @@ async function publicOnStar(client, message) {
   return;
 }
 
-async function publicBlockUser(userid) {
+async function publicBlockUser(userid, botdb) {
   // exempting/blocking users from starboard is easy since we don't need to go back and delete old starboard items from them.
   let alreadyBlocked = false;
   try {
-    await stardb.run(`INSERT OR IGNORE INTO blocked(user_id) VALUES(${userid})`)
+    await botdb.run('INSERT OR IGNORE INTO starboard_blocked(user_id) VALUES(?)', userid)
       .then(result => { if(result.changes == 0) {alreadyBlocked = true;}});
     if (alreadyBlocked) { return 'alreadyblocked'; }
     else {
@@ -288,28 +284,28 @@ async function publicBlockUser(userid) {
   }
 }
 
-async function publicBlockMsg(message, client) {
+async function publicBlockMsg(message, client, botdb) {
   // exempting/blocking a specific message requires us to check if there's a starboard message already.
   try {
     let dbdata;
     let alreadyBlocked;
     const starboardChannel = await client.channels.fetch(config.starboardChannelId);
     if (message.channel == starboardChannel) {
-      dbdata = await queryByStarboard(message.id);
+      dbdata = await queryByStarboard(message.id, botdb);
       message = await message.guild.channels.fetch(dbdata.channel).then(channel => {return channel.messages.fetch(dbdata.original_msg);});
     }
     else {
-      dbdata = await queryByOriginal(message.id);
+      dbdata = await queryByOriginal(message.id, botdb);
     }
     if (dbdata) {
     // item is already in star db; starboard message should exist. Get starboard message and delete.
       const starboardMsg = await starboardChannel.messages.fetch(dbdata.starboard_msg);
       // use an if statement because this function is also called automatically when a starboard message is deleted.
       if (starboardMsg) { starboardMsg.delete(); }
-      await stardb.run(`DELETE FROM starboard WHERE original_msg = ${message.id}`);
-      await stardb.run(`DELETE FROM starsgiven WHERE original_msg = ${message.id}`);
+      await botdb.run('DELETE FROM starboard WHERE original_msg = ?', message.id);
+      await botdb.run('DELETE FROM starsgiven WHERE original_msg = ?', message.id);
     }
-    await stardb.run(`INSERT OR IGNORE INTO blocked(original_msg) VALUES(${message.id})`)
+    await botdb.run('INSERT OR IGNORE INTO starboard_blocked(original_msg) VALUES(?)', message.id)
       .then(result => { if(result.changes == 0) {alreadyBlocked = true;}});
     if (alreadyBlocked) { return 'alreadyblocked'; }
     else {
@@ -322,10 +318,10 @@ async function publicBlockMsg(message, client) {
   }
 }
 
-async function publicUnblockUser(userid) {
+async function publicUnblockUser(userid, botdb) {
   let notBlocked = false;
   try {
-    await stardb.run(`DELETE FROM blocked WHERE user_id = ${userid}`)
+    await botdb.run('DELETE FROM starboard_blocked WHERE user_id = ?', userid)
       .then(result => { if(result.changes == 0) {notBlocked = true;}});
     if (notBlocked) { return 'notblocked'; }
     else {
@@ -338,10 +334,10 @@ async function publicUnblockUser(userid) {
   }
 }
 
-async function publicUnblockMessage(message) {
+async function publicUnblockMessage(message, botdb) {
   let notBlocked = false;
   try {
-    await stardb.run(`DELETE FROM blocked WHERE original_msg = ${message.id}`)
+    await botdb.run('DELETE FROM starboard_blocked WHERE original_msg = ?', message.id)
       .then(result => { if(result.changes == 0) {notBlocked = true;}});
     if (notBlocked) { return 'notblocked'; }
     else {
@@ -352,6 +348,112 @@ async function publicUnblockMessage(message) {
     console.error(`Error removing user from starboard block list! Error details: ${error}`);
     return 'error';
   }
+}
+
+async function getMessageFromURL(url, client) {
+  const messageRegEx = /(?:(?:https*:\/\/)*.*discord.*\/channels\/)\d+\/(\d+)\/(\d+)/;
+  const target = { chanID: messageRegEx.exec(url)[1], msgID: messageRegEx.exec(url)[2] };
+  try {
+    target.chan = await client.channels.fetch(target.chanID);
+    target.msg = await target.chan.messages.fetch(target.msgID);
+    return target.msg;
+  }
+  catch {
+    return null;
+  }
+}
+
+
+async function publicMigrator(fromChannel, toChannel, replyChannel, client, botdb) {
+  // create a temporary migrator db to integrate extant starboard with migrated; this is a copy of the old starboard.
+  await botdb.run(`CREATE TABLE IF NOT EXISTS starmigrator (original_msg text NOT NULL UNIQUE, starboard_msg text NOT NULL UNIQUE, channel text NOT NULL, author text NOT NULL, starthreshold integer NOT NULL, old_starboard_channel text NOT NULL ON CONFLICT REPLACE DEFAULT ${config.starboardChannelId}, PRIMARY KEY(original_msg, starboard_msg))`);
+  await botdb.run('INSERT INTO starmigrator SELECT * FROM starboard');
+  await botdb.run('ALTER TABLE starmigrator RENAME COLUMN starboard_msg TO old_starboard_msg');
+  await botdb.run('CREATE TABLE IF NOT EXISTS starsgivenmigrator (original_msg text NOT NULL, stargiver text NOT NULL, UNIQUE(original_msg, stargiver))');
+  // create a temporary blank starboard table to push data into. This will be renamed to replace starboard at the end of this process.
+  await botdb.run('CREATE TABLE IF NOT EXISTS newstarboard (original_msg text NOT NULL UNIQUE, starboard_msg text NOT NULL UNIQUE, channel text NOT NULL, author text NOT NULL, starthreshold integer NOT NULL, PRIMARY KEY(original_msg, starboard_msg)) ');
+  let lastSeenMessage = 0;
+  let loopbreaker = 0;
+  let prevLastSeen;
+  while (fromChannel.lastMessageID != lastSeenMessage && loopbreaker < 2) {
+    prevLastSeen = lastSeenMessage;
+    await fromChannel.messages.fetch({ limit: 100, after: lastSeenMessage }).then(async messagearr => {
+      for (const oldStarboardMsg of messagearr.values()) {
+        const urlfield = await oldStarboardMsg.embeds[0].fields.find(field => {
+          return field.name == 'Source';
+        });
+        const targetmsg = await getMessageFromURL(urlfield.value, client);
+        if (targetmsg) {
+          let starThreshold;
+          const usrArr = await retrieveStarGivers(targetmsg, oldStarboardMsg);
+          // to account for possible differences in star threshold over time, we will assume that any message OVER the current threshold uses the current threshold...
+          if (config.starThreshold && usrArr.length >= config.starThreshold) {
+            starThreshold = config.starThreshold;
+          }
+          // ...but any message that doesn't meet that criteria is legacied in with its threshold set to its current star count.
+          else { starThreshold = usrArr.length; }
+          // add it all to the migrator table and migrator star table.
+          await botdb.run('INSERT OR IGNORE INTO starmigrator(original_msg,old_starboard_msg,channel,author,starthreshold,old_starboard_channel) VALUES(?,?,?,?,?,?)', targetmsg.id, oldStarboardMsg.id, targetmsg.channel.id, targetmsg.author.id, starThreshold, oldStarboardMsg.channel.id);
+          for (const usr of usrArr) {
+            await botdb.run('INSERT OR IGNORE INTO starsgivenmigrator(original_msg, stargiver) VALUES(?,?)', targetmsg.id, usr);
+          }
+        }
+        else { replyChannel.send(`Message or channel deleted for starboard item at <${oldStarboardMsg.url}> - Skipping this item.`); }
+        // finally if the message id is larger than the oldest one we've seen, update our lastseen.
+        if (targetmsg && BigInt(targetmsg.id) > BigInt(lastSeenMessage)) { lastSeenMessage = targetmsg.id; }
+      }
+    });
+    // if the last message in a channel was deleted, there will be a mismatch in channel.lastMessageID, leading to an infinite loop.
+    // if that happens, since lastSeenMessage isn't being changed, this conditional will break the loop after 2 tries.
+    if (prevLastSeen === lastSeenMessage) {
+      loopbreaker++;
+    }
+  }
+  // once the while loop above completes, it's posting time.
+  // first, get the migrator table an order by old_starboard_msg, ascending.
+  const migratordbdata = await botdb.all('SELECT * FROM starmigrator ORDER BY old_starboard_msg');
+  // then run through each item, enumerate data about starboard and original post, and post in new starboard
+  for (const dbdata of migratordbdata) {
+    const oldstarboardChannel = await client.channels.cache.get(dbdata.old_starboard_channel);
+    const originalChannel = await client.channels.cache.get(dbdata.channel);
+    const originalMsg = await originalChannel.messages.fetch(dbdata.original_msg);
+    const oldstarboardMsg = await oldstarboardChannel.messages.fetch(dbdata.starboard_msg);
+    const usrArr = await retrieveStarGivers(originalMsg, oldstarboardMsg);
+    const starcount = usrArr.length;
+    // checking if starcount is greater than 0; edge case relating to
+    if (starcount >= dbdata.starthreshold && starcount > 0) {
+      const starboardEmbed = await generateEmbed(originalMsg, starcount, dbdata.starthreshold);
+      const starboardEmoji = generateEmoji(starcount, dbdata.starthreshold);
+      const newStarboardMsg = await toChannel.send(`${starboardEmoji} **${starcount}** ${originalChannel}`, starboardEmbed);
+      const starArr = await botdb.all('SELECT stargiver FROM starsgivenmigrator WHERE original_msg = ?', originalMsg.id);
+      for (const { stargiver } of starArr) {
+      // for each item of this the array from the migratorstars table, compare to usrArr...
+        if (!usrArr.includes(stargiver)) {
+        // if usrArr passed to this function does not contain a migratorstars item, that must mean the user has removed their star.
+          await botdb.run('DELETE FROM starsgivenmigrator WHERE original_msg = ? AND stargiver = ?', originalMsg.id, stargiver);
+        }
+        else {
+        // else if usrarr DOES contain the item, discard it.
+          usrArr.splice(usrArr.indexOf(stargiver), 1);
+        }
+      }
+      if (usrArr.length > 0) {
+      // remaining items in usrArr do not exist in migratorstars table. attempt to insert into starsgiven.
+        for (const usr of usrArr) {
+          await botdb.run('INSERT OR IGNORE INTO starsgivenmigrator(original_msg, stargiver) VALUES(?,?)', originalMsg.id, usr);
+        }
+      }
+      await botdb.run('INSERT INTO newstarboard(original_msg,starboard_msg,channel,author,starthreshold) VALUES(?,?,?,?,?)', originalMsg.id, newStarboardMsg.id, originalMsg.channel.id, originalMsg.author.id, config.starThreshold);
+    }
+  }
+  // TODO drop old tables; cleanup and rename newstarboard and migratorstars to starboard and starsgiven.
+  await botdb.run('DROP TABLE IF EXISTS starboard');
+  await botdb.run('DROP TABLE IF EXISTS starsgiven');
+  await botdb.run('ALTER TABLE newstarboard RENAME TO starboard');
+  await botdb.run('ALTER TABLE starsgivenmigrator RENAME TO starsgiven');
+  await botdb.run('CREATE INDEX IF NOT EXISTS idx_starsgiven_originals ON starsgiven(original_msg)');
+  await botdb.run('CREATE INDEX IF NOT EXISTS idx_stargiver ON starsgiven(stargiver)');
+  await botdb.run('DROP TABLE IF EXISTS starmigrator');
 }
 
 module.exports = {
@@ -361,4 +463,5 @@ module.exports = {
   blockMsg: publicBlockMsg,
   unblockUser: publicUnblockUser,
   unblockMsg: publicUnblockMessage,
+  migrator: publicMigrator,
 };

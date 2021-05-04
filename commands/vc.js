@@ -150,7 +150,7 @@ module.exports = {
     client.on('ready', async () => { OnReady(client); });
     // set up listener to revert configured game chambers to their default sizes
     client.on('voiceStateUpdate', (oldState, newState) => {
-        SnapbackCheck (oldState, newState, client);
+      SnapbackCheck (oldState, newState, client);
     });
-  }
+  },
 };

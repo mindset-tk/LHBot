@@ -191,7 +191,8 @@ Pin reacts needed to pin a message: **${config.pinsToPin}**
 Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + ignoreChans.join(', #') : 'None.'}**
 
 __Starboard:__
-Starboard: **${(config.starboardToggle) ? (config.starboardChannelId ? `ON** in: **#${getChannelName(config.starboardChannelId)}` : 'Not set. Starboard functionality disabled.') : 'OFF'}**
+Starboard: **${(config.starboardToggle) ? 'ON' : 'OFF'}**
+Starboard Channel: ${config.starboardChannelId ? `**#${getChannelName(config.starboardChannelId)}**` : 'Not set. Starboard functionality disabled.'}
 Star reaction threshold to post starboard: **${(config.starThreshold) ? config.starThreshold : (config.starboardChannelId) ? 'Not set. Starboard functionality disabled.' : 'N/A'}**
 Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '#' + starboardIgnoreChans.join(', #') : 'None.'}**
 Channels considered private for starboarding (user must affirm they are OK with a post going to starboard): **${(config.starboardPrivateChannels[0]) ? '#' + starboardPrivateChans.join(', #') : 'None.'}**
@@ -650,7 +651,7 @@ Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${q
     // channelArray is an array of channelIDs.
     // boolean and integer are as labeled
     configurableProps.forEach(prop => {
-      if(!config[prop.varName] && config[prop.varName] !== '' && config[prop.varName] !== []) {
+      if((!config[prop.varName] && config[prop.varName] !== false) && config[prop.varName] !== '' && config[prop.varName] !== []) {
         updatedProps.push(prop.varName);
         if (prop.varType == 'boolean' || prop.varType == 'string' || prop.varType == 'integer' || prop.varType == 'channel' || prop.varType == 'role' || prop.varType == 'voiceChamberSettings') {
           config[prop.varName] = '';
