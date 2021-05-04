@@ -219,10 +219,11 @@ async function startMigrator(message, client, botdb) {
       }
     }
     message.channel.send(`Great, I'll do the following:
-1. transfer the old starboard in ${fromChannel} to the new starboard in ${toChannel}.
+1. Scan and move the starboard in ${fromChannel} to the new starboard in ${toChannel}.
 2. Set the starboard channel for this server to ${toChannel}.
-3. If a starboard channel is already set for this server, all posts from that starboard will be checked and integrated to one consolidated starboard, based on their date of posting to the starboard.
-Is this correct? Please type 'yes' or 'no' in full. Once the process is started it cannot be stopped.`);
+3. If a different starboard channel is already set for this bot, all posts from that starboard will be checked and integrated to one consolidated starboard, based on their date of posting to the starboard.
+
+Is this correct? Please type '**yes**' or '**no**' in full. Once the process is started it cannot be stopped.`);
     while (!confirmed) {
       reply = await msgCollector(message);
       switch (reply.content.toLowerCase()) {
@@ -243,7 +244,7 @@ Is this correct? Please type 'yes' or 'no' in full. Once the process is started 
     }
   }
   config.starboardToggle = false;
-  // config.starboardChannelId = toChannel.id;
+  config.starboardChannelId = toChannel.id;
   writeConfig();
   message.channel.send('Great, beginning starboard migration...');
   await starboard.migrator(fromChannel, toChannel, message.channel, client, botdb);
