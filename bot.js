@@ -5,6 +5,9 @@ const configPath = './config.json';
 let config = undefined;
 const wait = require('util').promisify(setTimeout);
 const fsp = fs.promises;
+const sqlite3 = require('sqlite3');
+const { open } = require('sqlite');
+const dbpath = ('./db/');
 
 // function to pretty print the config data so that arrays show on one line, so it's easier to visually parse the config file when hand opening it. Purely cosmetic.
 function prettyPrintConfig(cfg) {
@@ -105,9 +108,8 @@ CONFIG_FILENAMES.forEach(filename => {
 
 const Discord = require('discord.js');
 const myIntents = new Discord.Intents();
-const Counting = require('./counting.js');
+const counting = require('./counting.js');
 const disboard = require('./disboard.js');
-const vc = require('./commands/vc.js');
 const listPath = './gamelist.json';
 const gameList = require(listPath);
 const dataLogger = require('./datalog.js');
@@ -118,6 +120,7 @@ const moment = require('moment-timezone');
 const vettingLimitPath = './commands/vettinglimit.js';
 const starboard = require('./starboard.js');
 
+// Extend guild with music details accessed by the .yt command.
 Discord.Structures.extend('Guild', Guild => {
   class MusicGuild extends Guild {
     constructor(client, data) {
@@ -136,6 +139,83 @@ Discord.Structures.extend('Guild', Guild => {
   return MusicGuild;
 });
 
+// Extending message objects to allow pluralkit integration.
+Discord.Structures.extend('Message', Message => {
+/**
+* Represents a message with pluralkit data appended. Call the pkQuery method to update props.
+* @extends {Message}
+* @prop {Boolean} PKMessage.isPKMessage        - Boolean. Is this a message from PK or not.
+* @prop {Object} PKMessage.PKData.author       - the user object for the account that initiated the pluralkit message.
+* @prop {Object} PKMessage.PKData.system       - data from pk about the plural system this message is from.
+* @prop {Object} PKMessage.PKData.systemMember - data from pk about the system member this message is from.
+*/
+  class PKMessage extends Message {
+    constructor(client, data, channel) {
+      super(client, data, channel);
+      this.pkCached = false;
+      this.isPKMessage = false;
+      this.PKData = {
+        author: null,
+        system: null,
+        systemMember: null,
+      };
+    }
+    /**
+    * Asyncronously updates the pluralkit properties of the message it is run from.
+    * @method pkQuery()
+    * @param {boolean} [force=false] Whether to skip any cached data and make a new request from the PK API.
+    * @returns {Object|null} returns either the PKData props of the message, or if it's not a PK message, returns null.
+    */
+    async pkQuery(force = false) {
+      if (!this.author.bot) return null;
+      if (!force && this.pkCached) return this.PKData;
+      const pkAPIurl = 'https://api.pluralkit.me/v1/msg/' + this.id;
+      try {
+        let pkResponse = await fetch(pkAPIurl);
+        if (pkResponse.headers.get('content-type').includes('application/json')) {
+          this.isPKMessage = true;
+          pkResponse = await pkResponse.json();
+          this.PKData.author = await this.guild.members.fetch(pkResponse.sender) || await this.client.users.fetch(pkResponse.sender);
+          this.PKData.system = pkResponse.system;
+          this.PKData.systemMember = pkResponse.member;
+          this.pkCached = true;
+          return this.PKData;
+        }
+      }
+      catch (err) {
+        console.log('Error caching PK data on message at:\n' + this.url + '\nError:\n' + err + ' PK Data for message not cached. Will try again next time pkQuery is called.');
+        return null;
+      }
+      this.pkCached = true;
+      return null;
+    }
+  }
+  return PKMessage;
+});
+
+// function to determine if a user's permission level - returns null, 'comrade', or 'staff'
+function getPermLevel(message) {
+  if (message.isPKMessage) {
+    if (message.PKData.author.roles.cache.has(config.roleStaff)) {
+      return 'staff';
+    }
+    else if (message.PKData.author.roles.cache.has(config.roleComrade)) {
+      return 'comrade';
+    }
+    else {return null;}
+  }
+  else if (!message.isPKMessage) {
+    if (message.member.roles.cache.has(config.roleStaff)) {
+      return 'staff';
+    }
+    else if (message.member.roles.cache.has(config.roleComrade)) {
+      return 'comrade';
+    }
+    else {return null;}
+  }
+  return null;
+}
+
 // initialize client, commands, command cooldown collections
 myIntents.add(Discord.Intents.NON_PRIVILEGED, 'GUILD_MEMBERS');
 const client = new Discord.Client({ ws: { intents: myIntents } });
@@ -144,22 +224,47 @@ const cooldowns = new Discord.Collection();
 // since the datalogger takes some time to cache messages, especially on larger servers, create a global check digit to block unwanted processing of new messages during datalogging
 client.dataLogLock = 0;
 
-// read command files (maybe rename? plugins, features?)
-const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
-
-for (const file of commandFiles) {
-  const command = require(`./commands/${file}`);
-  // set a new item in the Collection
-  // with the name attribute as the command name and the value as the exported module
-  if (command.name) {
-    client.commands.set(command.name, command);
+// initiate the sql db with various bot data, then initiate commands and modules
+let botdb;
+(async () => {
+  try {
+    if (!fs.existsSync(dbpath)) {
+      fs.mkdirSync(dbpath);
+    }
+    await open({
+      filename: `${dbpath}botdata.db`,
+      driver: sqlite3.Database,
+    }).then((value) => {
+      console.log('Bot data db opened.');
+      botdb = value;
+    });
+    const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
+    for (const file of commandFiles) {
+      const command = require(`./commands/${file}`);
+      // set a new item in the Collection
+      // with the name attribute as the command name and the value as the exported module
+      if (command.name) {
+        client.commands.set(command.name, command);
+      }
+      if (command.init) {
+        command.init(client, config, botdb);
+      }
+    }
+    const modules = fs.readdirSync('.').filter(file => file.endsWith('.js'));
+    for (const file of modules) {
+      if (file != 'bot.js') {
+        const module = require(`./${file}`);
+        if (module.init) {
+          module.init(client, config, botdb);
+        }
+      }
+    }
   }
-  if (command.init) {
-    command.init(client, config);
-  }
-}
+  catch (error) { console.error(error); }
+})();
 
-dataLogger.init(client, config);
+// login to Discord with your app's token
+client.login(config.authtoken);
 
 // initialize invite cache
 const invites = {};
@@ -174,7 +279,7 @@ client.on('ready', async () => {
     writeConfig(config);
   }
   if (config.currentActivity) { client.user.setActivity(config.currentActivity.Name, { type: config.currentActivity.Type }); }
-  Counting.OnReady(config, client);
+  counting.OnReady(config, client);
   // Lock datalog while caching offline messages. When that finishes, the callback will unlock the log.
   client.dataLogLock = 1;
   console.log('Fetching offline messages...');
@@ -182,7 +287,7 @@ client.on('ready', async () => {
     client.dataLogLock = 0;
     console.log('Offline message fetch complete!');
   });
-  starboard.onReady(config);
+  starboard.onReady(botdb);
   // wait 1000ms without holding up the rest of the script. This way we can ensure recieving all guild invite info.
   await wait(1000);
   client.guilds.cache.forEach(g => {
@@ -212,7 +317,7 @@ client.on('channelCreate', async channel => {
   }
 });
 
-// set up listener for channel creation events
+// set up listener for user update events
 client.on('userUpdate', async (oldUser, newUser) => {
   if (oldUser.avatar !== newUser.avatar && config.avatarLogToggle && config.channelAvatarLogs) {
     // If the toggle to make this feature airlock-role-only is on, then check if the user has that role
@@ -253,9 +358,6 @@ client.on('userUpdate', async (oldUser, newUser) => {
   }
 });
 
-// login to Discord with your app's token
-client.login(config.authtoken);
-
 // command parser
 client.on('message', async message => {
 
@@ -276,33 +378,15 @@ client.on('message', async message => {
   // only do datalogging on non-DM text channels. Don't log messages while offline retrieval is proceeding.
   // (offline logging will loop and catch new messages on the fly.)
   if (message.channel.type === 'text' && client.dataLogLock != 1) { dataLogger.OnMessage(message, config); }
-  if(Counting.HandleMessage(message)) {
+  if(counting.HandleMessage(message)) {
     return;
   }
-
-  // handler for PK user messages, so they can use bot commands.
-  if (message.author.bot) {
-    const pkAPIurl = 'https://api.pluralkit.me/v1/msg/' + message.id;
-    let pkResponse = await fetch(pkAPIurl);
-    if (pkResponse.headers.get('content-type').includes('application/json')) {
-      // normally message.member isn't writeable (for good reason), so we have to change that
-      Object.defineProperty(message, 'member', {
-        writable: true,
-      });
-      pkResponse = await pkResponse.json();
-      // set message author to NOT be a bot.
-      message.author.bot = false;
-      // console.log(await message.guild.members.fetch(pkResponse.sender));
-      await message.guild.members.fetch(pkResponse.sender).then(pkMbrData => message.member = pkMbrData);
-      // now the message object doesn't look like a bot, and the message.member property holds data for the discord account
-      // that caused the PK request to occur.
-      // message.author will still contain the PK webhook username, so we'll use that for @mentions in commands when possible.
-    }
-  }
+  // check if this is a PK message and if so, update the pk data props.
+  await message.pkQuery();
+  const permLevel = getPermLevel(message);
   // prevent parsing commands without correct prefix, from bots, and from non-staff non-comrades.
-  if (!message.content.startsWith(config.prefix) || message.author.bot) return;
-  if (message.channel.type == 'text' && !(message.member.roles.cache.has(config.roleStaff) || message.member.roles.cache.has(config.roleComrade))) return;
-
+  if (!message.content.startsWith(config.prefix) || (message.author.bot && !message.isPKMessage)) return;
+  if (message.channel.type == 'text' && !(permLevel == 'staff' || permLevel == 'comrade')) return;
   const args = message.content.slice(config.prefix.length).split(/ +/);
   let commandName = args.shift().toLowerCase();
 
@@ -321,7 +405,7 @@ client.on('message', async message => {
   if (command.guildOnly && message.channel.type !== 'text') { return await message.reply('I can\'t execute that command inside DMs!'); }
 
   // check permission level of command. Prevent staffonly commands from being run by non-staff.
-  if (command.staffOnly && !message.member.roles.cache.has(config.roleStaff)) return;
+  if (command.staffOnly && permLevel != 'staff') return;
 
   // check if command requires arguments
   if (command.args && !args.length) {
@@ -353,7 +437,7 @@ client.on('message', async message => {
 
   // Try to execute the command and return an error if it fails.
   try {
-    await command.execute(message, args, client, config);
+    await command.execute(message, args, client, config, botdb);
   }
   catch (error) {
     console.error(error);

@@ -76,9 +76,11 @@ const configurableProps = [{ varName:'prefix', description:'Command Prefix', var
   { varName:'botChannelId', description:'Bot stuff channel', varType:'channel' },
   { varName:'disboardChannelId', description:'Disboard Bumping Channel', varType:'channel' },
   { varName:'eventInfoChannelId', description:'Event announce channel', varType:'channel' },
+  { varName:'starboardToggle', description:'Toggle starboard functionality', varType:'boolean' },
   { varName:'starboardChannelId', description:'Starboard channel', varType:'channel' },
   { varName:'starThreshold', description:'Number of stars to starboard a message', varType:'integer' },
-  { varName:'starboardIgnoreChannels', description:'Channel(s) to ignore for starboarding', varType:'channelArray' }];
+  { varName:'starboardIgnoreChannels', description:'Channel(s) to ignore for starboarding', varType:'channelArray' },
+  { varName:'starboardPrivateChannels', description:'Channel(s) to consider private for starboarding purposes', varType:'channelArray' }];
 
 module.exports = {
   name: 'config',
@@ -133,7 +135,7 @@ module.exports = {
       await message.channel.awaitMessages(filter, { max: 1, time: 30000, errors: ['time'] })
         // this method creates a collection; since there is only one entry we get the data from collected.first
         .then(collected => reply = collected.first())
-        .catch(collected => message.channel.send('Sorry, I waited 30 seconds with no response, please run the command again.'));
+        .catch(() => message.channel.send('Sorry, I waited 30 seconds with no response, please run the command again.'));
       // console.log('Reply processed...');
       return reply;
     }
@@ -144,10 +146,12 @@ module.exports = {
       const voiceTextChans = [];
       const cfgVoiceChans = [];
       const starboardIgnoreChans = [];
+      const starboardPrivateChans = [];
       const knownInv = [];
       config.pinIgnoreChannels.forEach(chanID => ignoreChans.push(getChannelName(chanID)));
       config.voiceTextChannelIds.forEach(chanID => voiceTextChans.push(getChannelName(chanID)));
       config.starboardIgnoreChannels.forEach(chanID => starboardIgnoreChans.push(getChannelName(chanID)));
+      config.starboardPrivateChannels.forEach(chanID => starboardPrivateChans.push(getChannelName(chanID)));
       if (config.knownInvites) {config.knownInvites.forEach(inv => knownInv.push('**' + inv[1] + '** (' + inv[0] + ')'));}
       //      console.log((Object.keys(config[voiceChamberDefaultSizes]).length == 0));
       if(typeof config.voiceChamberDefaultSizes == 'object') Object.keys(config.voiceChamberDefaultSizes).forEach(chanID => cfgVoiceChans.push('#' + config.voiceChamberDefaultSizes[chanID].Name + ' (Size: ' + config.voiceChamberDefaultSizes[chanID].Size + ')'));
@@ -187,13 +191,14 @@ Pin reacts needed to pin a message: **${config.pinsToPin}**
 Channel(s) to ignore for pinning: **${(config.pinIgnoreChannels[0]) ? '#' + ignoreChans.join(', #') : 'None.'}**
 
 __Starboard:__
-Starboard channel: **${(config.starboardChannelId) ? `#${getChannelName(config.starboardChannelId)}` : 'Not set. Starboard functionality disabled.'}**
+Starboard: **${(config.starboardToggle) ? 'ON' : 'OFF'}**
+Starboard Channel: ${config.starboardChannelId ? `**#${getChannelName(config.starboardChannelId)}**` : 'Not set. Starboard functionality disabled.'}
 Star reaction threshold to post starboard: **${(config.starThreshold) ? config.starThreshold : (config.starboardChannelId) ? 'Not set. Starboard functionality disabled.' : 'N/A'}**
+Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '#' + starboardIgnoreChans.join(', #') : 'None.'}**
+Channels considered private for starboarding (user must affirm they are OK with a post going to starboard): **${(config.starboardPrivateChannels[0]) ? '#' + starboardPrivateChans.join(', #') : 'None.'}**
 
 __Miscellaneous:__
 Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${questionChans.join(', #')}` : 'None.'}**`;
-      // Item not yet implemented.
-      // Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '#' + starboardIgnoreChans.join(', #') : 'None.'}**
     }
     // initialize disallowed prefix characters. None of these will be permitted in any part of the command prefix.
     const disallowedPrefix = ['@', '#', '/', '\\', '\\\\', '*', '~', '_'];
@@ -564,16 +569,31 @@ Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${q
           reply = await msgCollector();
           if(!reply) {return;}
           if (reply.content.toLowerCase() == 'add') {
-            message.channel.send('Please #mention the channel you would like to add to the list, or copy/paste the channel ID.');
+            message.channel.send('Please #mention or type the channelid of the channel you would like to add to the list, or copy/paste the channel ID. You may also #mention or type the ID of a category for all channels under that category to be added.');
             reply = await msgCollector();
             if(!reply) {return;}
             const newChannel = await getChannel(reply.content);
-            if (!config[change.varName].includes(newChannel.id)) {
-              config[change.varName].push(newChannel.id);
-              writeConfig(message);
-              return message.channel.send(`Added ${newChannel} to *${change.description}*`);
+            if (newChannel.type == 'text') {
+              if (!config[change.varName].includes(newChannel.id)) {
+                config[change.varName].push(newChannel.id);
+                writeConfig(message);
+                return message.channel.send(`Added ${newChannel} to *${change.description}*`);
+              }
+              else {return message.channel.send(`${newChannel} is already a part of *${change.description}*`);}
             }
-            else {return message.channel.send(`${newChannel} is already a part of *${change.description}*`);}
+            else if(newChannel.type == 'category') {
+              const alreadyInListArr = [];
+              const addedArr = [];
+              for (const childChannel of newChannel.children.values()) {
+                if (!config[change.varName].includes(childChannel.id)) {
+                  config[change.varName].push(childChannel.id);
+                  addedArr.push(childChannel);
+                }
+                else { alreadyInListArr.push(childChannel); }
+              }
+              writeConfig(message);
+              return message.channel.send(`${addedArr.length > 0 ? `Added channels ${addedArr.join(' ')} to ${change.description}` : ''} ${alreadyInListArr.length > 0 ? `${alreadyInListArr.join(' ')} was/were already part of ${change.description}` : ' '}`);
+            }
           }
           else if (reply.content.toLowerCase() == 'remove' && config[change.varName].length > 0) {
             const chanArr = [];
@@ -631,7 +651,7 @@ Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${q
     // channelArray is an array of channelIDs.
     // boolean and integer are as labeled
     configurableProps.forEach(prop => {
-      if(!config[prop.varName] && config[prop.varName] !== '' && config[prop.varName] !== []) {
+      if((!config[prop.varName] && config[prop.varName] !== false) && config[prop.varName] !== '' && config[prop.varName] !== []) {
         updatedProps.push(prop.varName);
         if (prop.varType == 'boolean' || prop.varType == 'string' || prop.varType == 'integer' || prop.varType == 'channel' || prop.varType == 'role' || prop.varType == 'voiceChamberSettings') {
           config[prop.varName] = '';
