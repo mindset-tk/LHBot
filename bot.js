@@ -152,6 +152,7 @@ Discord.Structures.extend('Message', Message => {
   class PKMessage extends Message {
     constructor(client, data, channel) {
       super(client, data, channel);
+      this.pkCached = false;
       this.isPKMessage = false;
       this.PKData = {
         author: null,
@@ -167,22 +168,53 @@ Discord.Structures.extend('Message', Message => {
     */
     async pkQuery(force = false) {
       if (!this.author.bot) return null;
-      if (!force && this.isPKMessage && this.PKData.author) return this.PKData;
+      if (!force && this.pkCached) return this.PKData;
       const pkAPIurl = 'https://api.pluralkit.me/v1/msg/' + this.id;
-      let pkResponse = await fetch(pkAPIurl);
-      if (pkResponse.headers.get('content-type').includes('application/json')) {
-        this.isPKMessage = true;
-        pkResponse = await pkResponse.json();
-        this.PKData.author = await this.guild.members.fetch(pkResponse.sender) || await this.client.users.fetch(pkResponse.sender);
-        this.PKData.system = pkResponse.system;
-        this.PKData.systemMember = pkResponse.member;
-        return this.PKData;
+      try {
+        let pkResponse = await fetch(pkAPIurl);
+        if (pkResponse.headers.get('content-type').includes('application/json')) {
+          this.isPKMessage = true;
+          pkResponse = await pkResponse.json();
+          this.PKData.author = await this.guild.members.fetch(pkResponse.sender) || await this.client.users.fetch(pkResponse.sender);
+          this.PKData.system = pkResponse.system;
+          this.PKData.systemMember = pkResponse.member;
+          this.pkCached = true;
+          return this.PKData;
+        }
       }
+      catch (err) {
+        console.log('Error caching PK data on message at:\n' + this.url + '\nError:\n' + err + ' PK Data for message not cached. Will try again next time pkQuery is called.');
+        return null;
+      }
+      this.pkCached = true;
       return null;
     }
   }
   return PKMessage;
 });
+
+// function to determine if a user's permission level - returns null, 'comrade', or 'staff'
+function getPermLevel(message) {
+  if (message.isPKMessage) {
+    if (message.PKData.author.roles.cache.has(config.roleStaff)) {
+      return 'staff';
+    }
+    else if (message.PKData.author.roles.cache.has(config.roleComrade)) {
+      return 'comrade';
+    }
+    else {return null;}
+  }
+  else if (!message.isPKMessage) {
+    if (message.member.roles.cache.has(config.roleStaff)) {
+      return 'staff';
+    }
+    else if (message.member.roles.cache.has(config.roleComrade)) {
+      return 'comrade';
+    }
+    else {return null;}
+  }
+  return null;
+}
 
 // initialize client, commands, command cooldown collections
 myIntents.add(Discord.Intents.NON_PRIVILEGED, 'GUILD_MEMBERS');
@@ -351,10 +383,11 @@ client.on('message', async message => {
   }
   // check if this is a PK message and if so, update the pk data props.
   await message.pkQuery();
+  const permLevel = getPermLevel(message);
   // prevent parsing commands without correct prefix, from bots, and from non-staff non-comrades.
   if (!message.content.startsWith(config.prefix) || (message.author.bot && !message.isPKMessage)) return;
-  if (message.channel.type == 'text' && !(message.member.roles.cache.has(config.roleStaff) || message.member.roles.cache.has(config.roleComrade))) return;
-
+  console.log(permLevel);
+  if (message.channel.type == 'text' && !(permLevel == 'staff' || permLevel == 'comrade')) return;
   const args = message.content.slice(config.prefix.length).split(/ +/);
   let commandName = args.shift().toLowerCase();
 
@@ -373,7 +406,7 @@ client.on('message', async message => {
   if (command.guildOnly && message.channel.type !== 'text') { return await message.reply('I can\'t execute that command inside DMs!'); }
 
   // check permission level of command. Prevent staffonly commands from being run by non-staff.
-  if (command.staffOnly && !message.member.roles.cache.has(config.roleStaff)) return;
+  if (command.staffOnly && permLevel != 'staff') return;
 
   // check if command requires arguments
   if (command.args && !args.length) {
