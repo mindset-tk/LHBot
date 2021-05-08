@@ -1,5 +1,5 @@
 // require the filesystem and discord.js modules
-require('console-stamp')(console, { pattern: 'mm/dd/yy HH:MM:ss', label: false });
+require('console-stamp')(console, { format: ':date(mm/dd/yy HH:MM:ss)' });
 const fs = require('fs');
 const configPath = './config.json';
 let config = undefined;
