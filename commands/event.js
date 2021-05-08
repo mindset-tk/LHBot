@@ -1585,6 +1585,8 @@ Staff can add users to the event by hand simply by giving any user the associate
   staffOnly: false,
   args: true,
   async execute(message, args, client) {
+    await message.pkQuery();
+    if (message.isPKMessage) {return message.reply('Unfortunately, due to how roles work in Discord, the event system cannot be accessed by PluralKit webhooks at this time.');}
 
     // function to get a channel object based on a channel ID or mention.
     async function getChannel(ID) {

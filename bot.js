@@ -386,7 +386,6 @@ client.on('message', async message => {
   const permLevel = getPermLevel(message);
   // prevent parsing commands without correct prefix, from bots, and from non-staff non-comrades.
   if (!message.content.startsWith(config.prefix) || (message.author.bot && !message.isPKMessage)) return;
-  console.log(permLevel);
   if (message.channel.type == 'text' && !(permLevel == 'staff' || permLevel == 'comrade')) return;
   const args = message.content.slice(config.prefix.length).split(/ +/);
   let commandName = args.shift().toLowerCase();

@@ -5,6 +5,28 @@ const configPath = path.resolve('./config.json');
 const config = require(configPath);
 const fs = require('fs');
 
+function getPermLevel(message) {
+  if (message.isPKMessage) {
+    if (message.PKData.author.roles.cache.has(config.roleStaff)) {
+      return 'staff';
+    }
+    else if (message.PKData.author.roles.cache.has(config.roleComrade)) {
+      return 'comrade';
+    }
+    else {return null;}
+  }
+  else if (!message.isPKMessage) {
+    if (message.member.roles.cache.has(config.roleStaff)) {
+      return 'staff';
+    }
+    else if (message.member.roles.cache.has(config.roleComrade)) {
+      return 'comrade';
+    }
+    else {return null;}
+  }
+  return null;
+}
+
 function prettyPrintConfig() {
   const output = JSON.stringify(config, function(k, v) {
     if (v instanceof Array) {
@@ -73,6 +95,7 @@ async function getChannel(ID, client) {
 }
 
 async function userBlock(message, targetdata, botdb) {
+  const permLevel = getPermLevel(message);
   let blockTarget;
   if (targetdata.toLowerCase() === 'me') {
     blockTarget = message.author;
@@ -92,7 +115,7 @@ async function userBlock(message, targetdata, botdb) {
       return message.reply('Error exempting you! See console log for details.');
     }
   }
-  else if (blockTarget != null && blockTarget.id != message.author.id && message.member.roles.cache.has(config.roleStaff)) {
+  else if (blockTarget != null && blockTarget.id != message.author.id && permLevel == 'staff') {
     switch (await starboard.blockUser(blockTarget.id, botdb)) {
     case 'blocksuccessful':
       return message.reply(`Successfully blocked ${blockTarget.displayName} from the starboard. Current starboard messages from them will no longer accrue stars; future messages from them will not be considered for the starboard.`);
@@ -102,7 +125,7 @@ async function userBlock(message, targetdata, botdb) {
       return message.reply(`Error blocking ${blockTarget.displayName}! See console log for details.`);
     }
   }
-  else if (blockTarget != null && !message.member.roles.cache.has(config.roleStaff)) {
+  else if (blockTarget != null && permLevel != 'staff') {
     return message.reply(`Only staff can block others from the starboard.  You can exempt yourself from starboarding via the command \`${config.prefix}starboard exempt me\`.`);
   }
   else {
@@ -112,9 +135,10 @@ async function userBlock(message, targetdata, botdb) {
 
 
 async function msgBlock(message, targetdata, botdb) {
+  const permLevel = getPermLevel(message);
   const targetMsg = await getMessageFromURL(targetdata, message.client);
   if (!targetMsg) { return message.reply(`I couldn't parse ${targetdata} - please include a full message link as an argument to the block message command.`); }
-  else if (message.author.id == targetMsg.author.id || message.member.roles.cache.has(config.roleStaff)) {
+  else if (message.author.id == targetMsg.author.id || permLevel == 'staff') {
     switch (await starboard.blockMsg(targetMsg, botdb)) {
     case 'blocksuccessful':
       return message.reply('Message blocked from starboard!');
@@ -124,12 +148,13 @@ async function msgBlock(message, targetdata, botdb) {
       return message.reply('I couldn\'t block that message. See console for details.');
     }
   }
-  else if (message.author.id != targetMsg.author.id && !message.member.roles.cache.has(config.roleStaff)) {
+  else if (message.author.id != targetMsg.author.id && permLevel != 'staff') {
     message.reply('Only staff may block a message they did not write!');
   }
 }
 
 async function userUnblock(message, targetdata, botdb) {
+  const permLevel = getPermLevel(message);
   let unblockTarget;
   if (targetdata.toLowerCase() === 'me') {
     unblockTarget = message.author;
@@ -149,7 +174,7 @@ async function userUnblock(message, targetdata, botdb) {
       return message.reply('Error exempting you! See console log for details.');
     }
   }
-  else if (unblockTarget != null && unblockTarget.id != message.author.id && message.member.roles.cache.has(config.roleStaff)) {
+  else if (unblockTarget != null && unblockTarget.id != message.author.id && permLevel == 'staff') {
     switch (await starboard.unblockUser(unblockTarget.id, botdb)) {
     case 'unblocksuccessful':
       return message.reply(`Successfully unblocked ${unblockTarget.displayName} from the starboard. Any messages of theirs can go onto the starboard; Old messages of theirs will need to have a star added/removed to update the starboard.`);
@@ -159,7 +184,7 @@ async function userUnblock(message, targetdata, botdb) {
       return message.reply(`Error unblocking ${unblockTarget.displayName}! See console log for details.`);
     }
   }
-  else if (unblockTarget != null && !message.member.roles.cache.has(config.roleStaff)) {
+  else if (unblockTarget != null && permLevel != 'staff') {
     return message.reply(`Only staff can unblock others from the starboard.  You can un-exempt yourself from starboarding via the command \`${config.prefix}starboard unexempt me\`.`);
   }
   else {
@@ -168,9 +193,10 @@ async function userUnblock(message, targetdata, botdb) {
 }
 
 async function msgUnblock(message, targetdata, botdb) {
+  const permLevel = getPermLevel(message);
   const targetMsg = await getMessageFromURL(targetdata, message.client);
   if (!targetMsg) { return message.reply(`I couldn't parse ${targetdata} - please include a full message link as an argument to the block message command.`); }
-  else if (message.author.id == targetMsg.author.id || message.member.roles.cache.has(config.roleStaff)) {
+  else if (message.author.id == targetMsg.author.id || permLevel == 'staff') {
     switch (await starboard.unblockMsg(targetMsg, botdb)) {
     case 'unblocksuccessful':
       message.reply('Successfully unblocked message from starboard! Adding back to starboard if above threshold.');
@@ -181,7 +207,7 @@ async function msgUnblock(message, targetdata, botdb) {
       return message.reply('Error unblocking message. See console log for details.');
     }
   }
-  else if (message.author.id != targetMsg.author.id && !message.member.roles.cache.has(config.roleStaff)) {
+  else if (message.author.id != targetMsg.author.id && permLevel != 'staff') {
     message.reply('Only staff may block a message they did not write!');
   }
 }

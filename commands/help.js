@@ -2,6 +2,28 @@ const path = require('path');
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
 
+function getPermLevel(message) {
+  if (message.isPKMessage) {
+    if (message.PKData.author.roles.cache.has(config.roleStaff)) {
+      return 'staff';
+    }
+    else if (message.PKData.author.roles.cache.has(config.roleComrade)) {
+      return 'comrade';
+    }
+    else {return null;}
+  }
+  else if (!message.isPKMessage) {
+    if (message.member.roles.cache.has(config.roleStaff)) {
+      return 'staff';
+    }
+    else if (message.member.roles.cache.has(config.roleComrade)) {
+      return 'comrade';
+    }
+    else {return null;}
+  }
+  return null;
+}
+
 module.exports = {
   name: 'help',
   description: 'List all of my commands or info about a specific command.',
@@ -9,10 +31,11 @@ module.exports = {
   usage: '[command name]',
   cooldown: 3,
   execute(message, args) {
+    const permLevel = getPermLevel(message);
     const data = [];
     const { commands } = message.client;
     // If the help invoker is staff, give all commands.
-    if (!args.length && message.member.roles.cache.has(config.roleStaff)) {
+    if (!args.length && permLevel == 'staff') {
       data.push('Here\'s a list of all my commands:');
       // map all command names to an array, filter(Boolean) to remove empty values, then join for clean output
       data.push(commands.map(command => command.name).filter(Boolean).join('\n'));
@@ -21,7 +44,7 @@ module.exports = {
       return message.channel.send(data, { split: true });
     }
     // If the invoker is not staff, but has permission to invoke the command, give only commands available to them.
-    if (!args.length && !message.member.roles.cache.has(config.roleStaff)) {
+    if (!args.length && permLevel == 'comrade') {
       data.push('Here\'s a list of commands available to you:');
       // map all non-staffOnly command names to an array, filter(Boolean) to remove empty values, then join for clean output
       data.push(commands.map(command => {if (!command.staffOnly) return command.name;}).filter(Boolean).join('\n'));
@@ -32,7 +55,7 @@ module.exports = {
     const name = args[0].toLowerCase();
     const command = commands.get(name) || commands.find(c => c.aliases && c.aliases.includes(name));
 
-    if (!command || (command.staffOnly && !message.member.roles.cache.has(config.roleStaff))) {
+    if (!command || (command.staffOnly && permLevel != 'staff')) {
       return message.reply('that\'s not a valid command, or you don\'t have permission to use it!');
     }
 

@@ -14,6 +14,28 @@ if (!config.youTubeAPIKey) {
 }
 else { YT = new YouTube(config.youTubeAPIKey); }
 
+function getPermLevel(message) {
+  if (message.isPKMessage) {
+    if (message.PKData.author.roles.cache.has(config.roleStaff)) {
+      return 'staff';
+    }
+    else if (message.PKData.author.roles.cache.has(config.roleComrade)) {
+      return 'comrade';
+    }
+    else {return null;}
+  }
+  else if (!message.isPKMessage) {
+    if (message.member.roles.cache.has(config.roleStaff)) {
+      return 'staff';
+    }
+    else if (message.member.roles.cache.has(config.roleComrade)) {
+      return 'comrade';
+    }
+    else {return null;}
+  }
+  return null;
+}
+
 module.exports = {
   name: 'yt',
   description: 'Play any song or playlist from youtube in the voice channel you\'re currently in.',
@@ -41,7 +63,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
   guildOnly: true,
   cooldown: 0.1,
   async execute(message, args, client) {
-
+    const permLevel = getPermLevel(message);
     if (!YT) { return message.channel.send('I can\'t perform that function until a Youtube API Key is set in the config file.'); }
 
     function minsAndSeconds(ms) {
@@ -74,7 +96,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
       return message.channel.send('You didn\'t provide any arguments!');
     }
 
-    if (args[0].toLowerCase() == 'timeout' && message.member.roles.cache.has(config.roleStaff)) {
+    if (args[0].toLowerCase() == 'timeout' && permLevel == 'staff') {
       if (args[1] == 0) {
         args[1] = 'stop';
       }
@@ -108,7 +130,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
       }
     }
 
-    if (message.guild.musicData.timeOutExp > now && args[0].toLowerCase() != 'timeout' && !message.member.roles.cache.has(config.roleStaff)) {
+    if (message.guild.musicData.timeOutExp > now && args[0].toLowerCase() != 'timeout' && permLevel != 'staff') {
       const timeLeft = (message.guild.musicData.timeOutExp - now);
       return message.channel.send(`Sorry, the ${config.prefix}yt command is locked out for ${minsAndSeconds(timeLeft)} more minutes.`);
     }
@@ -129,7 +151,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
     // Commands that can be permissibly used by a user that is in a different voice channel.
     const safeCommands = ['stop', 'list'];
 
-    if (!config.voiceTextChannelIds.includes(message.channel.id) && !message.member.roles.cache.has(config.roleStaff)) {
+    if (!config.voiceTextChannelIds.includes(message.channel.id) && permLevel != 'staff') {
       return message.channel.send('Please use this command only in the #voice-chat channels.');
     }
     const voiceChannel = message.member.voice.channel;
@@ -149,7 +171,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
       catch(err) { console.log(`Unable to join voice channel ID ${voiceChannel.id} due to following error: ${err}`); }
       return message.channel.send(`I couldn't join ${voiceChannel}, but I'm not sure why. Please see log for details.`);
     }
-    if ((message.guild.musicData.isPlaying == true && voiceChannel != message.guild.musicData.voiceChannel) && !message.member.roles.cache.has(config.roleStaff)) {
+    if ((message.guild.musicData.isPlaying == true && voiceChannel != message.guild.musicData.voiceChannel) && permLevel != 'staff') {
       if (!safeCommands.includes(args[0])) {
         return message.channel.send(`Sorry, I'm already playing in another voice channel! I can only be in one voice channel at a time. The **${config.prefix}yt stop** command will forcibly end playback, but please be conscientious of other users!`);
       }

@@ -6,6 +6,28 @@ const listPath = path.resolve('./gamelist.json');
 const gameList = require(listPath);
 const Discord = require('discord.js');
 
+function getPermLevel(message) {
+  if (message.isPKMessage) {
+    if (message.PKData.author.roles.cache.has(config.roleStaff)) {
+      return 'staff';
+    }
+    else if (message.PKData.author.roles.cache.has(config.roleComrade)) {
+      return 'comrade';
+    }
+    else {return null;}
+  }
+  else if (!message.isPKMessage) {
+    if (message.member.roles.cache.has(config.roleStaff)) {
+      return 'staff';
+    }
+    else if (message.member.roles.cache.has(config.roleComrade)) {
+      return 'comrade';
+    }
+    else {return null;}
+  }
+  return null;
+}
+
 module.exports = {
   name: 'games',
   description: 'Display/manage rosters for the specified game or system.',
@@ -18,6 +40,7 @@ module.exports = {
   args: true,
   guildOnly: true,
   async execute(message, args, client) {
+    const permLevel = getPermLevel(message);
     // Quick function to capitalize gamelist output
     function capitalize(str) {
       return str.replace(/(?:^\w|\b\w)/g, function(ltr) {
@@ -149,7 +172,7 @@ module.exports = {
         return;
       }
     }
-    else if (action === 'purge' && message.member.roles.cache.has(config.roleStaff)) {
+    else if (action === 'purge' && permLevel == 'staff') {
       let targetUser;
       if (!args[1]) { return message.channel.send('Sorry, I need a user @mention or ID to purge them from the list');	}
       else if (IDFormat.test(args[1])) { targetUser = await client.fetchUser(args[1]); }

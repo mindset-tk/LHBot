@@ -3,10 +3,32 @@ const configPath = path.resolve('./config.json');
 const config = require(configPath);
 const wait = require('util').promisify(setTimeout);
 
-async function updateChannel(type, args, message) {
-  const isStaff = message.member.roles.cache.has(config.roleStaff);
+function getPermLevel(message) {
+  if (message.isPKMessage) {
+    if (message.PKData.author.roles.cache.has(config.roleStaff)) {
+      return 'staff';
+    }
+    else if (message.PKData.author.roles.cache.has(config.roleComrade)) {
+      return 'comrade';
+    }
+    else {return null;}
+  }
+  else if (!message.isPKMessage) {
+    if (message.member.roles.cache.has(config.roleStaff)) {
+      return 'staff';
+    }
+    else if (message.member.roles.cache.has(config.roleComrade)) {
+      return 'comrade';
+    }
+    else {return null;}
+  }
+  return null;
+}
 
-  if (!isStaff && !config.voiceTextChannelIds.includes(message.channel.id)) {
+async function updateChannel(type, args, message) {
+  const permLevel = getPermLevel(message);
+
+  if (permLevel != 'staff' && !config.voiceTextChannelIds.includes(message.channel.id)) {
     let outMsg = 'Please use this command only in these channels:';
     config.voiceTextChannelIds.forEach(channelId => outMsg += ' <#' + message.guild.channels.resolve(channelId).id + '>');
     return message.channel.send(outMsg);
@@ -14,7 +36,7 @@ async function updateChannel(type, args, message) {
 
   // Find the channel
   let voiceChannel;
-  if(args.length > 1 && isStaff) {
+  if(args.length > 1 && permLevel == 'staff') {
     // Check for second argument
     const vcArg = message.guild.channels.resolve(args[0]);
     if(vcArg && vcArg.type == 'voice') {
@@ -128,6 +150,7 @@ module.exports = {
   staffOnly: false,
   args: true,
   execute(message, args, client) {
+    const permLevel = getPermLevel(message);
     const type = args.shift();
     switch (type) {
     case 'name':
@@ -135,7 +158,7 @@ module.exports = {
       updateChannel(type, args, message);
       break;
     case 'check':
-      if (message.member.roles.cache.has(config.roleStaff)) {
+      if (permLevel == 'staff') {
         OnReady(client);
         message.channel.send('Ok! Snapping back names/sizes of any configured voice channels back to their defaults');
       }
