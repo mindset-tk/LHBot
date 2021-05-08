@@ -3,7 +3,7 @@
 // extended to other sources
 const Discord = require('discord.js');
 const YouTube = require('simple-youtube-api');
-const ytdl = require('ytdl-core');
+const ytdl = require('ytdl-core-discord');
 const path = require('path');
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
@@ -177,20 +177,21 @@ If the bot is the only user in a voice channel when it finishes playback of the 
       }
     }
 
-    function playSong(queue) {
-      message.guild.musicData.voiceChannel.join().then(connection => {
+    async function playSong(queue) {
+      await message.guild.musicData.voiceChannel.join().then(async connection => {
         try {
           const dispatcher = connection
             .play(
-              ytdl(queue[0].url, {
+              await ytdl(queue[0].url, {
                 // pass the url to .ytdl()
                 quality: 'highestaudio',
                 // buffer 32MB prior to playing.
                 highWaterMark: 1024 * 1024 * 32,
               }),
-              { volume: message.guild.musicData.volume },
+              { volume: message.guild.musicData.volume, type: 'opus' },
             )
             .on('start', () => {
+              dispatcher.setBitrate(96);
               message.guild.musicData.songDispatcher = dispatcher;
               message.guild.musicData.songDispatcher.pausedTime = null;
               // dispatcher.setVolume(message.guild.musicData.volume);
@@ -219,7 +220,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
                 }
               });
               if (queue.length >= 1 && VCUsersNotMe.length > 0) {
-                return playSong(queue);
+                return await playSong(queue);
               }
               // else if there are no more songs in queue, leave the voice channel after 60 seconds.
               else {
@@ -240,13 +241,13 @@ If the bot is the only user in a voice channel when it finishes playback of the 
                 }
               }
             })
-            .on('error', e => {
+            .on('error', async e => {
               message.guild.musicData.voiceTextChannel.send('Error playing a song. See console log for details. Skipping to next song...');
               console.error('Youtube playback error! Error Details: ', e);
               if (message.guild.musicData.nowPlaying) console.error('Song playing at time of error: ', message.guild.musicData.nowPlaying);
               if (queue[0]) console.error('Video at top of queue: ', queue[0]);
               if (queue.length > 0) {
-                return playSong(queue);
+                return await playSong(queue);
               }
               else {
                 message.guild.musicData.isPlaying = false;
@@ -328,7 +329,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
         else { message.guild.musicData.voiceTextChannel = message.channel; }
         message.guild.musicData.voiceChannel = voiceChannel;
         message.guild.musicData.isPlaying = true;
-        return playSong(message.guild.musicData.queue);
+        return await playSong(message.guild.musicData.queue);
       }
       // if something is already playing
       else if (message.guild.musicData.isPlaying == true) {
@@ -430,7 +431,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
           return;
         }
       }
-      return playSong(message.guild.musicData.queue);
+      return await playSong(message.guild.musicData.queue);
     }
     else if (args[0].toLowerCase() == 'stop' && !args[1]) {
       if (!message.guild.musicData.songDispatcher) { message.channel.send('Playback reset.'); }
