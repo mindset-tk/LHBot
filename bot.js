@@ -120,6 +120,7 @@ const moment = require('moment-timezone');
 const vettingLimitPath = './commands/vettinglimit.js';
 const starboard = require('./starboard.js');
 
+// Extend guild with music details accessed by the .yt command.
 Discord.Structures.extend('Guild', Guild => {
   class MusicGuild extends Guild {
     constructor(client, data) {
@@ -136,6 +137,51 @@ Discord.Structures.extend('Guild', Guild => {
     }
   }
   return MusicGuild;
+});
+
+// Extending message objects to allow pluralkit integration.
+Discord.Structures.extend('Message', Message => {
+/**
+* Represents a message with pluralkit data appended. Call the pkQuery method to update props.
+* @extends {Message}
+* @prop {Boolean} PKMessage.isPKMessage        - Boolean. Is this a message from PK or not.
+* @prop {Object} PKMessage.PKData.author       - the user object for the account that initiated the pluralkit message.
+* @prop {Object} PKMessage.PKData.system       - data from pk about the plural system this message is from.
+* @prop {Object} PKMessage.PKData.systemMember - data from pk about the system member this message is from.
+*/
+  class PKMessage extends Message {
+    constructor(client, data, channel) {
+      super(client, data, channel);
+      this.isPKMessage = false;
+      this.PKData = {
+        author: null,
+        system: null,
+        systemMember: null,
+      };
+    }
+    /**
+    * Asyncronously updates the pluralkit properties of the message it is run from.
+    * @method pkQuery()
+    * @param {boolean} [force=false] Whether to skip any cached data and make a new request from the PK API.
+    * @returns {Object|null} returns either the PKData props of the message, or if it's not a PK message, returns null.
+    */
+    async pkQuery(force = false) {
+      if (!this.author.bot) return null;
+      if (!force && this.isPKMessage && this.PKData.author) return this.PKData;
+      const pkAPIurl = 'https://api.pluralkit.me/v1/msg/' + this.id;
+      let pkResponse = await fetch(pkAPIurl);
+      if (pkResponse.headers.get('content-type').includes('application/json')) {
+        this.isPKMessage = true;
+        pkResponse = await pkResponse.json();
+        this.PKData.author = await this.guild.members.fetch(pkResponse.sender) || await this.client.users.fetch(pkResponse.sender);
+        this.PKData.system = pkResponse.system;
+        this.PKData.systemMember = pkResponse.member;
+        return this.PKData;
+      }
+      return null;
+    }
+  }
+  return PKMessage;
 });
 
 // initialize client, commands, command cooldown collections
@@ -303,28 +349,10 @@ client.on('message', async message => {
   if(counting.HandleMessage(message)) {
     return;
   }
-
-  // handler for PK user messages, so they can use bot commands.
-  if (message.author.bot) {
-    const pkAPIurl = 'https://api.pluralkit.me/v1/msg/' + message.id;
-    let pkResponse = await fetch(pkAPIurl);
-    if (pkResponse.headers.get('content-type').includes('application/json')) {
-      // normally message.member isn't writeable (for good reason), so we have to change that
-      Object.defineProperty(message, 'member', {
-        writable: true,
-      });
-      pkResponse = await pkResponse.json();
-      // set message author to NOT be a bot.
-      message.author.bot = false;
-      // console.log(await message.guild.members.fetch(pkResponse.sender));
-      await message.guild.members.fetch(pkResponse.sender).then(pkMbrData => message.member = pkMbrData);
-      // now the message object doesn't look like a bot, and the message.member property holds data for the discord account
-      // that caused the PK request to occur.
-      // message.author will still contain the PK webhook username, so we'll use that for @mentions in commands when possible.
-    }
-  }
+  // check if this is a PK message and if so, update the pk data props.
+  await message.pkQuery();
   // prevent parsing commands without correct prefix, from bots, and from non-staff non-comrades.
-  if (!message.content.startsWith(config.prefix) || message.author.bot) return;
+  if (!message.content.startsWith(config.prefix) || (message.author.bot && !message.isPKMessage)) return;
   if (message.channel.type == 'text' && !(message.member.roles.cache.has(config.roleStaff) || message.member.roles.cache.has(config.roleComrade))) return;
 
   const args = message.content.slice(config.prefix.length).split(/ +/);

@@ -111,11 +111,11 @@ async function userBlock(message, targetdata, botdb) {
 }
 
 
-async function msgBlock(message, targetdata, client, botdb) {
-  const targetMsg = await getMessageFromURL(targetdata, client);
+async function msgBlock(message, targetdata, botdb) {
+  const targetMsg = await getMessageFromURL(targetdata, message.client);
   if (!targetMsg) { return message.reply(`I couldn't parse ${targetdata} - please include a full message link as an argument to the block message command.`); }
   else if (message.author.id == targetMsg.author.id || message.member.roles.cache.has(config.roleStaff)) {
-    switch (await starboard.blockMsg(targetMsg, client, botdb)) {
+    switch (await starboard.blockMsg(targetMsg, botdb)) {
     case 'blocksuccessful':
       return message.reply('Message blocked from starboard!');
     case 'alreadyblocked':
@@ -167,14 +167,14 @@ async function userUnblock(message, targetdata, botdb) {
   }
 }
 
-async function msgUnblock(message, targetdata, client, botdb) {
-  const targetMsg = await getMessageFromURL(targetdata, client);
+async function msgUnblock(message, targetdata, botdb) {
+  const targetMsg = await getMessageFromURL(targetdata, message.client);
   if (!targetMsg) { return message.reply(`I couldn't parse ${targetdata} - please include a full message link as an argument to the block message command.`); }
   else if (message.author.id == targetMsg.author.id || message.member.roles.cache.has(config.roleStaff)) {
     switch (await starboard.unblockMsg(targetMsg, botdb)) {
     case 'unblocksuccessful':
       message.reply('Successfully unblocked message from starboard! Adding back to starboard if above threshold.');
-      return starboard.onStar(client, targetMsg, botdb);
+      return starboard.onStar(targetMsg, botdb);
     case 'notblocked':
       return message.reply('Message was not blocked from starboard!');
     case 'error':
@@ -186,7 +186,7 @@ async function msgUnblock(message, targetdata, client, botdb) {
   }
 }
 
-async function startMigrator(message, client, botdb) {
+async function startMigrator(message, botdb) {
   let reply;
   let questionLoop = true;
   let fromChannel = null;
@@ -199,7 +199,7 @@ async function startMigrator(message, client, botdb) {
       if (reply.content.toLowerCase() == 'cancel') {
         return message.channel.send('Migration canceled!');
       }
-      fromChannel = await getChannel(reply.content, client);
+      fromChannel = await getChannel(reply.content, message.client);
       if (!fromChannel) {
         message.channel.send('I\'m sorry, I couldn\'t parse that reply. Please provide a #channel mention or channel ID, or type \'cancel\'. What channel will you be migrating the starboard from?');
       }
@@ -210,7 +210,7 @@ async function startMigrator(message, client, botdb) {
       if (reply.content.toLowerCase() == 'cancel') {
         return message.channel.send('Migration canceled!');
       }
-      toChannel = await getChannel(reply.content, client);
+      toChannel = await getChannel(reply.content, message.client);
       if (!toChannel) {
         message.channel.send('I\'m sorry, I couldn\'t parse that reply. Please provide a #channel mention or channel ID, or type \'cancel\'. What channel will you be migrating the starboard from?');
       }
@@ -247,7 +247,7 @@ Is this correct? Please type '**yes**' or '**no**' in full. Once the process is 
   config.starboardChannelId = toChannel.id;
   writeConfig();
   message.channel.send('Great, beginning starboard migration...');
-  await starboard.migrator(fromChannel, toChannel, message.channel, client, botdb);
+  await starboard.migrator(fromChannel, toChannel, message.channel, botdb);
   message.channel.send('Starboard migration now complete. Please use the config commands to turn the starboard back on.');
 }
 
@@ -274,7 +274,7 @@ non-staff may also perform the block/unblockmsg commands for any post they are t
     case 'blockmsg':
     case 'blockmessage':
       for (const targetdata of args) {
-        await msgBlock(message, targetdata, client, botdb);
+        await msgBlock(message, targetdata, botdb);
       }
       return;
     case 'unblockuser':
@@ -286,7 +286,7 @@ non-staff may also perform the block/unblockmsg commands for any post they are t
     case 'unblockmsg':
     case 'unblockmessage':
       for (const targetdata of args) {
-        await msgUnblock(message, targetdata, client, botdb);
+        await msgUnblock(message, targetdata, botdb);
       }
       return;
     case 'unblock':
@@ -294,7 +294,7 @@ non-staff may also perform the block/unblockmsg commands for any post they are t
     case 'block':
       return message.reply(`Sorry, please use ${config.prefix}starboard blockuser or blockmsg.`);
     case 'migrate':
-      await startMigrator(message, client, botdb);
+      await startMigrator(message, botdb);
       return;
     }
   },
@@ -312,11 +312,13 @@ non-staff may also perform the block/unblockmsg commands for any post they are t
       const { d: data } = packet;
       const user = client.users.cache.get(data.user_id);
       const channel = client.channels.cache.get(data.channel_id) || await user.createDM();
-      // fetch info about the message the reaction was added to.
-      await channel.messages.fetch(data.message_id).then(message => {
-        if (!message || message.system) return;
-        starboard.onStar(client, message, botdb);
-      });
+      if (channel.type == 'text') {
+        // if it's a guild channel, fetch the message the reaction was added to, then pass it to the starboard functions for examination.
+        await channel.messages.fetch(data.message_id).then(message => {
+          if (!message || message.system) return;
+          starboard.onStar(message, botdb);
+        });
+      }
     });
   },
 };
