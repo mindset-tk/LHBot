@@ -5,28 +5,7 @@ const config = require(configPath);
 const listPath = path.resolve('./gamelist.json');
 const gameList = require(listPath);
 const Discord = require('discord.js');
-
-function getPermLevel(message) {
-  if (message.isPKMessage) {
-    if (message.PKData.author.roles.cache.has(config.roleStaff)) {
-      return 'staff';
-    }
-    else if (message.PKData.author.roles.cache.has(config.roleComrade)) {
-      return 'comrade';
-    }
-    else {return null;}
-  }
-  else if (!message.isPKMessage) {
-    if (message.member.roles.cache.has(config.roleStaff)) {
-      return 'staff';
-    }
-    else if (message.member.roles.cache.has(config.roleComrade)) {
-      return 'comrade';
-    }
-    else {return null;}
-  }
-  return null;
-}
+const {getPermLevel} = require('../extras/common.js');
 
 module.exports = {
   name: 'games',

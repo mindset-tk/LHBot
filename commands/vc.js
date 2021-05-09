@@ -2,28 +2,7 @@ const path = require('path');
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
 const wait = require('util').promisify(setTimeout);
-
-function getPermLevel(message) {
-  if (message.isPKMessage) {
-    if (message.PKData.author.roles.cache.has(config.roleStaff)) {
-      return 'staff';
-    }
-    else if (message.PKData.author.roles.cache.has(config.roleComrade)) {
-      return 'comrade';
-    }
-    else {return null;}
-  }
-  else if (!message.isPKMessage) {
-    if (message.member.roles.cache.has(config.roleStaff)) {
-      return 'staff';
-    }
-    else if (message.member.roles.cache.has(config.roleComrade)) {
-      return 'comrade';
-    }
-    else {return null;}
-  }
-  return null;
-}
+const {getPermLevel} = require('../extras/common.js');
 
 async function updateChannel(type, args, message) {
   const permLevel = getPermLevel(message);
