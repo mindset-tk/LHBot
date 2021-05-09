@@ -119,6 +119,7 @@ if (fs.existsSync(eventDataPath)) { global.eventData = require(eventDataPath);}
 const moment = require('moment-timezone');
 const vettingLimitPath = './commands/vettinglimit.js';
 const starboard = require('./starboard.js');
+const {getPermLevel} = require('./extras/common.js');
 
 // Extend guild with music details accessed by the .yt command.
 Discord.Structures.extend('Guild', Guild => {
@@ -192,29 +193,6 @@ Discord.Structures.extend('Message', Message => {
   }
   return PKMessage;
 });
-
-// function to determine if a user's permission level - returns null, 'comrade', or 'staff'
-function getPermLevel(message) {
-  if (message.isPKMessage) {
-    if (message.PKData.author.roles.cache.has(config.roleStaff)) {
-      return 'staff';
-    }
-    else if (message.PKData.author.roles.cache.has(config.roleComrade)) {
-      return 'comrade';
-    }
-    else {return null;}
-  }
-  else if (!message.isPKMessage) {
-    if (message.member.roles.cache.has(config.roleStaff)) {
-      return 'staff';
-    }
-    else if (message.member.roles.cache.has(config.roleComrade)) {
-      return 'comrade';
-    }
-    else {return null;}
-  }
-  return null;
-}
 
 // initialize client, commands, command cooldown collections
 myIntents.add(Discord.Intents.NON_PRIVILEGED, 'GUILD_MEMBERS');
