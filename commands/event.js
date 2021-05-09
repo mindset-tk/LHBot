@@ -12,6 +12,7 @@ const config = require(configPath);
 const moment = require('moment-timezone');
 const tz = require('../extras/timezones');
 const eventDataPath = path.resolve('./events.json');
+const { promptForMessage, promptYesNo } = require('../extras/common.js');
 
 let eventInfoChannel = null;
 
@@ -177,6 +178,59 @@ function getRelativeTime(date1, date2) {
     humanized += `${minutes} ${minutes == 1 ? 'minutes' : 'minutes'}`;
   }
   return humanized;
+}
+
+async function handleUserDateParse(dmChannel, date, time, ampm, timeZone) {
+  let datePart;
+  switch (date.toLowerCase()) {
+    case 'today':
+      datePart = moment.tz(moment(), dateInputFormats, true, timeZone);
+      break;
+    case 'tomorrow':
+      datePart = moment.tz(
+        moment().add(1, 'd'),
+        dateInputFormats,
+        true,
+        timeZone
+      );
+      break;
+    default:
+      datePart = moment.tz(date, dateInputFormats, true, timeZone);
+  }
+  let [hours, minutes] = time.split(':');
+  if (parseInt(hours) < 10) {
+    hours = '0' + parseInt(hours);
+  }
+  time = hours + ':' + minutes;
+  const timePart = moment.tz(time, timeInputFormat, true, timeZone);
+
+  if (!datePart.isValid()) {
+    dmChannel.send(
+      `The date format used wasn't recognized, or you entered an invalid date. Supported date formats are: ${dateInputFormats
+        .map((d) => `\`${d}\``)
+        .join(', ')}.\n Please try again or type cancel to end event creation.`
+    );
+    return false;
+  } else if (!timePart.isValid()) {
+    dmChannel.send(
+      "The time format used wasn't recognized. Examples of properly formatted time:\n1:00\n01:00\n13:00\n1:00 AM\n1:00 PM\n Please try enter the date and time again or type cancel to end event time editing."
+    );
+    return false;
+  } else if (ampm && !['am', 'pm'].includes(ampm.toLowerCase())) {
+    dmChannel.send(
+      'Please either use 24 hour time or include AM/PM after the time. Please try again or type cancel to end event time editing.'
+    );
+    return false;
+  } else if (ampm) {
+    if (hours !== 12 && ampm.toLowerCase() === 'pm') {
+      timePart.add(12, 'h');
+    }
+    if (hours === 12 && ampm.toLowerCase() === 'am') {
+      timePart.subtract(12, 'h');
+    }
+  }
+
+  return { datePart, timePart };
 }
 
 class EventManager {
@@ -778,8 +832,8 @@ async function editCommand(message, client, name) {
       );
     }
     const timeZone = getAuthorTimeZone(message);
-    const DMChannel = await message.author.createDM();
-    DMChannel.send(
+    const dmChannel = await message.author.createDM();
+    dmChannel.send(
       `Just a reminder that all dates and times are set for the **${getTimeZoneCanonicalDisplayName(
         timeZone
       )}** time zone. This is ${
@@ -790,7 +844,9 @@ async function editCommand(message, client, name) {
       }`
     );
     const minimumDate = moment.tz(timeZone).add('1', 'minutes');
-    DMChannel.send(
+
+    // Prompt for new event date
+    dmChannel.send(
       `What date and time would you like to change the event to? Please use the format: [Date] [HH:mm] [AM/PM] (AM/PM are optional).\nValid date formats are: YYYY/MM/DD, MM/DD, today, or tomorrow.\n Currently, ${
         event.name
       } is set to occur at ${formatDateCalendar(
@@ -798,153 +854,102 @@ async function editCommand(message, client, name) {
         timeZone
       )} ${getTimeZoneCanonicalDisplayName(timeZone)}`
     );
-    let awaitingAnswer = true;
-    let reply;
-    let resolvedDate;
-    let datePart;
-    let timePart;
-    while (awaitingAnswer) {
-      reply = await DMCollector(DMChannel);
-      if (!reply) {
-        awaitingAnswer = false;
-        return false;
-      }
-      if (reply.content.toLowerCase() == 'cancel') {
-        awaitingAnswer = false;
-        DMChannel.send(
-          'Event edit cancelled. Please run the command again to edit an event.'
-        );
-        return false;
-      }
-      let [date, time, ampm] = reply.content.split(' ');
-      // handle special date formats.
-      if (!time) {
-        DMChannel.send(
-          'Please include a time, separated by a space from the date.  You can enter the time in 24 hour format, or with AM/PM separated by a space.\nPlease try again or type cancel to end event edit.'
-        );
-      } else {
-        switch (date.toLowerCase()) {
-          case 'today':
-            datePart = moment.tz(moment(), dateInputFormats, true, timeZone);
-            break;
-          case 'tomorrow':
-            datePart = moment.tz(
-              moment().add(1, 'd'),
-              dateInputFormats,
-              true,
-              timeZone
-            );
-            break;
-          default:
-            datePart = moment.tz(date, dateInputFormats, true, timeZone);
+    let editing = true;
+    while (editing) {
+      let result = await promptForMessage(dmChannel, async (reply) => {
+        const content = reply.content.trim();
+        if (content.toLowerCase() === 'cancel') {
+          dmChannel.send(
+            'Event edit cancelled. Please run the command again to edit an event.'
+          );
+          return 'abort';
         }
-        let [hours, minutes] = time.split(':');
-        if (parseInt(hours) < 10) {
-          hours = '0' + parseInt(hours);
+        let [date, time, ampm] = content.split(' ');
+        // handle special date formats.
+        if (!time) {
+          dmChannel.send(
+            'Please include a time, separated by a space from the date.  You can enter the time in 24 hour format, or with AM/PM separated by a space.\nPlease try again or type cancel to end event edit.'
+          );
+          return 'retry';
         }
-        time = hours + ':' + minutes;
-        timePart = moment.tz(time, timeInputFormat, true, timeZone);
+        const dateParseRes = await handleUserDateParse(
+          dmChannel,
+          date,
+          time,
+          ampm,
+          timeZone
+        );
+        if (!dateParseRes) return 'retry';
+        const { datePart, timePart } = dateParseRes;
 
         if (!datePart.isValid()) {
-          DMChannel.send(
-            `The date format used wasn't recognized, or you entered an invalid date. Supported date formats are: ${dateInputFormats
-              .map((d) => `\`${d}\``)
-              .join(
-                ', '
-              )}.\n Please try again or type cancel to end event creation.`
+          dmChannel.send(
+            'There was a problem with the format of your date. Please try again or type cancel to end.'
           );
+          return 'retry';
         } else if (!timePart.isValid()) {
-          DMChannel.send(
-            "The time format used wasn't recognized. Examples of properly formatted time:\n1:00\n01:00\n13:00\n1:00 AM\n1:00 PM\n Please try enter the date and time again or type cancel to end event time editing."
+          dmChannel.send(
+            'There was a problem with the format of your time. Please try again or type cancel to end.'
           );
-        } else if (ampm && !['am', 'pm'].includes(ampm.toLowerCase())) {
-          DMChannel.send(
-            'Please either use 24 hour time or include AM/PM after the time. Please try again or type cancel to end event time editing.'
-          );
-        } else if (ampm) {
-          if (hours != 12 && ampm.toLowerCase() == 'pm') {
-            timePart.add(12, 'h');
-          }
-          if (hours == 12 && ampm.toLowerCase() == 'am') {
-            timePart.subtract(12, 'h');
-          }
+          return 'retry';
         }
 
-        if (datePart.isValid() && timePart.isValid()) {
-          resolvedDate = datePart.set({
-            hour: timePart.hour(),
-            minute: timePart.minute(),
-            second: 0,
-            millisecond: 0,
-          });
-        }
+        const resolvedDate = datePart.set({
+          hour: timePart.hour(),
+          minute: timePart.minute(),
+          second: 0,
+          millisecond: 0,
+        });
+
         // Ensure the event is in the future.
         if (resolvedDate && resolvedDate.diff(minimumDate) < 0) {
-          DMChannel.send(
+          dmChannel.send(
             'The event must start in the future. Please try again or type cancel to end.'
           );
-        } else {
-          const d = resolvedDate.utc();
-          DMChannel.send(
-            `Great, **${
-              event.name
-            }** will be updated to occur at ${formatDateCalendar(
-              moment(d),
-              timeZone
-            )} ${getTimeZoneCanonicalDisplayName(
-              timeZone
-            )}. Is this OK? **Y/N**`
-          );
-          let awaitYN = true;
-          while (awaitYN == true) {
-            reply = await DMCollector(DMChannel);
-            if (!reply) {
-              return;
-            }
-            switch (reply.content.toLowerCase()) {
-              case 'n':
-              case 'no':
-                DMChannel.send(
-                  'OK, please type a new date and time for the event.'
-                );
-                awaitingAnswer = true;
-                awaitYN = false;
-                break;
-              case 'y':
-              case 'yes':
-                DMChannel.send("Perfect. I'll notify the channel.");
-                event.due = d;
-                writeEventState();
-                await eventManager.updateUpcomingEventsPost(message.guild.id);
-                awaitingAnswer = false;
-                awaitYN = false;
-                return message.channel.send(
-                  embedEvent(event, message.guild, {
-                    title: `Event has changed: ${event.name}`,
-                    forUser: message.author,
-                  })
-                );
-              case 'cancel':
-                DMChannel.send(
-                  'Event edit cancelled. Please run the command again to edit an event.'
-                );
-                return;
-              case false:
-                return;
-              default:
-                DMChannel.send(
-                  `Reply not recognized! Please answer Y or N. is ${formatDateCalendar(
-                    moment(d),
-                    timeZone
-                  )} ${getTimeZoneCanonicalDisplayName(
-                    timeZone
-                  )} an acceptable date and time for the event? **Y/N**`
-                );
-                break;
-            }
-          }
-          awaitingAnswer = false;
+          return 'retry';
         }
+
+        return { resolvedDate };
+      });
+      if (!result) return false;
+      console.log(result);
+      const { resolvedDate } = result;
+      const d = resolvedDate.utc();
+      dmChannel.send(
+        `Great, **${
+          event.name
+        }** will be updated to occur at ${formatDateCalendar(
+          moment(d),
+          timeZone
+        )} ${getTimeZoneCanonicalDisplayName(timeZone)}. Is this OK? **Y/N**`
+      );
+
+      result = await promptYesNo(dmChannel, {
+        messages: {
+          yes: "Perfect. I'll notify the channel.",
+          no: 'OK, please type a new date and time for the event.',
+          cancel:
+            'Event edit cancelled. Please run the command again to edit an event.',
+          invalid: `Reply not recognized! Please answer Y or N. is ${formatDateCalendar(
+            moment(d),
+            timeZone
+          )} ${getTimeZoneCanonicalDisplayName(
+            timeZone
+          )} an acceptable date and time for the event? **Y/N**`,
+        },
+      });
+      if (!result) return false;
+      editing = !result.answer;
+
+      if (result.answer) {
+        event.due = d;
+        await eventManager.updateUpcomingEventsPost(message.guild.id);
+        await message.channel.send(
+          embedEvent(event, message.guild, {
+            title: `Event has changed: ${event.name}`,
+            forUser: message.author,
+          })
+        );
       }
     }
   } else {
@@ -1249,110 +1254,67 @@ async function msgCollector(message) {
   return reply;
 }
 
-// function to create a message collector in a DM. Timeout is 3 minutes.
-async function DMCollector(DMChannel) {
-  // let responses = 0;
-  let reply = false;
-  // awaitmessages needs a filter but we're just going to accept the first reply it gets.
-  const filter = (m) => m.author.id === DMChannel.recipient.id;
-  await DMChannel.awaitMessages(filter, {
-    max: 1,
-    time: 180000,
-    errors: ['time'],
-  })
-    // this method creates a collection; since there is only one entry we get the data from collected.first
-    .then((collected) => (reply = collected.first()))
-    .catch((collected) =>
-      DMChannel.send(
-        'Sorry, I waited 3 minutes with no response. You will need to start over.'
-      )
-    );
-  // console.log('Reply processed...');
-  return reply;
-}
-
 async function createWizard(message, channel) {
   let eventData = {};
   let awaitingAnswer = true;
   let reply;
-  const DMChannel = await message.author.createDM();
+  let result;
+  const dmChannel = await message.author.createDM();
   // TODO if/then statement to check if it's the first time the user has done this (global.eventData.userTimeZones[message.author.id]) then run the user through setting their time zone or just using the server zone.
   // Note to self: setting the user's timeZone to "server" should tell this routine to use the server time zone without storing any time zone in the system.
   if (!global.eventData.userTimeZones[message.author.id]) {
-    let needTZ = false;
-    DMChannel.send(
+    dmChannel.send(
       `Before we get started, it looks like you don't have a time zone set on file. Would you like to add one now? **Y/N**\n\n**PLEASE NOTE** this will store your userID and time zone on file (this data will be deleted if you leave the server). If you are not comfortable with this, say **N** and you will not be asked again, but all events you create will be in the server time zone (currently **${getTimeZoneCanonicalDisplayName(
         getGuildTimeZone(message.guild)
       )}**, but staff can change this setting at any time.) No matter what you elect to do, you can still change it at a later date with the ${
         config.prefix
       }event tz command. You may also type 'cancel' to quit event creation entirely; no data is stored in this case.`
     );
-    while (awaitingAnswer) {
-      reply = await DMCollector(DMChannel);
-      if (!reply) {
-        return;
-      }
-      switch (reply.content.toLowerCase()) {
-        case 'n':
-        case 'no':
-          DMChannel.send(
-            `OK, no problem. Going forward, all time zones will use the server time zone. Again, this is currently **${getTimeZoneCanonicalDisplayName(
-              getGuildTimeZone(message.guild)
-            )}**`
-          );
+    result = await promptYesNo(dmChannel, {
+      messages: {
+        yes: 'OK. Please provide a time zone.',
+        no: `OK, no problem. Going forward, all time zones will use the server time zone. Again, this is currently **${getTimeZoneCanonicalDisplayName(
+          getGuildTimeZone(message.guild)
+        )}**`,
+        cancel: `Event creation cancelled. Please run ${config.prefix}event create again to initiate event creation again.`,
+        invalid: 'Reply not recognized! Please answer Y or N.',
+      },
+    });
+    if (!result.answer) {
+      await setUserTimeZone(message.author, 'server');
+    } else {
+      result = await promptForMessage(dmChannel, async (reply) => {
+        const content = reply.content.trim();
+        if (content === 'cancel') {
           await setUserTimeZone(message.author, 'server');
-          awaitingAnswer = false;
-          break;
-        case 'y':
-        case 'yes':
-          DMChannel.send('OK. Please provide a time zone.');
-          awaitingAnswer = false;
-          needTZ = true;
-          break;
-        case 'cancel':
-          DMChannel.send(
-            `Event creation cancelled. Please run ${config.prefix}event create again to initiate event creation again.`
-          );
-          return;
-        case false:
-          return;
-        default:
-          DMChannel.send('Reply not recognized! Please answer Y or N.');
-          break;
-      }
-    }
-    while (needTZ) {
-      reply = await DMCollector(DMChannel);
-      if (!reply) {
-        return;
-      }
-      if (reply.content.toLowerCase() == 'cancel') {
-        await setUserTimeZone(message.author, 'server');
-        needTZ = false;
-      } else {
-        const usrTZ = getTimeZoneFromUserInput(reply.content);
-        if (!isValidTimeZone(usrTZ)) {
-          message.author.send(
-            `'${usrTZ}' is an invalid or unknown time zone. Please try again, or type 'cancel' to set your time zone to match the server's time zone.`
-          );
+          return 'abort';
         } else {
-          await setUserTimeZone(message.author, usrTZ);
-          DMChannel.send(
-            `OK, your time zone is now set to **${getTimeZoneCanonicalDisplayName(
-              usrTZ
-            )}**.`
-          );
-          needTZ = false;
+          const usrTZ = getTimeZoneFromUserInput(reply.content);
+          if (!isValidTimeZone(usrTZ)) {
+            message.author.send(
+              `'${usrTZ}' is an invalid or unknown time zone. Please try again, or type 'cancel' to set your time zone to match the server's time zone.`
+            );
+            return 'retry';
+          } else {
+            await setUserTimeZone(message.author, usrTZ);
+            dmChannel.send(
+              `OK, your time zone is now set to **${getTimeZoneCanonicalDisplayName(
+                usrTZ
+              )}**.`
+            );
+            return { set: true };
+          }
         }
-      }
+      });
+      if (!result) return false;
     }
   } else {
     const usrTZ = getAuthorTimeZone(message);
-    DMChannel.send(
+    dmChannel.send(
       `Just a reminder that all dates and times are set for the **${getTimeZoneCanonicalDisplayName(
         usrTZ
       )}** time zone. This is ${
-        global.eventData.userTimeZones[message.author.id] == 'server'
+        global.eventData.userTimeZones[message.author.id] === 'server'
           ? 'the server time zone, and not set by you.'
           : 'the time zone you set.'
       }`
@@ -1360,321 +1322,207 @@ async function createWizard(message, channel) {
   }
   const timeZone = getAuthorTimeZone(message);
   const minimumDate = moment.tz(timeZone).add('1', 'minutes');
-  DMChannel.send(
+  dmChannel.send(
     "First, I'll need a name for the event. What would you like to call it?\n *You can reply 'cancel' without quotes at any time to end this wizard without creating an event.\nPlease note that you have 3 minutes to answer each of these questions; The timer resets for each question."
   );
-  awaitingAnswer = true;
-  while (awaitingAnswer) {
-    reply = await DMCollector(DMChannel);
-    if (!reply) {
-      awaitingAnswer = false;
-      return false;
-    }
-    if (reply.content.toLowerCase() == 'cancel') {
-      awaitingAnswer = false;
-      DMChannel.send(
+  result = await promptForMessage(dmChannel, async (reply) => {
+    const content = reply.content.trim();
+    if (content.toLowerCase() === 'cancel') {
+      dmChannel.send(
         `Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`
       );
-      return false;
+      return 'abort';
     }
-    eventData.name = reply.content.replace(/["_\*>`\n]/g, '');
+    eventData.name = content.replace(/["_\*>`\n]/g, '');
     if (eventManager.getByName(message.guild.id, eventData.name)) {
-      DMChannel.send(
+      dmChannel.send(
         `An event called '${eventData.name}' already exists. Please enter a different name.`
       );
+      return 'retry';
     } else {
-      awaitingAnswer = false;
+      return { name: eventData.name };
     }
-  }
-  DMChannel.send(
-    `ok, an event called **${eventData.name}**.\nNext, I need a date and time for the event, like so: [Date] [HH:mm] [AM/PM] (AM/PM are optional).\nValid date formats are: YYYY/MM/DD, MM/DD, today, or tomorrow.`
+  });
+  if (!result) return false;
+  dmChannel.send(
+    `OK, an event called **${eventData.name}**.\nNext, I need a date and time for the event, like so: [Date] [HH:mm] [AM/PM] (AM/PM are optional).\nValid date formats are: YYYY/MM/DD, MM/DD, today, or tomorrow.`
   );
-  awaitingAnswer = true;
-  let resolvedDate = null;
-  let datePart;
-  let timePart;
-  while (awaitingAnswer) {
-    reply = await DMCollector(DMChannel);
-    if (!reply) {
-      awaitingAnswer = false;
-      return false;
-    }
-    if (reply.content.toLowerCase() == 'cancel') {
-      awaitingAnswer = false;
-      DMChannel.send(
-        `Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`
-      );
-      return false;
-    }
-    let [date, time, ampm] = reply.content.split(' ');
-    // handle special date formats.
-    if (!time) {
-      DMChannel.send(
-        'Please include a time, separated by a space from the date.  You can enter the time in 24 hour format, or with AM/PM separated by a space.\nPlease try again or type cancel to end event creation.'
-      );
-    } else {
-      switch (date.toLowerCase()) {
-        case 'today':
-          datePart = moment.tz(moment(), dateInputFormats, true, timeZone);
-          break;
-        case 'tomorrow':
-          datePart = moment.tz(
-            moment().add(1, 'd'),
-            dateInputFormats,
-            true,
-            timeZone
-          );
-          break;
-        default:
-          datePart = moment.tz(date, dateInputFormats, true, timeZone);
+  let settingDate = true;
+  let resolvedDate;
+  while (settingDate) {
+    result = await promptForMessage(dmChannel, async (reply) => {
+      const content = reply.content.trim();
+      if (content.toLowerCase() === 'cancel') {
+        dmChannel.send(
+          `Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`
+        );
+        return 'abort';
       }
-      let [hours, minutes] = time.split(':');
-      if (parseInt(hours) < 10) {
-        hours = '0' + parseInt(hours);
+      let [date, time, ampm] = reply.content.split(' ');
+      // handle special date formats.
+      if (!time) {
+        dmChannel.send(
+          'Please include a time, separated by a space from the date.  You can enter the time in 24 hour format, or with AM/PM separated by a space.\nPlease try again or type cancel to end event creation.'
+        );
+        return 'retry';
       }
-      time = hours + ':' + minutes;
-      timePart = moment.tz(time, timeInputFormat, true, timeZone);
+      const dateParseRes = await handleUserDateParse(
+        dmChannel,
+        date,
+        time,
+        ampm,
+        timeZone
+      );
+      if (!dateParseRes) return 'retry';
+      const { datePart, timePart } = dateParseRes;
 
       if (!datePart.isValid()) {
-        DMChannel.send(
-          `The date format used wasn't recognized, or you entered an invalid date. Supported date formats are: ${dateInputFormats
-            .map((d) => `\`${d}\``)
-            .join(
-              ', '
-            )}.\n Please try again or type cancel to end event creation.`
+        dmChannel.send(
+          'There was a problem with the format of your date. Please try again or type cancel to end.'
         );
+        return 'retry';
       } else if (!timePart.isValid()) {
-        DMChannel.send(
-          "The time format used wasn't recognized. Examples of properly formatted time:\n1:00\n01:00\n13:00\n1:00 AM\n1:00 PM\n Please try enter the date and time again or type cancel to end event creation."
+        dmChannel.send(
+          'There was a problem with the format of your time. Please try again or type cancel to end.'
         );
-      } else if (ampm && !['am', 'pm'].includes(ampm.toLowerCase())) {
-        DMChannel.send(
-          'Please either use 24 hour time or include AM/PM after the time. Please try again or type cancel to end event creation.'
-        );
-      } else if (ampm) {
-        if (hours != 12 && ampm.toLowerCase() == 'pm') {
-          timePart.add(12, 'h');
-        }
-        if (hours == 12 && ampm.toLowerCase() == 'am') {
-          timePart.subtract(12, 'h');
-        }
+        return 'retry';
       }
 
-      if (datePart.isValid() && timePart.isValid()) {
-        resolvedDate = datePart.set({
-          hour: timePart.hour(),
-          minute: timePart.minute(),
-          second: 0,
-          millisecond: 0,
-        });
-      }
+      const resolvedDate = datePart.set({
+        hour: timePart.hour(),
+        minute: timePart.minute(),
+        second: 0,
+        millisecond: 0,
+      });
 
       // Ensure the event is in the future.
       if (resolvedDate && resolvedDate.diff(minimumDate) < 0) {
-        DMChannel.send(
-          'The event must start in the future. Please try again or type cancel to end event creation.'
+        dmChannel.send(
+          'The event must start in the future. Please try again or type cancel to end.'
         );
-      } else if (resolvedDate) {
-        eventData.due = resolvedDate.utc();
-        const d = new Date(resolvedDate);
-        const options = {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: 'numeric',
-          timeZone: timeZone,
-          timeZoneName: 'short',
-        };
-        DMChannel.send(
-          `Great, **${eventData.name}** will happen on ${d.toLocaleString(
-            'en-US',
-            options
-          )}. Is this OK? **Y/N**`
-        );
-        let awaitYN = true;
-        while (awaitYN == true) {
-          reply = await DMCollector(DMChannel);
-          if (!reply) {
-            return;
-          }
-          switch (reply.content.toLowerCase()) {
-            case 'n':
-            case 'no':
-              DMChannel.send(
-                'OK, please type a new date and time for the event.'
-              );
-              awaitingAnswer = true;
-              awaitYN = false;
-              break;
-            case 'y':
-            case 'yes':
-              DMChannel.send(
-                'OK! Would you like to set a description for this event? **Y/N**'
-              );
-              awaitingAnswer = false;
-              awaitYN = false;
-              break;
-            case 'cancel':
-              DMChannel.send(
-                `Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`
-              );
-              return;
-            case false:
-              return;
-            default:
-              DMChannel.send(
-                'Reply not recognized! Please answer Y or N. Would you like to set a description for this event? **Y/N**'
-              );
-              break;
-          }
-        }
-        awaitingAnswer = false;
+        return 'retry';
       }
-    }
+
+      return { resolvedDate };
+    });
+
+    if (!result) return false;
+    console.log(result);
+    resolvedDate = result.resolvedDate;
+    const d = resolvedDate.utc();
+    const options = {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      timeZone: timeZone,
+      timeZoneName: 'short',
+    };
+
+    dmChannel.send(
+      `Great, **${eventData.name}** will happen on ${d.toLocaleString(
+        'en-US',
+        options
+      )}. Is this OK? **Y/N**`
+    );
+
+    result = await promptYesNo(dmChannel, {
+      messages: {
+        no: 'OK, please type a new date and time for the event.',
+        cancel: `Event creation cancelled. Please run ${config.prefix}event create again to initiate event creation again.`,
+        invalid: `Reply not recognized! Please answer Y or N. Is ${d.toLocaleString(
+          'en-US',
+          options
+        )} an acceptable date and time for the event? **Y/N**`,
+      },
+    });
+    if (!result) return false;
+    settingDate = !result.answer;
   }
+
+  dmChannel.send(
+    'OK! Would you like to set a description for this event? **Y/N**'
+  );
+
   eventData.due = resolvedDate.utc();
-  let needsDesc = false;
-  awaitingAnswer = true;
-  while (awaitingAnswer) {
-    reply = await DMCollector(DMChannel);
-    if (!reply) {
-      return;
-    }
-    switch (reply.content.toLowerCase()) {
-      case 'n':
-      case 'no':
-        DMChannel.send('OK, no description. Does this all look good? **Y/N**');
-        awaitingAnswer = false;
-        break;
-      case 'y':
-      case 'yes':
-        DMChannel.send(
-          "Great! Please enter a description for the event.  It's best to keep this short, 2-3 sentences max. You can type 'none' if you decide you do no want a description after all"
-        );
-        awaitingAnswer = false;
-        needsDesc = true;
-        break;
-      case 'cancel':
-        DMChannel.send(
-          `Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`
-        );
-        return;
-      case false:
-        return;
-      default:
-        DMChannel.send(
-          'Reply not recognized! Please answer Y or N. Would you like to set a description for this event? **Y/N**'
-        );
-        break;
-    }
-  }
-  let description;
-  while (needsDesc == true) {
-    reply = await DMCollector(DMChannel);
-    if (!reply) {
-      return;
-    }
-    description = reply.content.replace(/["_\*>`]/g, '');
-    switch (description.toLowerCase()) {
-      case 'cancel':
-        DMChannel.send(
-          `Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`
-        );
-        return;
-      case 'none':
-        DMChannel.send('OK, no description. Does this all look good? **Y/N**');
-        needsDesc = false;
-        break;
-      case false:
-        return;
-      default:
-        DMChannel.send(
-          `Great,\n> ${description.replace(
-            /\n/g,
-            '\n> '
-          )}\nwill be the description of your event. Is this OK? **Y/N**`
-        );
-        awaitingAnswer = true;
-        while (awaitingAnswer) {
-          reply = await DMCollector(DMChannel);
-          if (!reply) {
-            return;
-          }
-          switch (reply.content.toLowerCase()) {
-            case 'n':
-            case 'no':
-              DMChannel.send(
-                "OK, please type a new description, or 'none' for no description."
-              );
-              awaitingAnswer = false;
-              break;
-            case 'y':
-            case 'yes':
-              eventData.description = description;
-              awaitingAnswer = false;
-              needsDesc = false;
-              break;
-            case 'cancel':
-              DMChannel.send(
-                `Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`
-              );
-              return;
-            case false:
-              return;
-            default:
-              DMChannel.send(
-                `Reply not recognized! Please answer Y or N. Would you like to change the description for this event from *${description}*? **Y/N**`
-              );
-              break;
-          }
-        }
+  result = await promptYesNo(dmChannel, {
+    messages: {
+      yes:
+        "Great! Please enter a description for the event. It's best to keep this short, 2-3 sentences max. You can type 'none' if you decide you do not want a description after all.",
+      no: 'OK, no description.',
+      cancel: `Event creation cancelled. Please run ${config.prefix}event create again to initiate event creation again.`,
+      invalid:
+        'Reply not recognized! Please answer Y or N. Would you like to set a description for this event? **Y/N**',
+    },
+  });
+  if (!result) return false;
+  const needsDesc = result.answer;
+
+  while (needsDesc) {
+    result = await promptForMessage(dmChannel, async (reply) => {
+      const description = reply.content.trim().replace(/["_\*>`]/g, '');
+      switch (description.toLowerCase()) {
+        case 'cancel':
+          dmChannel.send(
+            `Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`
+          );
+          return 'abort';
+        case 'none':
+          dmChannel.send('OK, no description.');
+          return { description: undefined };
+        case false:
+          return 'retry';
+        default:
+          dmChannel.send(
+            `Great,\n> ${description.replace(
+              /\n/g,
+              '\n> '
+            )}\nwill be the description of your event. Is this OK? **Y/N**`
+          );
+          return { description };
+      }
+    });
+    if (!result) return false;
+    const { description } = result;
+    // Confirm the description is okay
+    result = await promptYesNo(dmChannel, {
+      messages: {
+        no: "OK, please type a new description, or 'none' for no description.",
+        cancel: `Event creation cancelled. Please run ${config.prefix}event create again to initiate event creation again.`,
+        invalid: `Reply not recognized! Please answer Y or N. Would you like to change the description for this event from *${description}*? **Y/N**`,
+      },
+    });
+    if (!result) return false;
+    const needsDesc = !result.answer;
+    if (result.answer) {
+      eventData.description = description;
     }
   }
   eventData.channel = channel.id;
   eventData.owner = message.author.id;
   eventData.guild = message.guild.id;
 
-  DMChannel.send(
+  dmChannel.send("Great! Here's your event:");
+  dmChannel.send(
     DMembedEvent(eventData, message.guild, {
       title: `New event: ${eventData.name}`,
       forUser: message.author,
     })
   );
-  DMChannel.send('Great! Does this look OK? **Y/N**');
-  let awaitYN = true;
-  while (awaitYN == true) {
-    reply = await DMCollector(DMChannel);
-    if (!reply) {
-      return;
-    }
-    switch (reply.content.toLowerCase()) {
-      case 'n':
-      case 'no':
-        DMChannel.send(
-          'OK. For now you will have to re-run the command in the server to re-create the event.'
-        );
-        awaitYN = false;
-        return;
-      case 'y':
-      case 'yes':
-        DMChannel.send(`Perfect. I'll notify <#${eventData.channel}> now`);
-        awaitYN = false;
-        break;
-      case 'cancel':
-        DMChannel.send(
-          `Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`
-        );
-        return;
-      case false:
-        return;
-      default:
-        DMChannel.send(
-          'Reply not recognized! Please answer Y or N. Is the event data I posted above acceptable? **Y/N**'
-        );
-        break;
-    }
-  }
+  dmChannel.send('Does this look OK? **Y/N**');
+  result = await promptYesNo(dmChannel, {
+    messages: {
+      yes: `Perfect. I'll notify <#${eventData.channel}> now.`,
+      no:
+        'OK. For now you will have to re-run the command in the server to re-create the event.',
+      cancel: `Event creation cancelled. Please run ${config.prefix}event again to initiate event creation again.`,
+      invalid:
+        'Reply not recognized! Please answer Y or N. Is the event data I posted above acceptable? **Y/N**',
+    },
+  });
+  if (!result || !result.answer) return false;
+
   let role;
   try {
     role = await message.guild.roles.create({
