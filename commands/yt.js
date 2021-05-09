@@ -8,33 +8,13 @@ const path = require('path');
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
 const wait = require('util').promisify(setTimeout);
+const {getPermLevel} = require('../extras/common.js');
+
 let YT;
 if (!config.youTubeAPIKey) {
   console.log('No youtube API Key set! until it is set by editing config.json, the YT voice features will not work.');
 }
 else { YT = new YouTube(config.youTubeAPIKey); }
-
-function getPermLevel(message) {
-  if (message.isPKMessage) {
-    if (message.PKData.author.roles.cache.has(config.roleStaff)) {
-      return 'staff';
-    }
-    else if (message.PKData.author.roles.cache.has(config.roleComrade)) {
-      return 'comrade';
-    }
-    else {return null;}
-  }
-  else if (!message.isPKMessage) {
-    if (message.member.roles.cache.has(config.roleStaff)) {
-      return 'staff';
-    }
-    else if (message.member.roles.cache.has(config.roleComrade)) {
-      return 'comrade';
-    }
-    else {return null;}
-  }
-  return null;
-}
 
 module.exports = {
   name: 'yt',
