@@ -13,12 +13,12 @@ function PublicBumpReminder(config, message) {
     botChannel.updateOverwrite(message.author, { 'VIEW_CHANNEL': false },
       'Disboard Bump Cooldown');
 
-    bumpChannel.send('Server bumped! The next reminder will be in **8 hours**');
+    bumpChannel.send('Server bumped! The next reminder will be in **6 hours**');
     setTimeout(function() {
-      bumpChannel.send(`It's been 8 hours! The server can be bumped on Disboard again using \`!d bump\` in <#${config.botChannelId}>`);
+      bumpChannel.send(`It's been 6 hours! The server can be bumped on Disboard again using \`!d bump\` in <#${config.botChannelId}>`);
       message.channel.updateOverwrite(message.author, { 'VIEW_CHANNEL': true },
         'Disboard Bump Cooldown');
-    }, 28800 * 1000);
+    }, 21600 * 1000);
     return;
   }
 }
