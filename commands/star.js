@@ -87,7 +87,7 @@ async function userBlock(message, targetdata, botdb) {
   }
   // self-exemption responses.
   if (blockTarget != null && blockTarget.id === message.author.id) {
-    switch (await starboard.blockUser(blockTarget.id, botdb)) {
+    switch (await starboard.blockUser(blockTarget, message.guild, botdb)) {
     case 'blocksuccessful':
       return message.reply('Successfully exempted you from the starboard. Current starboard messages from you will no longer accrue stars; your future starboard messages will not be considered for the starboard.');
     case 'alreadyblocked':
@@ -97,7 +97,7 @@ async function userBlock(message, targetdata, botdb) {
     }
   }
   else if (blockTarget != null && blockTarget.id != message.author.id && permLevel == 'staff') {
-    switch (await starboard.blockUser(blockTarget.id, botdb)) {
+    switch (await starboard.blockUser(blockTarget, message.guild, botdb)) {
     case 'blocksuccessful':
       return message.reply(`Successfully blocked ${blockTarget.displayName} from the starboard. Current starboard messages from them will no longer accrue stars; future messages from them will not be considered for the starboard.`);
     case 'alreadyblocked':
@@ -146,7 +146,7 @@ async function userUnblock(message, targetdata, botdb) {
   }
   // self-exemption responses.
   if (unblockTarget != null && unblockTarget.id === message.author.id) {
-    switch (await starboard.unblockUser(unblockTarget.id, botdb)) {
+    switch (await starboard.unblockUser(unblockTarget, message.guild, botdb)) {
     case 'unblocksuccessful':
       return message.reply('Successfully un-exempted you from starboard. Old messages of yours will need to have a star added/removed to update the starboard.');
     case 'notblocked':
@@ -156,7 +156,7 @@ async function userUnblock(message, targetdata, botdb) {
     }
   }
   else if (unblockTarget != null && unblockTarget.id != message.author.id && permLevel == 'staff') {
-    switch (await starboard.unblockUser(unblockTarget.id, botdb)) {
+    switch (await starboard.unblockUser(unblockTarget, message.guild, botdb)) {
     case 'unblocksuccessful':
       return message.reply(`Successfully unblocked ${unblockTarget.displayName} from the starboard. Any messages of theirs can go onto the starboard; Old messages of theirs will need to have a star added/removed to update the starboard.`);
     case 'notblocked':

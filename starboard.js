@@ -9,8 +9,8 @@ starboard.db schema:
 starboard - contains data for individual starboarded posts. Columns: original_msg, starboard_msg, channel, author, starthreshold
 starboard_blocked_messages - contains ids of messages that were blocked from starboard. One column: original_msg
 starboard_stars - contains data for individual stars. Columns: original_msg, stargiver.
-starboard_policies - contains data for stored data relating to user preferences; essentially a combination block/allow list. Columns: author, channel, allow_starboard.
-  on starboard_policies, 'channel' shall either be a channelID, or 'all'.  Currently the 'all' preference trumps all other channel preferences if 'allow_starboard' is set to 'blocked'.
+starboard_policies - contains data for stored data relating to user preferences; essentially a combination block/allow list. Columns: author, snowflake, type, allow_starboard.
+  on starboard_policies, 'snowflake' shall be the snowflake of the item in question. 'type' shall be either 'channel', 'guildpublic', 'guildprivate', or 'guildall'.
   'allow_starboard' can be true, false, or 'ask'.  'ask' will DM a user for permission to starboard a message.
 starboard_limbo - contains data for starboard items that are in an 'ask' state but have not yet been starboard approved by the user. Columns: author channel original_msg dm_id
 */
@@ -27,8 +27,8 @@ async function publicOnReady(botdb) {
   // uncomment to drop tables at bot start (for debugging purposes)
   // await botdb.run('DROP TABLE IF EXISTS starboard');
   // await botdb.run('DROP TABLE IF EXISTS starboard_stars');
-  // await botdb.run('DROP TABLE IF EXISTS starboard_blocked');
-  // await botdb.run('DROP TABLE IF EXISTS starboard_policies');
+  await botdb.run('DROP TABLE IF EXISTS starboard_blocked_messages');
+  await botdb.run('DROP TABLE IF EXISTS starboard_policies');
   // await botdb.run('DROP TABLE IF EXISTS starboard_limbo');
   // drop migrator tables in case bot crashed during a star migration.
   await botdb.run('DROP TABLE IF EXISTS starmigrator');
@@ -38,9 +38,17 @@ async function publicOnReady(botdb) {
   await botdb.run('CREATE TABLE IF NOT EXISTS starboard_stars (original_msg text NOT NULL, stargiver text NOT NULL, UNIQUE(original_msg, stargiver))');
   await botdb.run('CREATE INDEX IF NOT EXISTS idx_starsgiven_originals ON starboard_stars(original_msg)');
   await botdb.run('CREATE INDEX IF NOT EXISTS idx_stargiver ON starboard_stars(stargiver)');
-  await botdb.run('CREATE TABLE IF NOT EXISTS starboard_blocked_messages (original_msg text NOT NULL UNIQUE)');
-  await botdb.run('CREATE TABLE IF NOT EXISTS starboard_policies (author text NOT NULL, channel text, allow_starboard text NOT NULL, UNIQUE(author, channel))');
+  await botdb.run('CREATE TABLE IF NOT EXISTS starboard_message_policies (original_msg text NOT NULL UNIQUE, channel NOT NULL, allow_starboard text NOT NULL)');
+  await botdb.run('CREATE TABLE IF NOT EXISTS starboard_policies (author text NOT NULL, snowflake text NOT NULL, type NOT NULL, allow_starboard text NOT NULL, UNIQUE(author, snowflake))');
   await botdb.run('CREATE TABLE IF NOT EXISTS starboard_limbo (author text NOT NULL, channel text NOT NULL, original_msg text NOT NULL UNIQUE, dm_id NOT NULL UNIQUE)');
+}
+
+function getAuthorAccount(message) {
+  return message.isPKmessage ? message.pkData.author.id : message.author.id;
+}
+
+function getPublicPrivate(message) {
+  return config.starboardPrivateChannels.includes(message.channel.id) ? 'guildprivate' : 'guildpublic';
 }
 
 // function for adjusting the color of the embed based on number of stars.
@@ -194,14 +202,32 @@ async function queryByStarboard(id, botdb) {
 
 async function blockCheck(message, botdb) {
   let isBlocked = false;
-  const pkData = await message.pkQuery();
-  // first check if the message is on the blocked message list.
-  await botdb.get('SELECT * FROM starboard_blocked_messages WHERE original_msg = ?', message.id)
+  await message.pkQuery();
+  // first check if the message is explicitly blocked in starboard_message_policies.
+  await botdb.get('SELECT * FROM starboard_message_policies WHERE original_msg = ? AND allow_starboard = ?', message.id, false)
     .then(result => {
       if(result != null) {isBlocked = true;}
     });
-  await botdb.get('SELECT * FROM starboard_policies WHERE (author = ? AND allow_starboard = ?) AND (channel = ? OR channel = ?)', message.isPKmessage ? pkData.author.id : message.author.id, false, message.channel.id, 'all')
+  // then check if the member's messages are blocked at the channel or guild level;
+  // false always beats true in this case so a user might have set an individual channel to 'true' but if they set the whole guild to 'false' (or vice versa) it's a block.
+  await botdb.all('SELECT * FROM starboard_policies WHERE author = ? AND allow_starboard = ? AND (snowflake = ? OR snowflake = ?)',
+    getAuthorAccount(message), false, message.channel.id, message.guild.id)
     .then(result => {
+      if (!result) { return; }
+      result.forEach(i => {
+        switch (i.type) {
+        case 'channel':
+        case 'guildall':
+          isBlocked = true;
+          break;
+        case 'guildpublic':
+          if(!config.starboardPrivateChannels.includes(message.channel.id)) {isBlocked = true;}
+          break;
+        case 'guildprivate':
+          if(config.starboardPrivateChannels.includes(message.channel.id)) {isBlocked = true;}
+          break;
+        }
+      });
       if(result != null) {isBlocked = true;}
     });
   return isBlocked;
@@ -213,9 +239,13 @@ policy options are: 'true' (allow direct to starboard posting)
 'false' (item not permitted to go to starboard)
 */
 async function policyCheck(message, botdb) {
+  await message.pkQuery();
   // initialize the effective policy to true (post is starrable and does not need an ask)
   let effectivePolicy = true;
-  const policyArr = await botdb.all('SELECT * FROM starboard_policies WHERE author = ? AND (channel = ? OR channel = ?)', message.isPKmessage ? message.pkData.author.id : message.author.id, message.channel.id, 'all') || [];
+  // get an arr of policy objects; check for guild, channel, and msg level objects to parse through.
+  const policyArr = await botdb.all('SELECT * FROM starboard_policies WHERE author = ? AND (snowflake = ? OR (snowflake = ? AND (type = ? OR type = ?)))',
+    getAuthorAccount(message), message.channel.id, message.guild.id, 'guildall', getPublicPrivate(message)) || [];
+  policyArr.push(await botdb.get('SELECT * FROM starboard_message_policies WHERE original_msg = ?', message.id));
   // if there is no custom policy for this user and channel, AND the channel is listed in the private channels, return "ask"
   if (policyArr.length == 0 && config.starboardPrivateChannels.includes(message.channel.id)) {
     return 'ask';
@@ -240,7 +270,7 @@ async function policyCheck(message, botdb) {
 async function publicOnStar(message, botdb, force = false) {
   if (!config.starboardChannelId || !config.starboardToggle || config.starboardIgnoreChannels.includes(message.channel.id)) return;
   // initialize PK data for message.
-  const pkData = await message.pkQuery();
+  await message.pkQuery();
   // check if user or message are on the blocklist
   if(await blockCheck(message, botdb)) return;
   const starboardChannel = await message.client.channels.fetch(config.starboardChannelId);
@@ -308,7 +338,8 @@ async function publicOnStar(message, botdb, force = false) {
       const starboardMsg = await starboardChannel.send(`${starboardEmoji} **${starcount}** ${message.channel}`, starboardEmbed);
       // update starboard_stars table and starboard table
       await starsGivenUpdater(message, usrArr, botdb);
-      return await botdb.run('INSERT INTO starboard(original_msg,starboard_msg,channel,author,starthreshold) VALUES(?,?,?,?,?)', message.id, starboardMsg.id, message.channel.id, message.isPKmessage ? pkData.author.id : message.author.id, config.starThreshold);
+      return await botdb.run('INSERT INTO starboard(original_msg,starboard_msg,channel,author,starthreshold) VALUES(?,?,?,?,?)',
+        message.id, starboardMsg.id, message.channel.id, getAuthorAccount(message), config.starThreshold);
     }
     else if (starcount >= config.starThreshold && msgPolicy == 'ask') {
       // starboard_limbo - Columns: author channel original_msg dm_id
@@ -327,23 +358,39 @@ React to this post with one of the following:
 *This DM will not be repeated for this individual post. If you don't react, the post will not go to the starboard.*
 The .starboard command can be also be used in server to access these functionalities."`);
         // add DM data to limbo table.
-        return await botdb.run('INSERT INTO starboard_limbo(author, channel, original_msg, dm_id) VALUES(?,?,?,?)', message.isPKmessage ? pkData.author.id : message.author.id, message.channel.id, message.id, DM.id);
+        return await botdb.run('INSERT INTO starboard_limbo(author, channel, original_msg, dm_id) VALUES(?,?,?,?)',
+          getAuthorAccount(message), message.channel.id, message.id, DM.id);
       }
       else { return; }
     }
   }
 }
 
-async function publicBlockUser(userid, botdb) {
+async function publicBlockUser(user, guild, botdb) {
   // exempting/blocking users from starboard is easy since we don't need to go back and delete old starboard items from them.
   let alreadyBlocked = false;
   try {
-    await botdb.run('INSERT OR IGNORE INTO starboard_policies(author, channel, allow_starboard) VALUES(?,?,?)', userid, 'all', false)
-      .then(result => { if(result.changes == 0) {alreadyBlocked = true;}});
+    // first, delete all entries for this guild in the policies table that DON'T have an allow_starboard = false policy set.
+    await botdb.run('DELETE FROM starboard_policies WHERE author = ? AND snowflake = ? AND (type != ? OR allow_starboard != ?)',
+      user.id, guild.id, 'guildall', false);
+    await botdb.run('INSERT OR IGNORE INTO starboard_policies(author, snowflake, type, allow_starboard) VALUES(?,?,?)',
+      user.id, guild.id, 'guildall', false).then(
+      result => { if(result.changes == 0) {alreadyBlocked = true;}});
     if (alreadyBlocked) { return 'alreadyblocked'; }
     else {
-      // delete any other entries from starboard policies to prevent collisions.
-      await botdb.run('DELETE FROM starboard_policies WHERE author = ? AND channel != ?', userid, 'all');
+      // clean up db - prune extraneous channel settings
+      await botdb.all('SELECT * FROM starboard_policies WHERE author = ? AND type = ?', user.id, 'channel').then(
+        async result => {
+          result.forEach(
+            async i => {
+              const c = await guild.client.channels.fetch(i.channel);
+              if (c.guild.id == guild.id) {
+                await botdb.run('DELETE FROM starboard_policies WHERE author = ? and snowflake = ?',
+                  user.id, c.id);
+              }
+            },
+          );
+        });
       return 'blocksuccessful';
     }
   }
@@ -375,8 +422,9 @@ async function publicBlockMsg(message, botdb) {
       await botdb.run('DELETE FROM starboard WHERE original_msg = ?', message.id);
       await botdb.run('DELETE FROM starboard_stars WHERE original_msg = ?', message.id);
     }
-    await botdb.run('INSERT OR IGNORE INTO starboard_blocked_messages(original_msg) VALUES(?)', message.id)
-      .then(result => { if(result.changes == 0) {alreadyBlocked = true;}});
+    await botdb.run('INSERT OR IGNORE INTO starboard_message_policies(original_msg) VALUES(?)', message.id).then(result => {
+      if(result.changes == 0) {alreadyBlocked = true;}
+    });
     if (alreadyBlocked) { return 'alreadyblocked'; }
     else {
       return 'blocksuccessful';
@@ -388,11 +436,13 @@ async function publicBlockMsg(message, botdb) {
   }
 }
 
-async function publicUnblockUser(userid, botdb) {
+async function publicUnblockUser(user, guild, botdb) {
   let notBlocked = false;
   try {
-    await botdb.run('DELETE FROM starboard_policies WHERE author = ? AND channel = ?', userid, 'all')
-      .then(result => { if(result.changes == 0) {notBlocked = true;}});
+    await botdb.run('DELETE FROM starboard_policies WHERE author = ? AND snowflake = ? AND type = ? AND allow_starboard = ?',
+      user.id, guild.id, 'guildall', false).then(result => {
+      if(result.changes == 0) {notBlocked = true;}
+    });
     if (notBlocked) { return 'notblocked'; }
     else {
       return 'unblocksuccessful';
@@ -407,7 +457,7 @@ async function publicUnblockUser(userid, botdb) {
 async function publicUnblockMessage(message, botdb) {
   let notBlocked = false;
   try {
-    await botdb.run('DELETE FROM starboard_blocked_messages WHERE original_msg = ?', message.id)
+    await botdb.run('DELETE FROM starboard_message_policies WHERE original_msg = ?', message.id)
       .then(result => { if(result.changes == 0) {notBlocked = true;}});
     if (notBlocked) { return 'notblocked'; }
     else {
@@ -455,7 +505,7 @@ async function publicMigrator(fromChannel, toChannel, replyChannel, botdb) {
         });
         const targetmsg = await getMessageFromURL(urlfield.value, fromChannel.client);
         if (targetmsg) {
-          const pkData = await targetmsg.pkQuery();
+          await targetmsg.pkQuery();
           let starThreshold;
           const usrArr = await retrieveStarGivers(targetmsg, oldStarboardMsg);
           // to account for possible differences in star threshold over time, we will assume that any message OVER the current threshold uses the current threshold...
@@ -465,7 +515,8 @@ async function publicMigrator(fromChannel, toChannel, replyChannel, botdb) {
           // ...but any message that doesn't meet that criteria is legacied in with its threshold set to its current star count.
           else { starThreshold = usrArr.length; }
           // add it all to the migrator table and migrator star table.
-          await botdb.run('INSERT OR IGNORE INTO starmigrator(original_msg,old_starboard_msg,channel,author,starthreshold,old_starboard_channel) VALUES(?,?,?,?,?,?)', targetmsg.id, oldStarboardMsg.id, targetmsg.channel.id, (targetmsg.isPKmessage ? pkData.author.id : targetmsg.author.id), starThreshold, oldStarboardMsg.channel.id);
+          await botdb.run('INSERT OR IGNORE INTO starmigrator(original_msg,old_starboard_msg,channel,author,starthreshold,old_starboard_channel) VALUES(?,?,?,?,?,?)',
+            targetmsg.id, oldStarboardMsg.id, targetmsg.channel.id, getAuthorAccount(targetmsg), starThreshold, oldStarboardMsg.channel.id);
           for (const usr of usrArr) {
             await botdb.run('INSERT OR IGNORE INTO starboard_starsmigrator(original_msg, stargiver) VALUES(?,?)', targetmsg.id, usr);
           }
@@ -489,7 +540,6 @@ async function publicMigrator(fromChannel, toChannel, replyChannel, botdb) {
     const oldstarboardChannel = await fromChannel.client.channels.cache.get(dbdata.old_starboard_channel);
     const originalChannel = await fromChannel.client.channels.cache.get(dbdata.channel);
     const originalMsg = await originalChannel.messages.fetch(dbdata.original_msg);
-    const pkData = await originalMsg.pkQuery();
     const oldstarboardMsg = await oldstarboardChannel.messages.fetch(dbdata.starboard_msg);
     const usrArr = await retrieveStarGivers(originalMsg, oldstarboardMsg);
     const starcount = usrArr.length;
@@ -516,7 +566,8 @@ async function publicMigrator(fromChannel, toChannel, replyChannel, botdb) {
           await botdb.run('INSERT OR IGNORE INTO starboard_starsmigrator(original_msg, stargiver) VALUES(?,?)', originalMsg.id, usr);
         }
       }
-      await botdb.run('INSERT INTO newstarboard(original_msg,starboard_msg,channel,author,starthreshold) VALUES(?,?,?,?,?)', originalMsg.id, newStarboardMsg.id, originalMsg.channel.id, originalMsg.isPKmessage ? pkData.author.id : originalMsg.author.id, config.starThreshold);
+      await botdb.run('INSERT INTO newstarboard(original_msg,starboard_msg,channel,author,starthreshold) VALUES(?,?,?,?,?)',
+        originalMsg.id, newStarboardMsg.id, originalMsg.channel.id, getAuthorAccount(originalMsg), config.starThreshold);
     }
   }
   await botdb.run('DROP TABLE IF EXISTS starboard');
@@ -542,13 +593,13 @@ async function publicOnDMReact(message, emoji, botdb) {
   }
   case '🆗': {
     // add individual channel to starboard_policies with allow_starboard = true
-    await botdb.run('INSERT OR IGNORE INTO starboard_policies(author,channel,allow_starboard) VALUES(?,?,?)', limboEntry.author, limboEntry.channel, true);
+    await botdb.run('INSERT OR IGNORE INTO starboard_policies(author,snowflake,type,allow_starboard) VALUES(?,?,?,?)', limboEntry.author, limboEntry.channel, 'channel', true);
     // then re-run OnStar to add message to starboard
     return await publicOnStar(original_msg, botdb);
   }
   case '🆒': {
     // add all private channels to starboard_policies with allow_starboard = true
-    await botdb.run('INSERT OR IGNORE INTO starboard_policies(author,channel,allow_starboard) VALUES(?,?,?)', limboEntry.author, 'all', true);
+    await botdb.run('INSERT OR IGNORE INTO starboard_policies(author,snowflake,type,allow_starboard) VALUES(?,?,?,?)', limboEntry.author, original_msg.guild.id, 'guildprivate', true);
     // then re-run OnStar to add message to starboard
     return await publicOnStar(original_msg, botdb);
   }
@@ -557,11 +608,11 @@ async function publicOnDMReact(message, emoji, botdb) {
   }
   case '⛔': {
     // add individual channel to starboard_policies with allow_starboard = false
-    return await botdb.run('INSERT OR IGNORE INTO starboard_policies(author,channel,allow_starboard) VALUES(?,?,?)', limboEntry.author, limboEntry.channel, false);
+    return await botdb.run('INSERT OR IGNORE INTO starboard_policies(author,snowflake,type,allow_starboard) VALUES(?,?,?,?)', limboEntry.author, limboEntry.channel, 'channel', false);
   }
   case '🚫': {
     // add all private channels to starboard_policies with allow_starboard = false
-    return await botdb.run('INSERT OR IGNORE INTO starboard_policies(author,channel,allow_starboard) VALUES(?,?,?)', limboEntry.author, 'all', false);
+    return await botdb.run('INSERT OR IGNORE INTO starboard_policies(author,snowflake,type,allow_starboard) VALUES(?,?,?,?)', limboEntry.author, original_msg.guild.id, 'guildprivate', false);
   }
   default :
     return;
