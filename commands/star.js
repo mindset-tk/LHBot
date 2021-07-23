@@ -4,7 +4,9 @@ const starboard = require(starboardpath);
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
 const fs = require('fs');
-const {getPermLevel} = require('../extras/common.js');
+const { getPermLevel } = require('../extras/common.js');
+
+const emojiList = ['⭐', '✅', '🆗', '🆒', '❌', '⛔', '🚫'];
 
 function prettyPrintConfig() {
   const output = JSON.stringify(config, function(k, v) {
@@ -174,7 +176,7 @@ async function userUnblock(message, targetdata, botdb) {
 async function msgUnblock(message, targetdata, botdb) {
   const permLevel = getPermLevel(message);
   const targetMsg = await getMessageFromURL(targetdata, message.client);
-  if (!targetMsg) { return message.reply(`I couldn't parse ${targetdata} - please include a full message link as an argument to the block message command.`); }
+  if (!targetMsg) { return message.reply(`I couldn't parse ${targetdata} - please include a full message URL as an argument to the block message command.`); }
   else if (message.author.id == targetMsg.author.id || permLevel == 'staff') {
     switch (await starboard.unblockMsg(targetMsg, botdb)) {
     case 'unblocksuccessful':
@@ -309,19 +311,28 @@ non-staff may also perform the block/unblockmsg commands for any post they are t
       if (packet.t !== 'MESSAGE_REACTION_ADD' && packet.t !== 'MESSAGE_REACTION_REMOVE') {
         return;
       }
-      // then check if the emoji added/removed was a star. if not, do nothing.
-      else if (packet.d.emoji.name !== '⭐') {
+      // then check if the emoji added/removed was part of the list of emoji that starboard interacts with.
+      else if (!emojiList.includes(packet.d.emoji.name)) {
         return;
       }
       // pulling data from packet obj
       const { d: data } = packet;
       const user = client.users.cache.get(data.user_id);
       const channel = client.channels.cache.get(data.channel_id) || await user.createDM();
-      if (channel.type == 'text') {
+      if (channel.type == 'text' && data.emoji.name == '⭐') {
         // if it's a guild channel, fetch the message the reaction was added to, then pass it to the starboard functions for examination.
         await channel.messages.fetch(data.message_id).then(message => {
           if (!message || message.system) return;
           starboard.onStar(message, botdb);
+        });
+      }
+      else if (channel.type == 'dm' && data.emoji.name != '⭐') {
+        // if it's a dm, ignore stars (starboard is only functional for guild messages)
+        await channel.messages.fetch(data.message_id).then(async (message) => {
+          // check if item is in starboard limbo; if not, return.
+          const limboEntry = await botdb.run('SELECT * FROM starboard_limbo WHERE dm_id = ?', message.id);
+          if (!limboEntry && (!message || message.system)) return;
+          starboard.onDMReact(message, data.emoji.name, botdb);
         });
       }
     });
