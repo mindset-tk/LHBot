@@ -28,15 +28,15 @@ const DEFAULT_EVENT_DATA = {
 const EVENT_CLEANUP_PERIOD = moment.duration(7, 'days');
 
 // See https://momentjs.com/docs/#/displaying/format/ for format info
-const DATE_OUTPUT_FORMAT = 'dddd, MMMM Do YYYY, h:mm A';
+const DATE_OUTPUT_FORMAT = 'dddd, MMMM Do YYYY, H:mm';
 
 // Edit this to alter the text of the upcoming events message in the
 // event info channel.
 const EVENT_MESSAGE_TEMPLATE = ({ events, serverName, timeZone, prefix }) => `\
 __**UPCOMING EVENTS**__
-(listed in **${timeZone}**)
+All times are displayed in your local timezone for your current device.
 
-Use \`${prefix}event info event name\` to view the event time in your local timezone, and \
+Use \`${prefix}event info event name\` to view more about the event, and \
 \`${prefix}event join event name\` to be reminded about the event.
 
 ${events}
@@ -57,11 +57,14 @@ ${tzlist}
 Please contact staff if your preferred time zone doesn't have an abbreviation on this list!
 `;
 
+const discordMomentFullDate = (time) => `<t:${time.unix()}:F>`
+const discordMomentRelativeDate = (time) => `<t:${time.unix()}:R>`
+
 // Edit this to alter how individual events in the above message
 // are displayed.
 const EVENT_INFO_TEMPLATE = ({ name, owner, channel, description, due }) => `\
 **${name}** (by: <@${owner}> in <#${channel}>)
-> - Starts: ${due.format(DATE_OUTPUT_FORMAT)}
+> - Starts: ${discordMomentFullDate(due)}
 > - ${description ? `Description: ${description.replace(/\n/g, '\n> ')}` : ''}\
 
 `;
@@ -732,14 +735,11 @@ function embedEvent(event, guild, options = {}) {
     )
     .addField('Event name', event.name)
     .addField(
-      'Starts at (server time)',
-      `${formatDateCalendar(
-        moment(event.due),
-        guildTimeZone
-      )} ${getTimeZoneCanonicalDisplayName(guildTimeZone)}\n\n${
+      'Starts at (your time)',
+      `${discordMomentFullDate(event.due)} ${
         getRelativeTime(event.due) != ''
-          ? `${getRelativeTime(event.due)} from now.`
-          : 'Starting now.'
+          ? `(${discordMomentRelativeDate(event.due)})`
+          : '(starting now)'
       }`,
       true
     );
@@ -795,11 +795,9 @@ function DMembedEvent(event, guild, options = {}) {
     )
     .addField('Event name', event.name)
     .addField(
-      'Event time (server)',
-      `${formatDateCalendar(
-        moment(event.due),
-        timeZone
-      )} ${getTimeZoneCanonicalDisplayName(timeZone)}`
+        'Event time',
+        `${discordMomentFullDate(event.due)}`,
+        true
     );
   eventEmbed
     .addField('Creator', `<@${event.owner}>`)
@@ -1592,20 +1590,14 @@ async function createWizard(message, channel) {
     };
 
     dmChannel.send(
-      `Great, **${eventData.name}** will happen on ${d.toLocaleString(
-        'en-US',
-        options
-      )}. Is this OK? **Y/N**`
+      `Great, **${eventData.name}** will happen on ${discordMomentFullDate(d)}. Is this OK? **Y/N**`
     );
 
     result = await promptYesNo(dmChannel, {
       messages: {
         no: 'OK, please type a new date and time for the event.',
         cancel: `Event creation cancelled. Please run ${config.prefix}event create again to initiate event creation again.`,
-        invalid: `Reply not recognized! Please answer Y or N. Is ${d.toLocaleString(
-          'en-US',
-          options
-        )} an acceptable date and time for the event? **Y/N**`,
+        invalid: `Reply not recognized! Please answer Y or N. Is ${discordMomentFullDate(d)} an acceptable date and time for the event? **Y/N**`,
       },
     });
     if (!result) return false;
@@ -1628,7 +1620,7 @@ async function createWizard(message, channel) {
     },
   });
   if (!result) return false;
-  const needsDesc = result.answer;
+  let needsDesc = result.answer;
 
   while (needsDesc) {
     result = await promptForMessage(dmChannel, async (reply) => {
@@ -1665,7 +1657,7 @@ async function createWizard(message, channel) {
       },
     });
     if (!result) return false;
-    const needsDesc = !result.answer;
+    needsDesc = !result.answer;
     if (result.answer) {
       eventData.description = description;
     }
