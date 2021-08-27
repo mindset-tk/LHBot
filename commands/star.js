@@ -4,7 +4,9 @@ const starboard = require(starboardpath);
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
 const fs = require('fs');
-const {getPermLevel} = require('../extras/common.js');
+const { getPermLevel } = require('../extras/common.js');
+
+const emojiList = ['⭐', '✅', '🆗', '🆒', '❌', '⛔', '🚫'];
 
 function prettyPrintConfig() {
   const output = JSON.stringify(config, function(k, v) {
@@ -85,7 +87,7 @@ async function userBlock(message, targetdata, botdb) {
   }
   // self-exemption responses.
   if (blockTarget != null && blockTarget.id === message.author.id) {
-    switch (await starboard.blockUser(blockTarget.id, botdb)) {
+    switch (await starboard.blockUser(blockTarget, message.guild, botdb)) {
     case 'blocksuccessful':
       return message.reply('Successfully exempted you from the starboard. Current starboard messages from you will no longer accrue stars; your future starboard messages will not be considered for the starboard.');
     case 'alreadyblocked':
@@ -95,7 +97,7 @@ async function userBlock(message, targetdata, botdb) {
     }
   }
   else if (blockTarget != null && blockTarget.id != message.author.id && permLevel == 'staff') {
-    switch (await starboard.blockUser(blockTarget.id, botdb)) {
+    switch (await starboard.blockUser(blockTarget, message.guild, botdb)) {
     case 'blocksuccessful':
       return message.reply(`Successfully blocked ${blockTarget.displayName} from the starboard. Current starboard messages from them will no longer accrue stars; future messages from them will not be considered for the starboard.`);
     case 'alreadyblocked':
@@ -132,6 +134,92 @@ async function msgBlock(message, targetdata, botdb) {
   }
 }
 
+async function policyMgr(message, args, botdb) {
+  const scopes = ['server', 'public', 'private'];
+  const usrScope = args[1].toLowerCase();
+  const change = args[0].toLowerCase();
+  const channel = await getChannel(args[1], message.client);
+  if (!channel && !scopes.includes(usrScope)) {return message.reply(`Sorry, ${args[1]} does not appear to be a channel in this server. Run *${config.prefix}starboard help* for assistance.`);}
+  if (channel) {
+    switch (change) {
+    case 'allow':
+      message.reply(`OK, your messages in ${channel} will be permitted to the starboard without me asking for consent.`);
+      break;
+    case 'ask':
+      message.reply(`OK, I'll DM you and ask for consent to starboard items in ${channel}.`);
+      break;
+    case 'block':
+      message.reply(`OK, I'll block your messages in ${channel} from the starboard.`);
+      break;
+    case 'reset':
+      message.reply(`Resetting starboard policies for your account to the default for ${channel}`);
+      break;
+    default:
+      message.reply(`Sorry, I couldn't parse '${args[0]}'. Please enter allow, ask, block, or reset.`);
+      return;
+    }
+    await starboard.chanPolicyChange(message, channel, change, botdb);
+  }
+  else if (usrScope == 'server') {
+    switch (change) {
+    case 'allow':
+      message.reply('OK, your messages in this server will be permitted to the starboard without me asking for consent.');
+      break;
+    case 'ask':
+      message.reply('OK, I\'ll DM you and ask for consent to starboard items in this server.');
+      break;
+    case 'block':
+      message.reply('OK, I\'ll block all your messages in this server from the starboard.');
+      break;
+    case 'reset':
+      message.reply('Resetting all starboard policies for your account to the default for this server.');
+      break;
+    default:
+      message.reply(`Sorry, I couldn't parse '${args[0]}'. Please enter allow, ask, block, or reset.`);
+      return;
+    }
+  }
+  else if (usrScope == 'public') {
+    switch (change) {
+    case 'allow':
+      message.reply('OK, your messages in this server\'s public channels will be permitted to the starboard without me asking for consent.');
+      break;
+    case 'ask':
+      message.reply('OK, I\'ll DM you and ask for consent to starboard items in this server\'s public channels.');
+      break;
+    case 'block':
+      message.reply('OK, I\'ll block all your messages in this server\'s public channels from the starboard.');
+      break;
+    case 'reset':
+      message.reply('Resetting all starboard policies for your account to the default for this server\'s public channels.');
+      break;
+    default:
+      message.reply(`Sorry, I couldn't parse '${args[0]}'. Please enter allow, ask, block, or reset.`);
+      return;
+    }
+  }
+  else if (usrScope == 'private') {
+    switch (change) {
+    case 'allow':
+      message.reply('OK, your messages in this server\'s private channels will be permitted to the starboard without me asking for consent.');
+      break;
+    case 'ask':
+      message.reply('OK, I\'ll DM you and ask for consent to starboard items in this server\'s private channels.');
+      break;
+    case 'block':
+      message.reply('OK, I\'ll block all your messages in this server\'s private channels from the starboard.');
+      break;
+    case 'reset':
+      message.reply('Resetting all starboard policies for your account to the default for this server\'s private channels.');
+      break;
+    default:
+      message.reply(`Sorry, I couldn't parse '${args[0]}'. Please enter allow, ask, block, or reset.`);
+      return;
+    }
+  }
+  await starboard.servPolicyChange(message, change, usrScope, botdb);
+}
+
 async function userUnblock(message, targetdata, botdb) {
   const permLevel = getPermLevel(message);
   let unblockTarget;
@@ -144,7 +232,7 @@ async function userUnblock(message, targetdata, botdb) {
   }
   // self-exemption responses.
   if (unblockTarget != null && unblockTarget.id === message.author.id) {
-    switch (await starboard.unblockUser(unblockTarget.id, botdb)) {
+    switch (await starboard.unblockUser(unblockTarget, message.guild, botdb)) {
     case 'unblocksuccessful':
       return message.reply('Successfully un-exempted you from starboard. Old messages of yours will need to have a star added/removed to update the starboard.');
     case 'notblocked':
@@ -154,7 +242,7 @@ async function userUnblock(message, targetdata, botdb) {
     }
   }
   else if (unblockTarget != null && unblockTarget.id != message.author.id && permLevel == 'staff') {
-    switch (await starboard.unblockUser(unblockTarget.id, botdb)) {
+    switch (await starboard.unblockUser(unblockTarget, message.guild, botdb)) {
     case 'unblocksuccessful':
       return message.reply(`Successfully unblocked ${unblockTarget.displayName} from the starboard. Any messages of theirs can go onto the starboard; Old messages of theirs will need to have a star added/removed to update the starboard.`);
     case 'notblocked':
@@ -174,7 +262,7 @@ async function userUnblock(message, targetdata, botdb) {
 async function msgUnblock(message, targetdata, botdb) {
   const permLevel = getPermLevel(message);
   const targetMsg = await getMessageFromURL(targetdata, message.client);
-  if (!targetMsg) { return message.reply(`I couldn't parse ${targetdata} - please include a full message link as an argument to the block message command.`); }
+  if (!targetMsg) { return message.reply(`I couldn't parse ${targetdata} - please include a full message URL as an argument to the block message command.`); }
   else if (message.author.id == targetMsg.author.id || permLevel == 'staff') {
     switch (await starboard.unblockMsg(targetMsg, botdb)) {
     case 'unblocksuccessful':
@@ -259,17 +347,37 @@ Is this correct? Please type '**yes**' or '**no**' in full. Once the process is 
 module.exports = {
   name: 'starboard',
   description: 'Starboard-related functions.',
-  usage: `**[unblockmsg or blockmsg] [message URL]** to block/unblock a message from the starboard (will also add/remove it to starboard based on starcount and block status).
-**${config.prefix}starboard [unblockuser or blockuser] [user id or mention]** to block all of a user's posts from the starboard (will not delete their old posts)
-non-staff can run **${config.prefix}starboard [unexempt or exempt] me** to exempt all of their own posts from the starboard.
-non-staff may also perform the block/unblockmsg commands for any post they are the author of.`,
+  usage: `**[unblockmsg or blockmsg] [message URL]** to block/unblock an individual message from the starboard (will also add/remove it to starboard based on starcount and block status). Non-staff may only use this command for posts they authored.
+${config.prefix}starboard **[unblockuser or blockuser] [user id or mention]** (staff only) to block all of a user's posts from the starboard (will not delete their old posts)
+${config.prefix}starboard **[unexempt or exempt] me** to exempt all of your own posts from the starboard.
+Policy for your own posts on the starboard at a channel or server level. Note that this will clear
+${config.prefix}starboard **policy [scope] [policylevel]**
+The following options can be used for 'scope':
+- *#mention a channel* - a single channel
+- *private* - all private channels on this server
+- *public* - all non-private channels on this server
+- *server* - all channels on this server
+The following policy levels are available:
+- *allow* - this will allow your posts to be starboarded from any channel in the scope. You will not be asked for consent on these posts.
+- *block* - this will block any post within the scope from being starboarded
+- *ask* - this bot will DM you to request consent to starboard any eligible post within the scope.
+- *reset* - this will reset the policy in a given scope to the default. (the default is for public channels to 'allow', and private channels to 'ask')
+
+Examples:
+*${config.prefix}starboard policy #general block*
+*${config.prefix}starboard policy server ask*
+*${config.prefix}starboard policy private allow*`,
   cooldown: 3,
   guildOnly: true,
   staffOnly: false,
   args: true,
   async execute(message, args, client, c, botdb) {
     // pop out args[0] and run switch/case against it to determine next step.
-    switch (args.shift().toLowerCase()) {
+    const firstarg = args.shift().toLowerCase();
+    switch (firstarg) {
+    case 'policy':
+      await policyMgr(message, args, botdb);
+      return;
     case 'blockuser':
     case 'exempt':
       for (const targetdata of args) {
@@ -301,6 +409,8 @@ non-staff may also perform the block/unblockmsg commands for any post they are t
     case 'migrate':
       await startMigrator(message, botdb);
       return;
+    default:
+      return message.reply(`Sorry, I couldn't process ${firstarg}`);
     }
   },
   init(client, c, botdb) {
@@ -309,19 +419,28 @@ non-staff may also perform the block/unblockmsg commands for any post they are t
       if (packet.t !== 'MESSAGE_REACTION_ADD' && packet.t !== 'MESSAGE_REACTION_REMOVE') {
         return;
       }
-      // then check if the emoji added/removed was a star. if not, do nothing.
-      else if (packet.d.emoji.name !== '⭐') {
+      // then check if the emoji added/removed was part of the list of emoji that starboard interacts with.
+      else if (!emojiList.includes(packet.d.emoji.name)) {
         return;
       }
       // pulling data from packet obj
       const { d: data } = packet;
       const user = client.users.cache.get(data.user_id);
       const channel = client.channels.cache.get(data.channel_id) || await user.createDM();
-      if (channel.type == 'text') {
+      if (channel.type == 'text' && data.emoji.name == '⭐') {
         // if it's a guild channel, fetch the message the reaction was added to, then pass it to the starboard functions for examination.
         await channel.messages.fetch(data.message_id).then(message => {
           if (!message || message.system) return;
           starboard.onStar(message, botdb);
+        });
+      }
+      else if (channel.type == 'dm' && data.emoji.name != '⭐') {
+        // if it's a dm, ignore stars (starboard is only functional for guild messages)
+        await channel.messages.fetch(data.message_id).then(async (message) => {
+          // check if item is in starboard limbo; if not, return.
+          const limboEntry = await botdb.run('SELECT * FROM starboard_limbo WHERE dm_id = ?', message.id);
+          if (!limboEntry && (!message || message.system)) return;
+          starboard.onDMReact(message, data.emoji.name, botdb);
         });
       }
     });

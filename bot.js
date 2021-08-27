@@ -119,7 +119,7 @@ if (fs.existsSync(eventDataPath)) { global.eventData = require(eventDataPath);}
 const moment = require('moment-timezone');
 const vettingLimitPath = './commands/vettinglimit.js';
 const starboard = require('./starboard.js');
-const {getPermLevel} = require('./extras/common.js');
+const { getPermLevel } = require('./extras/common.js');
 
 // Extend guild with music details accessed by the .yt command.
 Discord.Structures.extend('Guild', Guild => {
@@ -165,10 +165,17 @@ Discord.Structures.extend('Message', Message => {
     * Asyncronously updates the pluralkit properties of the message it is run from.
     * @method pkQuery()
     * @param {boolean} [force=false] Whether to skip any cached data and make a new request from the PK API.
-    * @returns {Object|null} returns either the PKData props of the message, or if it's not a PK message, returns null.
+    * @returns {Object} returns the pkData props of the message. Property values will be null if it is not a PK message.
     */
     async pkQuery(force = false) {
-      if (!this.author.bot) return null;
+      if (!this.author.bot) {
+        this.PKData = {
+          author: null,
+          system: null,
+          systemMember: null,
+        };
+        return this.PKData;
+      }
       if (!force && this.pkCached) return this.PKData;
       const pkAPIurl = 'https://api.pluralkit.me/v1/msg/' + this.id;
       try {
@@ -185,10 +192,14 @@ Discord.Structures.extend('Message', Message => {
       }
       catch (err) {
         console.log('Error caching PK data on message at:\n' + this.url + '\nError:\n' + err + ' PK Data for message not cached. Will try again next time pkQuery is called.');
-        return null;
+        return this.PKData ;
       }
       this.pkCached = true;
-      return null;
+      return this.PKData = {
+        author: null,
+        system: null,
+        systemMember: null,
+      };
     }
   }
   return PKMessage;
@@ -338,7 +349,6 @@ client.on('userUpdate', async (oldUser, newUser) => {
 
 // command parser
 client.on('message', async message => {
-
   // Check for disboard bump messages in a configured channel to schedule a reminder
   disboard.BumpReminder(config, message);
 
@@ -359,7 +369,7 @@ client.on('message', async message => {
   if(counting.HandleMessage(message)) {
     return;
   }
-  // check if this is a PK message and if so, update the pk data props.
+  // cache pkData for message.
   await message.pkQuery();
   const permLevel = getPermLevel(message);
   // prevent parsing commands without correct prefix, from bots, and from non-staff non-comrades.
