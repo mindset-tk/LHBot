@@ -96,12 +96,14 @@ module.exports = {
     // function to get a channel name from a chanID
     function getChannelName(channelID) {
       const channelObj = client.channels.cache.get(channelID);
-      return channelObj.name;
+      if (channelObj) {return channelObj.name;}
+      else {return '[invalid or deleted channel]';}
     }
     // function to get a role name from a roleID
     function getRoleName(roleID) {
       const roleObj = message.guild.roles.cache.get(roleID);
-      return roleObj.name;
+      if (roleObj) {return roleObj.name;}
+      else {return '[invalid or deleted role]';}
     }
     // function to get a channel object based on a channel ID or mention.
     async function getChannel(ID) {
