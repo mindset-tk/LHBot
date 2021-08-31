@@ -142,8 +142,10 @@ async function retrieveStarGivers(message, starboardMsg) {
   if (starreacts) {
     await starreacts.users.fetch();
     starreacts.users.cache.forEach(user => {
-      // if (!usrArr.includes(user.id) && user.id != message.author.id && (!pkData.author || user.id != pkData.author.id)) usrArr.push(user.id);
-      if (!usrArr.includes(user.id) && (!pkData.author || user.id != pkData.author.id)) usrArr.push(user.id);
+      if (!usrArr.includes(user.id)
+      // comment this line to enable self-starring.
+      && user.id != message.author.id && (!pkData.author || user.id != pkData.author.id)
+      ) usrArr.push(user.id);
     });
   }
   if (starboardMsg && starboardMsg.reactions) {
@@ -151,8 +153,10 @@ async function retrieveStarGivers(message, starboardMsg) {
     if (!starboardreacts) return usrArr;
     await starboardreacts.users.fetch();
     starboardreacts.users.cache.forEach(user => {
-      // if (!usrArr.includes(user.id) && user.id != message.author.id && (!pkData.author || user.id != pkData.author.id)) usrArr.push(user.id);
-      if (!usrArr.includes(user.id) && (!pkData.author || user.id != pkData.author.id)) usrArr.push(user.id);
+      if (!usrArr.includes(user.id)
+      // comment this line to enable self-starring.
+      && user.id != message.author.id && (!pkData.author || user.id != pkData.author.id)
+      ) usrArr.push(user.id);
     });
   }
   return usrArr;
