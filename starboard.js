@@ -594,30 +594,33 @@ async function publicMigrator(fromChannel, toChannel, replyChannel, botdb) {
     prevLastSeen = lastSeenMessage;
     await fromChannel.messages.fetch({ limit: 100, after: lastSeenMessage }).then(async messagearr => {
       for (const oldStarboardMsg of messagearr.values()) {
-        const urlfield = await oldStarboardMsg.embeds[0].fields.find(field => {
-          return field.name == 'Source';
-        });
-        const targetmsg = await getMessageFromURL(urlfield.value, fromChannel.client);
-        if (targetmsg) {
-          await targetmsg.pkQuery();
-          let starThreshold;
-          const usrArr = await retrieveStarGivers(targetmsg, oldStarboardMsg);
-          // to account for possible differences in star threshold over time, we will assume that any message OVER the current threshold uses the current threshold...
-          if (config.starThreshold && usrArr.length >= config.starThreshold) {
-            starThreshold = config.starThreshold;
+        if (oldStarboardMsg.embeds[0]) {
+          let targetmsg = undefined;
+          const urlfield = await oldStarboardMsg.embeds[0].fields.find(field => {
+            return field.name == 'Source';
+          });
+          if (urlfield && urlfield.value) {targetmsg = await getMessageFromURL(urlfield.value, fromChannel.client);}
+          if (targetmsg) {
+            await targetmsg.pkQuery();
+            let starThreshold;
+            const usrArr = await retrieveStarGivers(targetmsg, oldStarboardMsg);
+            // to account for possible differences in star threshold over time, we will assume that any message OVER the current threshold uses the current threshold...
+            if (config.starThreshold && usrArr.length >= config.starThreshold) {
+              starThreshold = config.starThreshold;
+            }
+            // ...but any message that doesn't meet that criteria is legacied in with its threshold set to its current star count.
+            else { starThreshold = usrArr.length; }
+            // add it all to the migrator table and migrator star table.
+            await botdb.run('INSERT OR IGNORE INTO starmigrator(original_msg,old_starboard_msg,channel,author,starthreshold,old_starboard_channel) VALUES(?,?,?,?,?,?)',
+              targetmsg.id, oldStarboardMsg.id, targetmsg.channel.id, getAuthorAccount(targetmsg), starThreshold, oldStarboardMsg.channel.id);
+            for (const usr of usrArr) {
+              await botdb.run('INSERT OR IGNORE INTO starboard_starsmigrator(original_msg, stargiver) VALUES(?,?)', targetmsg.id, usr);
+            }
           }
-          // ...but any message that doesn't meet that criteria is legacied in with its threshold set to its current star count.
-          else { starThreshold = usrArr.length; }
-          // add it all to the migrator table and migrator star table.
-          await botdb.run('INSERT OR IGNORE INTO starmigrator(original_msg,old_starboard_msg,channel,author,starthreshold,old_starboard_channel) VALUES(?,?,?,?,?,?)',
-            targetmsg.id, oldStarboardMsg.id, targetmsg.channel.id, getAuthorAccount(targetmsg), starThreshold, oldStarboardMsg.channel.id);
-          for (const usr of usrArr) {
-            await botdb.run('INSERT OR IGNORE INTO starboard_starsmigrator(original_msg, stargiver) VALUES(?,?)', targetmsg.id, usr);
-          }
+          else { replyChannel.send(`Message or channel deleted for starboard item at <${oldStarboardMsg.url}> - Skipping this item.`); }
+          // finally if the message id is larger than the oldest one we've seen, update our lastseen.
+          if (targetmsg && BigInt(targetmsg.id) > BigInt(lastSeenMessage)) { lastSeenMessage = targetmsg.id; }
         }
-        else { replyChannel.send(`Message or channel deleted for starboard item at <${oldStarboardMsg.url}> - Skipping this item.`); }
-        // finally if the message id is larger than the oldest one we've seen, update our lastseen.
-        if (targetmsg && BigInt(targetmsg.id) > BigInt(lastSeenMessage)) { lastSeenMessage = targetmsg.id; }
       }
     });
     // if the last message in a channel was deleted, there will be a mismatch in channel.lastMessageID, leading to an infinite loop.
