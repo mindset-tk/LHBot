@@ -504,21 +504,23 @@ async function publicChanPolicyChange(message, channel, change, botdb) {
   let changePolicy;
   // delete any old policy entry.
   await botdb.run('DELETE FROM starboard_policies WHERE author = ? AND snowflake = ?', getAuthorAccount(message), channel.id);
+  console.log(change);
   switch (change) {
   case 'allow':
-    changePolicy == true;
+    changePolicy = true;
     break;
   case 'block':
-    changePolicy == false;
+    changePolicy = false;
     break;
   case 'ask':
-    changePolicy == 'ask';
+    changePolicy = 'ask';
     break;
   case 'reset':
   default:
     // return since we're not adding new policy.
     return;
   }
+  console.log(getAuthorAccount(message), '\n', channel.id, '\n', 'channel', '\n', changePolicy);
   await botdb.run('INSERT INTO starboard_policies(author,snowflake,type,allow_starboard) VALUES(?,?,?,?)', getAuthorAccount(message), channel.id, 'channel', changePolicy);
 }
 
