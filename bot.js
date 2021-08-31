@@ -183,7 +183,8 @@ Discord.Structures.extend('Message', Message => {
         if (pkResponse.headers.get('content-type').includes('application/json')) {
           this.isPKMessage = true;
           pkResponse = await pkResponse.json();
-          this.PKData.author = await this.guild.members.fetch(pkResponse.sender) || await this.client.users.fetch(pkResponse.sender);
+          try { this.PKData.author = await this.guild.members.fetch(pkResponse.sender);}
+          catch (err) { this.PKData.author = await this.client.users.fetch(pkResponse.sender);}
           this.PKData.system = pkResponse.system;
           this.PKData.systemMember = pkResponse.member;
           this.pkCached = true;
@@ -191,7 +192,7 @@ Discord.Structures.extend('Message', Message => {
         }
       }
       catch (err) {
-        console.log('Error caching PK data on message at:\n' + this.url + '\nError:\n' + err + ' PK Data for message not cached. Will try again next time pkQuery is called.');
+        console.log('Error caching PK data on message at:\n' + this.url + '\nError:\n' + err + '\nPK Data for message not cached. Will try again next time pkQuery is called.');
         return this.PKData ;
       }
       this.pkCached = true;
