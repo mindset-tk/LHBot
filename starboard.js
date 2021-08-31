@@ -506,13 +506,13 @@ async function publicChanPolicyChange(message, channel, change, botdb) {
   await botdb.run('DELETE FROM starboard_policies WHERE author = ? AND snowflake = ?', getAuthorAccount(message), channel.id);
   switch (change) {
   case 'allow':
-    changePolicy == true;
+    changePolicy = true;
     break;
   case 'block':
-    changePolicy == false;
+    changePolicy = false;
     break;
   case 'ask':
-    changePolicy == 'ask';
+    changePolicy = 'ask';
     break;
   case 'reset':
   default:

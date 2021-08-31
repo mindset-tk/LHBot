@@ -159,6 +159,7 @@ async function policyMgr(message, args, botdb) {
       return;
     }
     await starboard.chanPolicyChange(message, channel, change, botdb);
+    return;
   }
   else if (usrScope == 'server') {
     switch (change) {
@@ -350,23 +351,23 @@ module.exports = {
   usage: `**[unblockmsg or blockmsg] [message URL]** to block/unblock an individual message from the starboard (will also add/remove it to starboard based on starcount and block status). Non-staff may only use this command for posts they authored.
 ${config.prefix}starboard **[unblockuser or blockuser] [user id or mention]** (staff only) to block all of a user's posts from the starboard (will not delete their old posts)
 ${config.prefix}starboard **[unexempt or exempt] me** to exempt all of your own posts from the starboard.
-Policy for your own posts on the starboard at a channel or server level. Note that this will clear
-${config.prefix}starboard **policy [scope] [policylevel]**
-The following options can be used for 'scope':
-- *#mention a channel* - a single channel
-- *private* - all private channels on this server
-- *public* - all non-private channels on this server
-- *server* - all channels on this server
+Policy for your own posts on the starboard at a channel or server level. Note that this will clear any pre-existing settings at that level and for any channels that are part of that scope.
+${config.prefix}starboard **policy [policylevel] [scope]**
 The following policy levels are available:
 - *allow* - this will allow your posts to be starboarded from any channel in the scope. You will not be asked for consent on these posts.
 - *block* - this will block any post within the scope from being starboarded
 - *ask* - this bot will DM you to request consent to starboard any eligible post within the scope.
 - *reset* - this will reset the policy in a given scope to the default. (the default is for public channels to 'allow', and private channels to 'ask')
+The following options can be used for 'scope':
+- *#mention a channel* - a single channel
+- *private* - all private channels on this server
+- *public* - all non-private channels on this server
+- *server* - all channels on this server
 
 Examples:
-*${config.prefix}starboard policy #general block*
-*${config.prefix}starboard policy server ask*
-*${config.prefix}starboard policy private allow*`,
+*${config.prefix}starboard policy block #general*
+*${config.prefix}starboard policy ask server*
+*${config.prefix}starboard policy allow private*`,
   cooldown: 3,
   guildOnly: true,
   staffOnly: false,
