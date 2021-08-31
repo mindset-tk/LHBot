@@ -14,7 +14,31 @@ starboard_policies - contains data for stored data relating to user preferences;
   'allow_starboard' can be true, false, or 'ask'.  'ask' will DM a user for permission to starboard a message.
 starboard_limbo - contains data for starboard items that are in an 'ask' state but have not yet been starboard approved by the user. Columns: author channel original_msg dm_id
 */
+
+async function prepTables(botdb) {
+  // uncomment to drop tables at bot start (for debugging purposes)
+  // await botdb.run('DROP TABLE IF EXISTS starboard');
+  // await botdb.run('DROP TABLE IF EXISTS starboard_stars');
+  // await botdb.run('DROP TABLE IF EXISTS starboard_message_policies');
+  // await botdb.run('DROP TABLE IF EXISTS starboard_policies');
+  // await botdb.run('DROP TABLE IF EXISTS starboard_limbo');
+
+  // drop migrator tables in case bot crashed during a star migration.
+  await botdb.run('DROP TABLE IF EXISTS starmigrator');
+  await botdb.run('DROP TABLE IF EXISTS starboard_starsmigrator');
+  await botdb.run('DROP TABLE IF EXISTS newstarboard');
+  // ensure standard starboard tables are created.
+  await botdb.run('CREATE TABLE IF NOT EXISTS starboard (original_msg text NOT NULL UNIQUE, starboard_msg text NOT NULL UNIQUE, channel text NOT NULL, author text NOT NULL, starthreshold integer NOT NULL, PRIMARY KEY(original_msg, starboard_msg)) ');
+  await botdb.run('CREATE TABLE IF NOT EXISTS starboard_stars (original_msg text NOT NULL, stargiver text NOT NULL, UNIQUE(original_msg, stargiver))');
+  await botdb.run('CREATE INDEX IF NOT EXISTS idx_starsgiven_originals ON starboard_stars(original_msg)');
+  await botdb.run('CREATE INDEX IF NOT EXISTS idx_stargiver ON starboard_stars(stargiver)');
+  await botdb.run('CREATE TABLE IF NOT EXISTS starboard_message_policies (original_msg text NOT NULL UNIQUE, author NOT NULL, channel NOT NULL, allow_starboard)');
+  await botdb.run('CREATE TABLE IF NOT EXISTS starboard_policies (author text NOT NULL, snowflake text NOT NULL, type NOT NULL, allow_starboard, UNIQUE(author, snowflake))');
+  await botdb.run('CREATE TABLE IF NOT EXISTS starboard_limbo (author text NOT NULL, channel text NOT NULL, original_msg text NOT NULL UNIQUE, dm_id NOT NULL UNIQUE)');
+}
+
 async function publicOnReady(botdb) {
+  await prepTables(botdb);
   if (!config.starboardChannelId) {
     console.log('No starboard channel set! Starboard functions disabled.');
     return;
@@ -24,23 +48,6 @@ async function publicOnReady(botdb) {
     return;
   }
   console.log('starboard ready!');
-  // uncomment to drop tables at bot start (for debugging purposes)
-  // await botdb.run('DROP TABLE IF EXISTS starboard');
-  // await botdb.run('DROP TABLE IF EXISTS starboard_stars');
-  // await botdb.run('DROP TABLE IF EXISTS starboard_message_policies');
-  // await botdb.run('DROP TABLE IF EXISTS starboard_policies');
-  // await botdb.run('DROP TABLE IF EXISTS starboard_limbo');
-  // drop migrator tables in case bot crashed during a star migration.
-  await botdb.run('DROP TABLE IF EXISTS starmigrator');
-  await botdb.run('DROP TABLE IF EXISTS starboard_starsmigrator');
-  await botdb.run('DROP TABLE IF EXISTS newstarboard');
-  await botdb.run('CREATE TABLE IF NOT EXISTS starboard (original_msg text NOT NULL UNIQUE, starboard_msg text NOT NULL UNIQUE, channel text NOT NULL, author text NOT NULL, starthreshold integer NOT NULL, PRIMARY KEY(original_msg, starboard_msg)) ');
-  await botdb.run('CREATE TABLE IF NOT EXISTS starboard_stars (original_msg text NOT NULL, stargiver text NOT NULL, UNIQUE(original_msg, stargiver))');
-  await botdb.run('CREATE INDEX IF NOT EXISTS idx_starsgiven_originals ON starboard_stars(original_msg)');
-  await botdb.run('CREATE INDEX IF NOT EXISTS idx_stargiver ON starboard_stars(stargiver)');
-  await botdb.run('CREATE TABLE IF NOT EXISTS starboard_message_policies (original_msg text NOT NULL UNIQUE, author NOT NULL, channel NOT NULL, allow_starboard)');
-  await botdb.run('CREATE TABLE IF NOT EXISTS starboard_policies (author text NOT NULL, snowflake text NOT NULL, type NOT NULL, allow_starboard, UNIQUE(author, snowflake))');
-  await botdb.run('CREATE TABLE IF NOT EXISTS starboard_limbo (author text NOT NULL, channel text NOT NULL, original_msg text NOT NULL UNIQUE, dm_id NOT NULL UNIQUE)');
 }
 
 function getAuthorAccount(message) {
@@ -571,6 +578,7 @@ async function publicServPolicyChange(message, change, usrScope, botdb) {
 }
 
 async function publicMigrator(fromChannel, toChannel, replyChannel, botdb) {
+  await prepTables(botdb);
   // create a temporary migrator db to integrate extant starboard with migrated; this is a copy of the old starboard.
   await botdb.run('CREATE TABLE IF NOT EXISTS starmigrator (original_msg text NOT NULL UNIQUE, starboard_msg text NOT NULL UNIQUE, channel text NOT NULL, author text NOT NULL, starthreshold integer NOT NULL, PRIMARY KEY(original_msg, starboard_msg))');
   await botdb.run('INSERT INTO starmigrator SELECT * FROM starboard');
