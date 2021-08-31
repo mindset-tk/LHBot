@@ -211,7 +211,7 @@ Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${q
     else if (args[0]) { return message.channel.send('I\'m sorry but I couldn\'t parse `' + args.join(' ') + '`');}
     // if command has no args, start the chat wizard to modify commands.
     else {
-      message.channel.send(outputConfig() + '\n\n**Would you like to change any of these settings? (Y/N)**');
+      message.channel.send(outputConfig() + '\n\n**Would you like to change any of these settings? (Y/N)**', { split: true });
       let reply = await msgCollector();
       if (!reply) { return; }
       if (reply.content.toLowerCase() == 'n' || reply.content.toLowerCase() == 'no') {
@@ -228,7 +228,7 @@ Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${q
         i++;
         msgData.push(`${i}. ${prop.description}`);
       });
-      message.channel.send(`Which item would you like to change?\n${msgData.join('\n')}\nType 0 to cancel.`);
+      message.channel.send(`Which item would you like to change?\n${msgData.join('\n')}\nType 0 to cancel.`, { split: true });
       reply = await msgCollector();
       if (!reply) { return; }
       else if (reply.content == 0) { return message.channel.send('Canceling!');}
