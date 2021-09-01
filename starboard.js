@@ -33,7 +33,7 @@ async function prepTables(botdb) {
   await botdb.run('CREATE INDEX IF NOT EXISTS idx_starsgiven_originals ON starboard_stars(original_msg)');
   await botdb.run('CREATE INDEX IF NOT EXISTS idx_stargiver ON starboard_stars(stargiver)');
   await botdb.run('CREATE TABLE IF NOT EXISTS starboard_message_policies (original_msg text NOT NULL UNIQUE, author NOT NULL, channel NOT NULL, allow_starboard)');
-  await botdb.run('CREATE TABLE IF NOT EXISTS starboard_policies (author text NOT NULL, snowflake text NOT NULL, type NOT NULL, allow_starboard, UNIQUE(author, snowflake))');
+  await botdb.run('CREATE TABLE IF NOT EXISTS starboard_policies (author text NOT NULL, snowflake text NOT NULL, type NOT NULL, allow_starboard, UNIQUE(author, snowflake, type))');
   await botdb.run('CREATE TABLE IF NOT EXISTS starboard_limbo (author text NOT NULL, channel text NOT NULL, original_msg text NOT NULL UNIQUE, dm_id NOT NULL UNIQUE)');
 }
 
@@ -341,12 +341,12 @@ async function publicOnStar(message, botdb, force = false) {
     let msgPolicy;
     if (force === true) { msgPolicy = true; }
     else { msgPolicy = await policyCheck(message, botdb); }
-    // console.log(msgPolicy);
+    console.log('policy =' + msgPolicy);
     // if item's policy is false or the item is not in db and has fewer stars than threshold, do nothing.
     if (!msgPolicy
       || (!dbdata && (starcount < config.starThreshold))
     ) { return; }
-    else if (starcount >= config.starThreshold && msgPolicy === true) {
+    else if (starcount >= config.starThreshold && msgPolicy == true) {
       // item is new starboard candidate. generate embed and message
       const starboardEmbed = await generateEmbed(message, starcount, config.starThreshold);
       const starboardEmoji = generateEmoji(starcount, config.starThreshold);
@@ -561,13 +561,13 @@ async function publicServPolicyChange(message, change, usrScope, botdb) {
   }
   switch (change) {
   case 'allow':
-    changePolicy == true;
+    changePolicy = true;
     break;
   case 'block':
-    changePolicy == false;
+    changePolicy = false;
     break;
   case 'ask':
-    changePolicy == 'ask';
+    changePolicy = 'ask';
     break;
   case 'reset':
   default:
