@@ -341,7 +341,7 @@ async function publicOnStar(message, botdb, force = false) {
     let msgPolicy;
     if (force === true) { msgPolicy = true; }
     else { msgPolicy = await policyCheck(message, botdb); }
-    console.log('policy =' + msgPolicy);
+    // console.log('policy = ' + msgPolicy);
     // if item's policy is false or the item is not in db and has fewer stars than threshold, do nothing.
     if (!msgPolicy
       || (!dbdata && (starcount < config.starThreshold))
