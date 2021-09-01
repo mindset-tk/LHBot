@@ -561,13 +561,13 @@ async function publicServPolicyChange(message, change, usrScope, botdb) {
   }
   switch (change) {
   case 'allow':
-    changePolicy == true;
+    changePolicy = true;
     break;
   case 'block':
-    changePolicy == false;
+    changePolicy = false;
     break;
   case 'ask':
-    changePolicy == 'ask';
+    changePolicy = 'ask';
     break;
   case 'reset':
   default:
