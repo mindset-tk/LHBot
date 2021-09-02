@@ -165,7 +165,7 @@ Discord.Structures.extend('Message', Message => {
     * Asyncronously updates the pluralkit properties of the message it is run from.
     * @method pkQuery()
     * @param {boolean} [force=false] Whether to skip any cached data and make a new request from the PK API.
-    * @returns {Object} returns the pkData props of the message. Property values will be null if it is not a PK message.
+    * @returns {Object} returns the PKData props of the message. Property values will be null if it is not a PK message.
     */
     async pkQuery(force = false) {
       if (!this.author.bot) {
@@ -363,14 +363,13 @@ client.on('message', async message => {
     }
   }
 
-  // console.log(message.author);
   // only do datalogging on non-DM text channels. Don't log messages while offline retrieval is proceeding.
   // (offline logging will loop and catch new messages on the fly.)
   if (message.channel.type === 'text' && client.dataLogLock != 1) { dataLogger.OnMessage(message, config); }
   if(counting.HandleMessage(message)) {
     return;
   }
-  // cache pkData for message.
+  // cache PKData for message.
   await message.pkQuery();
   const permLevel = getPermLevel(message);
   // prevent parsing commands without correct prefix, from bots, and from non-staff non-comrades.

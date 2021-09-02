@@ -51,7 +51,7 @@ async function publicOnReady(botdb) {
 }
 
 function getAuthorAccount(message) {
-  return message.isPKmessage ? message.pkData.author.id : message.author.id;
+  return message.isPKMessage ? message.PKData.author.id : message.author.id;
 }
 
 function getPublicPrivate(channel) {
@@ -143,7 +143,7 @@ function generateEmoji(starcount, threshold) {
 // function to get stars on a message and optional starboard message, but exclude stars from the original author.
 // returns an array of userids (for use with starsGivenUpdater())
 async function retrieveStarGivers(message, starboardMsg) {
-  const pkData = await message.pkQuery();
+  const PKData = await message.pkQuery();
   const starreacts = await message.reactions.cache.get('⭐');
   const usrArr = [];
   if (starreacts) {
@@ -151,7 +151,7 @@ async function retrieveStarGivers(message, starboardMsg) {
     starreacts.users.cache.forEach(user => {
       if (!usrArr.includes(user.id)
       // comment this line to enable self-starring.
-      && user.id != message.author.id && (!pkData.author || user.id != pkData.author.id)
+      && user.id != message.author.id && (!PKData.author || user.id != PKData.author.id)
       ) usrArr.push(user.id);
     });
   }
@@ -162,7 +162,7 @@ async function retrieveStarGivers(message, starboardMsg) {
     starboardreacts.users.cache.forEach(user => {
       if (!usrArr.includes(user.id)
       // comment this line to enable self-starring.
-      && user.id != message.author.id && (!pkData.author || user.id != pkData.author.id)
+      && user.id != message.author.id && (!PKData.author || user.id != PKData.author.id)
       ) usrArr.push(user.id);
     });
   }
@@ -361,7 +361,8 @@ async function publicOnStar(message, botdb, force = false) {
       // check if item is already in starboard limbo and a DM was sent.
       const inLimbo = await botdb.get('SELECT * FROM starboard_limbo WHERE original_msg = ?', message.id);
       if (!inLimbo) {
-        const DM = await message.author.send(`
+        const authorAccount = await message.client.users.fetch(getAuthorAccount(message));
+        const DM = await authorAccount.send(`
 "Hey! your post at ${message.url} got ${starcount} stars and is eligible for the starboard! Since it is in a private channel, I need your affirmation to put it on the starboard.
 React to this post with one of the following:
 - :white_check_mark: to **permit** this single post to go to the starboard.
