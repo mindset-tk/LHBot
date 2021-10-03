@@ -1,10 +1,7 @@
-const fs = require('fs');
 const path = require('path');
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
 const moment = require('moment-timezone');
-
-/* global BigInt */
 
 function kickUser(user, reason) {
   user.send(`You've been kicked from **${user.guild.name}** with reason: "${reason}"`);
@@ -34,12 +31,12 @@ module.exports = {
       let outMsg = '';
 
       // Loop through any airlock channels to find the last post date of airlock users
-      airlockChannels = await client.channels.cache.filter(channel => channel.viewable && !channel.deleted && channel.type == 'text' && channel.name.includes(AIRLOCK_CHANNEL));
-      for (channel of airlockChannels) {
+      const airlockChannels = await client.channels.cache.filter(channel => channel.viewable && !channel.deleted && channel.type == 'text' && channel.name.includes(AIRLOCK_CHANNEL));
+      for (const channel of airlockChannels) {
         await channel[1].messages.fetch().then(messages => {
           //          messages = messages.filter(m => m.member.roles.cache.has(AIRLOCK_ROLE_ID));
           if (messages.size > 0) {
-            for (m of messages) {
+            for (let m of messages) {
               m = m[1];
               // if the usrmap doesn't have the author at all, add them with value = message ID, so long as they are still currently in the guild
               if (!usrMap.has(m.author.id) && !m.author.bot && currentGuildUsrs.has(m.author.id)) {
@@ -54,8 +51,9 @@ module.exports = {
         });
       }
       message.guild.roles.cache.get(AIRLOCK_ROLE_ID).members.forEach(u => {
-        let daysSinceJoin = moment.duration(now.diff(u.joinedAt)).asDays();
-        let hasPosted = usrMap.has(u.id);
+        const daysSinceJoin = moment.duration(now.diff(u.joinedAt)).asDays();
+        const hasPosted = usrMap.has(u.id);
+        let timeSinceLastPost;
         let entry = `> - <@${u.id}> (${u.user.username}#${u.user.discriminator}) joined `;
         // ${moment(u.joinedAt).format('MMM Do')} displays Feb 23 if we need it
         if (daysSinceJoin > 1) {
@@ -65,8 +63,8 @@ module.exports = {
           entry += '**today**';
         }
         if (hasPosted) {
-          var lastPostTimestamp = Number((BigInt(usrMap.get(u.id)) >> BigInt(22)) + BigInt(1420070400000));
-          var timeSinceLastPost = moment.duration(now.diff(lastPostTimestamp)).asDays();
+          const lastPostTimestamp = Number((BigInt(usrMap.get(u.id)) >> BigInt(22)) + BigInt(1420070400000));
+          timeSinceLastPost = moment.duration(now.diff(lastPostTimestamp)).asDays();
           if (timeSinceLastPost >= 1) {
             entry += `, and last posted **${parseInt(timeSinceLastPost)} day(s)** ago`;
           }
@@ -92,7 +90,7 @@ module.exports = {
       });
       if (usersOverLimit[0] || usersUnderLimit[0]) {
         if (usersOverLimit[0]) {
-          let header = (pruneNow && canKick) ? 'Kicked ' + usersOverLimit.length + ' users who were' : 'Airlock users';
+          const header = (pruneNow && canKick) ? 'Kicked ' + usersOverLimit.length + ' users who were' : 'Airlock users';
           outMsg += '__**' + header + ' past the prune limit (' + AIRLOCK_PRUNE_LIMIT + ' days):**__\n' + usersOverLimit.join('\n') + '\n\n';
         }
         if (usersUnderLimit[0] && !pruneNow) {

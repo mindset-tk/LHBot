@@ -1,15 +1,6 @@
-const fs = require('fs');
 const path = require('path');
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
-
-// function to get a channel object based on a channel ID or mention.
-async function getChannel(ID) {
-  if (ID.startsWith('<#') && ID.endsWith('>')) {
-    ID = ID.slice(2, -1);
-    return await client.channels.cache.get(ID);
-  }
-}
 
 module.exports = {
   name: 'createinvite',
@@ -19,7 +10,7 @@ module.exports = {
   guildOnly: true,
   staffOnly: true,
   args: false,
-  async execute(message, args, client) {
+  async execute(message) {
     const lobby = config.channelLobby ? message.guild.channels.resolve(config.channelLobby) : message.channel;
     const invite = await lobby.createInvite(
       {
