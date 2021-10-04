@@ -255,7 +255,9 @@ module.exports = {
   args: false,
   async execute(message, args) {
     const voteData = JSON.parse(args.join(' '));
-    voteData.due = moment().add(1, 'minutes');
+    const durationData = voteData.duration.split(', ');
+    voteData.due = moment().add(durationData[0], durationData[1]);
+    delete voteData.duration;
     voteData.channel = message.channel.id;
     voteData.creator = message.author.id;
     voteData.guild = message.guild.id;
