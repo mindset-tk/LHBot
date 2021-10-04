@@ -8,6 +8,7 @@ events.json
 prunestorage.json
 prunedata.json
 vettinglimit.json
+votes.json
 pm2.json
 *CSV*
 .editorconfig
