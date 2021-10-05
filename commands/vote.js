@@ -179,7 +179,12 @@ class VoteManager {
     else if (vote.emoji.includes(emoji)) {
       const DMreply = vote.votes.has(userID) ? `Your vote was changed to ${emoji}` : `You successfully voted ${emoji}`;
       vote.votes.set(userID, emoji);
-      user.send(DMreply + ` for '${vote.summary}'.`);
+      try {
+        await user.send(DMreply + ` for '${vote.summary}'.`);
+      }
+      catch {
+        console.log('Could not send a DM for vote reciept.');
+      }
     }
 
     return true;
@@ -288,7 +293,7 @@ module.exports = {
       if (packet.t !== 'MESSAGE_REACTION_ADD' || packet.d.user_id == client.user.id) {
         return;
       }
-      // then check if the emoji added/removed was part of the list of emoji that current open votes interact with.
+      // then check if the message in question is one of the vote-related messages.
       else if (!getActiveVoteMessages(packet.d.guild_id).includes(packet.d.message_id)) {
         return;
       }
