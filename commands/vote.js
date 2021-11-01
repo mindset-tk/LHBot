@@ -116,7 +116,7 @@ class VoteManager {
             console.log('Got vote for unknown channel', vote.channel);
             break;
           }
-          console.log(vote);
+          // console.log(vote);
           const totals = this.getResults(vote);
           let resultString = '';
           totals.forEach((v, k) => resultString += `${k} : ${v}\n`);

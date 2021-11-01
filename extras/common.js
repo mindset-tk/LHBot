@@ -16,7 +16,7 @@ function getPermLevel(message) {
     }
     else {return null;}
   }
-  else if (!message.isPKMessage) {
+  else if (!message.isPKMessage && message.member) {
     if (message.member.roles.cache.has(config.roleStaff)) {
       return 'staff';
     }
