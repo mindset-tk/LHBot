@@ -613,7 +613,7 @@ Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${q
                 console.log(`Could not find channel ID ${chanID} in ${change.varName}!`);
               }
             }
-            message.channel.send(`Please choose from the following to remove:\n${msgArr.join('\n')}\ntype all to remove all items.\ntype 0 to cancel.`);
+            await message.channel.send(`Please choose from the following to remove:\n${msgArr.join('\n')}\ntype all to remove all items.\ntype 0 to cancel.`, { split: true });
             reply = await msgCollector();
             if (!reply) { return; }
             else if (reply.content.toLowerCase() == 'all') {
