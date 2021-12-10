@@ -255,11 +255,12 @@ function getActiveVoteMessages(guildID) {
 
 module.exports = {
   name: 'vote',
-  description: 'generates a message that can be voted on.',
+  description: 'generates a message that can be voted on with reactions.',
   usage: '',
+  aliases: 'poll',
   cooldown: 3,
   guildOnly: true,
-  staffOnly: true,
+  staffOnly: false,
   args: false,
   async execute(message) {
     const dmChannel = await message.author.createDM();
