@@ -4,6 +4,9 @@ const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
 const voteDataPath = path.resolve('./votes.json');
+const { promptForMessage, promptYesNo } = require('../extras/common.js');
+const configPath = path.resolve('./config.json');
+const config = require(configPath);
 
 async function writeVoteState() {
   return fsp.writeFile(
@@ -258,18 +261,75 @@ module.exports = {
   guildOnly: true,
   staffOnly: true,
   args: false,
-  async execute(message, args) {
-    const voteData = JSON.parse(args.join(' '));
-    const durationData = voteData.duration.split(', ');
-    voteData.due = moment().add(durationData[0], durationData[1]);
-    delete voteData.duration;
+  async execute(message) {
+    const dmChannel = await message.author.createDM();
+    const voteData = {};
+    await dmChannel.send('You can type cancel to cancel this wizard at any time.\nWhat would you like the text of your vote to be?');
+    let result = await promptForMessage(dmChannel, async (reply) => {
+      const content = reply.content.trim();
+      if (content.toLowerCase() === 'cancel') {
+        dmChannel.send(
+          `Vote creation cancelled. Please run ${config.prefix}vote again to initiate event creation again.`,
+        );
+        return 'abort';
+      }
+      else { return voteData.summary = content; }
+    });
+    if (!result) {return;}
+    await dmChannel.send('Please list the emoji you wish to use for this vote, separated by only a space. (eg. "👍 👎").\nDue to limitations of Discord, you may only use standard emoji, and 🚫 will always be included as a vote remover option.');
+    result = await promptForMessage(dmChannel, async (reply) => {
+      let content = reply.content.trim();
+      content = content.replace(/ +/g, ' ');
+      if (content.toLowerCase() === 'cancel') {
+        dmChannel.send(
+          `Vote creation cancelled. Please run ${config.prefix}vote again to initiate event creation again.`,
+        );
+        return 'abort';
+      }
+      else {
+        voteData.emoji = content.split(' ');
+        return voteData.emoji.push('🚫');
+      }
+    });
+    if (!result) {return;}
+    let humanReadableDuration;
+    await dmChannel.send('How long shall the vote run for?\nPlease answer in the form of "10 minutes", "5 hours", "1 day", "3 weeks"');
+    result = await promptForMessage(dmChannel, async (reply) => {
+      let content = reply.content.trim();
+      content = content.replace(/ +/g, ' ');
+      if (content.toLowerCase() === 'cancel') {
+        dmChannel.send(
+          `Vote creation cancelled. Please run ${config.prefix}vote again to initiate event creation again.`,
+        );
+        return 'abort';
+      }
+      else {
+        humanReadableDuration = content;
+        const durationData = content.split(' ');
+        try { return voteData.due = moment().add(durationData[0], durationData[1]); }
+        catch {
+          dmChannel.send('Sorry, I couldn\'t parse that. Please answer in the form of "10 minutes", "5 hours", "1 day", "3 weeks", etc.');
+          return 'retry';
+        }
+      }
+    });
+    if (!result) {return;}
+    await dmChannel.send(`Does this look OK?\nVote text: ${voteData.summary}\n Duration: ${humanReadableDuration}\n Emoji: ${voteData.emoji}`);
+    await promptYesNo(dmChannel, {
+      messages: {
+        yes: 'OK, your vote is now posted.',
+        no: 'OK, please run the command again to post a vote (looping not yet implemented).',
+        cancel:
+          'Vote creation cancelled!',
+        invalid: 'Reply not recognized! Please answer Y or N.',
+      },
+    });
     voteData.channel = message.channel.id;
     voteData.creator = message.author.id;
     voteData.guild = message.guild.id;
     // create a vote embed and send to the channel.
     const voteMsg = await message.channel.send(`Please vote with the reaction buttons on the following: \n ${voteData.summary} \n If you would like to remove a vote you already made, please use the 🚫 react.`);
     voteData.message = voteMsg.id;
-    voteData.emoji.push('🚫');
     voteData.emoji.forEach(async e => await voteMsg.react(e));
     voteData.votes = new Map();
     voteManager.add(voteData);
