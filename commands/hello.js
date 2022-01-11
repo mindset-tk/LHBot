@@ -4,7 +4,7 @@ module.exports = {
   description: 'Pings bot to verify operation',
   cooldown: 3,
   execute(message, args, client) {
-    if (message.channel.type == 'text') {
+    if (message.channel.type == 'GUILD_TEXT') {
       const botguildmember = message.guild.me;
       message.channel.send('Hello, I am ' + botguildmember.displayName + '.');
     }

@@ -5,7 +5,7 @@ const config = require(configPath);
 const listPath = path.resolve('./gamelist.json');
 const gameList = require(listPath);
 const Discord = require('discord.js');
-const {getPermLevel} = require('../extras/common.js');
+const { getPermLevel } = require('../extras/common.js');
 
 module.exports = {
   name: 'games',
@@ -49,7 +49,7 @@ module.exports = {
       else {return false;}
     }
 
-    const IDFormat = new RegExp('^(\\d{16,})$');
+    const IdFormat = new RegExp('^(\\d{16,})$');
     // Block for adding a user's data to a given roster
     const action = args[0].toLowerCase();
     if (action === 'add') {
@@ -98,7 +98,7 @@ module.exports = {
         let numRow = 1;
         gameList[system].accounts.forEach(acctinfo => {
           const guild = message.guild;
-          const guildmember = guild.member(acctinfo.userID);
+          const guildmember = guild.members.cache.get(acctinfo.userID);
           if (guildmember) {
             column1.push('**' + numRow + '.** ' + guildmember.displayName);
             column2.push('**' + numRow + '.** ' + acctinfo.account);
@@ -116,7 +116,7 @@ module.exports = {
         if (gameList[system].embedIcon) {
           gameListEmbed.setThumbnail(gameList[system].embedIcon);
         }
-        message.channel.send(gameListEmbed);
+        message.channel.send({ embeds: [gameListEmbed] });
       }
     }
     // removal block
@@ -154,7 +154,7 @@ module.exports = {
     else if (action === 'purge' && permLevel == 'staff') {
       let targetUser;
       if (!args[1]) { return message.channel.send('Sorry, I need a user @mention or ID to purge them from the list');	}
-      else if (IDFormat.test(args[1])) { targetUser = await client.fetchUser(args[1]); }
+      else if (IdFormat.test(args[1])) { targetUser = await client.fetchUser(args[1]); }
       else if (getUserFromMention(args[1])) { targetUser = await getUserFromMention(args[1]); }
       else if (!getUserFromMention(args[1])) { return message.channel.send('Couldn\'t get a user from that. Please @mention the user or type their ID.'); }
       const data = [];

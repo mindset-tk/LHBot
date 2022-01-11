@@ -44,9 +44,9 @@ function sliceIfMention(input) {
 
 async function getMessageFromURL(url, client) {
   const messageRegEx = /(?:(?:https*:\/\/)*discord.com\/channels\/)\d+\/(\d+)\/(\d+)/;
-  const target = { chanID: messageRegEx.exec(url)[1], msgID: messageRegEx.exec(url)[2] };
-  target.chan = await client.channels.fetch(target.chanID);
-  target.msg = await target.chan.messages.fetch(target.msgID);
+  const target = { chanId: messageRegEx.exec(url)[1], msgId: messageRegEx.exec(url)[2] };
+  target.chan = await client.channels.fetch(target.chanId);
+  target.msg = await target.chan.messages.fetch(target.msgId);
   return target.msg;
 }
 
@@ -56,7 +56,7 @@ async function msgCollector(message) {
   let reply = false;
   // create a filter to ensure output is only accepted from the author who initiated the command.
   const filter = input => (input.author.id === message.author.id);
-  await message.channel.awaitMessages(filter, { max: 1, time: 30000, errors: ['time'] })
+  await message.channel.awaitMessages({ filter, max: 1, time: 30000, errors: ['time'] })
   // this method creates a collection; since there is only one entry we get the data from collected.first
     .then(collected => reply = collected.first())
     .catch(() => message.channel.send('Sorry, I waited 30 seconds with no response, please run the command again.'));
@@ -64,13 +64,13 @@ async function msgCollector(message) {
 }
 
 // function to get a channel object based on a channel ID or mention.
-async function getChannel(ID, client) {
-  if (ID.startsWith('<#') && ID.endsWith('>')) {
-    ID = ID.slice(2, -1);
-    return await client.channels.cache.get(ID);
+async function getChannel(Id, client) {
+  if (Id.startsWith('<#') && Id.endsWith('>')) {
+    Id = Id.slice(2, -1);
+    return await client.channels.cache.get(Id);
   }
   else {
-    try { return await client.channels.cache.get(ID);}
+    try { return await client.channels.cache.get(Id);}
     catch { return null;}
   }
 }
@@ -428,14 +428,14 @@ Examples:
       const { d: data } = packet;
       const user = client.users.cache.get(data.user_id);
       const channel = client.channels.cache.get(data.channel_id) || await user.createDM();
-      if (channel.type == 'text' && data.emoji.name == '⭐') {
+      if (channel.type == 'GUILD_TEXT' && data.emoji.name == '⭐') {
         // if it's a guild channel, fetch the message the reaction was added to, then pass it to the starboard functions for examination.
         await channel.messages.fetch(data.message_id).then(message => {
           if (!message || message.system) return;
           starboard.onStar(message, botdb);
         });
       }
-      else if (channel.type == 'dm' && data.emoji.name != '⭐') {
+      else if (channel.type == 'DM' && data.emoji.name != '⭐') {
         // if it's a dm, ignore stars (starboard is only functional for guild messages)
         await channel.messages.fetch(data.message_id).then(async (message) => {
           // check if item is in starboard limbo; if not, return.

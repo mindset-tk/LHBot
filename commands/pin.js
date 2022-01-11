@@ -1,5 +1,5 @@
 exports.init = async function(client, config) {
-  client.on('raw', async(packet) => {
+  client.on('raw', async (packet) => {
     if (packet.t !== 'MESSAGE_REACTION_ADD') {
       return;
     }
@@ -16,7 +16,7 @@ exports.init = async function(client, config) {
 
     // If the message somehow doesn't have any reactions on it, or the channel type is not a guild text channel (like a DM for example),
     // do not emit a reaction add event.
-    if (!reaction || message.channel.type !== 'text') return;
+    if (!reaction || message.channel.type !== 'GUILD_TEXT') return;
 
     if (message == null || message.system) return;
     if (reaction.emoji.name == '📌' && reaction.count >= config.pinsToPin && !message.pinned && !config.pinIgnoreChannels.includes(message.channel.id)) {

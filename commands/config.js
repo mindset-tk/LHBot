@@ -7,8 +7,8 @@ const countingDataPath = path.resolve('./counting.json');
 if(global.countingData == null) {
   global.countingData = require(countingDataPath);
 }
-const eventPath = path.resolve('./commands/event.js');
-const event = require(eventPath);
+// const eventPath = path.resolve('./commands/event.js');
+// const event = require(eventPath);
 
 function writeCounting() {
   fs.writeFile(countingDataPath, JSON.stringify(global.countingData, null, 2), function(err) {
@@ -94,36 +94,36 @@ module.exports = {
     // declaring some useful functions.
 
     // function to get a channel name from a chanID
-    function getChannelName(channelID) {
-      const channelObj = client.channels.cache.get(channelID);
+    function getChannelName(channelId) {
+      const channelObj = client.channels.cache.get(channelId);
       if (channelObj) {return channelObj.name;}
       else {return '[invalid or deleted channel]';}
     }
-    // function to get a role name from a roleID
-    function getRoleName(roleID) {
-      const roleObj = message.guild.roles.cache.get(roleID);
+    // function to get a role name from a roleId
+    function getRoleName(roleId) {
+      const roleObj = message.guild.roles.cache.get(roleId);
       if (roleObj) {return roleObj.name;}
       else {return '[invalid or deleted role]';}
     }
     // function to get a channel object based on a channel ID or mention.
-    async function getChannel(ID) {
-      if (ID.startsWith('<#') && ID.endsWith('>')) {
-        ID = ID.slice(2, -1);
-        return await client.channels.cache.get(ID);
+    async function getChannel(Id) {
+      if (Id.startsWith('<#') && Id.endsWith('>')) {
+        Id = Id.slice(2, -1);
+        return await client.channels.cache.get(Id);
       }
       else {
-        try { return await client.channels.cache.get(ID);}
+        try { return await client.channels.cache.get(Id);}
         catch { return null;}
       }
     }
 
-    async function getRole(ID) {
-      if (ID.startsWith('<@&') && ID.endsWith('>')) {
-        ID = ID.slice(3, -1);
-        return await message.guild.roles.cache.get(ID);
+    async function getRole(Id) {
+      if (Id.startsWith('<@&') && Id.endsWith('>')) {
+        Id = Id.slice(3, -1);
+        return await message.guild.roles.cache.get(Id);
       }
       else {
-        try { return await message.guild.roles.cache.get(ID);}
+        try { return await message.guild.roles.cache.get(Id);}
         catch { return null;}
       }
     }
@@ -134,7 +134,7 @@ module.exports = {
       let reply = false;
       // create a filter to ensure output is only accepted from the author who initiated the command.
       const filter = input => (input.author.id === message.author.id);
-      await message.channel.awaitMessages(filter, { max: 1, time: 30000, errors: ['time'] })
+      await message.channel.awaitMessages({ filter, max: 1, time: 30000, errors: ['time'] })
         // this method creates a collection; since there is only one entry we get the data from collected.first
         .then(collected => reply = collected.first())
         .catch(() => message.channel.send('Sorry, I waited 30 seconds with no response, please run the command again.'));
@@ -150,13 +150,13 @@ module.exports = {
       const starboardIgnoreChans = [];
       const starboardPrivateChans = [];
       const knownInv = [];
-      config.pinIgnoreChannels.forEach(chanID => ignoreChans.push(getChannelName(chanID)));
-      config.voiceTextChannelIds.forEach(chanID => voiceTextChans.push(getChannelName(chanID)));
-      config.starboardIgnoreChannels.forEach(chanID => starboardIgnoreChans.push(getChannelName(chanID)));
-      config.starboardPrivateChannels.forEach(chanID => starboardPrivateChans.push(getChannelName(chanID)));
+      config.pinIgnoreChannels.forEach(chanId => ignoreChans.push(getChannelName(chanId)));
+      config.voiceTextChannelIds.forEach(chanId => voiceTextChans.push(getChannelName(chanId)));
+      config.starboardIgnoreChannels.forEach(chanId => starboardIgnoreChans.push(getChannelName(chanId)));
+      config.starboardPrivateChannels.forEach(chanId => starboardPrivateChans.push(getChannelName(chanId)));
       if (config.knownInvites) {config.knownInvites.forEach(inv => knownInv.push('**' + inv[1] + '** (' + inv[0] + ')'));}
       //      console.log((Object.keys(config[voiceChamberDefaultSizes]).length == 0));
-      if(typeof config.voiceChamberDefaultSizes == 'object') Object.keys(config.voiceChamberDefaultSizes).forEach(chanID => cfgVoiceChans.push('#' + config.voiceChamberDefaultSizes[chanID].Name + ' (Size: ' + config.voiceChamberDefaultSizes[chanID].Size + ')'));
+      if(typeof config.voiceChamberDefaultSizes == 'object') Object.keys(config.voiceChamberDefaultSizes).forEach(chanId => cfgVoiceChans.push('#' + config.voiceChamberDefaultSizes[chanId].Name + ' (Size: ' + config.voiceChamberDefaultSizes[chanId].Size + ')'));
 
       return `Here's my current configuration:
 __General settings__
@@ -276,7 +276,7 @@ Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${q
           reply = await msgCollector();
           if(!reply) {return;}
           const newChannel = await getChannel(reply.content);
-          const oldChannelID = config[change.varName] || null;
+          // const oldChannelId = config[change.varName] || null;
           if (newChannel) {
             config[change.varName] = newChannel.id;
             writeConfig(message);
@@ -286,10 +286,10 @@ Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${q
               writeCounting();
               return message.channel.send(`${change.description} is now ${newChannel}. Count has been reset to 0.`);
             }
-            if (change.varName == 'eventInfoChannelId') {
-              await event.regenMsgs(oldChannelID, newChannel.id, message.guild);
+            /* if (change.varName == 'eventInfoChannelId') {
+              await event.regenMsgs(oldChannelId, newChannel.id, message.guild);
               return message.channel.send(`${change.description} is now ${newChannel}. Deleting info messages from old channel (if applicable) and recreating.`);
-            }
+            } */
             if (change.varName == 'starboardChannelId') {
               return message.channel.send(`${change.description} is now ${newChannel}. Defaulting starboard threshold to 5 stars. This can be changed with the config command.`);
             }
@@ -377,16 +377,16 @@ Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${q
             const chanArr = [];
             const msgArr = [];
             i = 0;
-            for (const chanID in config[change.varName]) {
+            for (const chanId in config[change.varName]) {
               i++;
-              const chan = await getChannel(chanID);
+              const chan = await getChannel(chanId);
               if (chan) {
                 chanArr.push(chan);
-                msgArr.push(`${i}. ${config[change.varName][chanID]['Name']}`);
+                msgArr.push(`${i}. ${config[change.varName][chanId]['Name']}`);
               }
               else {
                 msgArr.push(`Bad channel ID in config.json! See console for details; type ${i} to just delete this entry.`);
-                console.log(`Could not find channel ID ${chanID} in ${change.varName}!`);
+                console.log(`Could not find channel ID ${chanId} in ${change.varName}!`);
               }
             }
             message.channel.send(`Please choose from the following to remove:\n${msgArr.join('\n')}\ntype all to remove all items.\ntype 0 to cancel.`);
@@ -423,16 +423,16 @@ Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${q
             const chanArr = [];
             const msgArr = [];
             i = 0;
-            for (const chanID in config[change.varName]) {
+            for (const chanId in config[change.varName]) {
               i++;
-              const chan = await getChannel(chanID);
+              const chan = await getChannel(chanId);
               if (chan) {
                 chanArr.push(chan);
-                msgArr.push(`${i}. ${config[change.varName][chanID]['Name']} (default size: ${config[change.varName][chanID]['Size']})`);
+                msgArr.push(`${i}. ${config[change.varName][chanId]['Name']} (default size: ${config[change.varName][chanId]['Size']})`);
               }
               else {
                 msgArr.push(`Bad channel ID in config.json! See console for details; type ${i} to just delete this entry.`);
-                console.log(`Could not find channel ID ${chanID} in ${change.varName}!`);
+                console.log(`Could not find channel ID ${chanId} in ${change.varName}!`);
               }
             }
             message.channel.send(`Please choose from the following to change:\n${msgArr.join('\n')}\ntype 0 to cancel.`);
@@ -449,7 +449,7 @@ Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${q
             }
             else {
               const indexToChange = parseInt(reply.content) - 1;
-              const chanID = Object.keys(config[change.varName])[indexToChange];
+              const chanId = Object.keys(config[change.varName])[indexToChange];
 
               message.channel.send('Do you want to change the default **name**, **size**, or **both**?');
               reply = await msgCollector();
@@ -461,7 +461,7 @@ Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${q
                 message.channel.send('Please enter the default name for the channel (this should really be 24 chars or less)');
                 reply = await msgCollector();
                 if(!reply) {return;}
-                config[change.varName][chanID]['Name'] = reply.content.replace(/"/g, '');
+                config[change.varName][chanId]['Name'] = reply.content.replace(/"/g, '');
               }
 
               if (type == 'size' || type == 'both') {
@@ -469,7 +469,7 @@ Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${q
                 reply = await msgCollector();
                 if(!reply) {return;}
                 if (!reply.content.includes('.') && parseInt(reply.content) && reply.content <= 99) {
-                  config[change.varName][chanID]['Size'] = reply.content;
+                  config[change.varName][chanId]['Size'] = reply.content;
                 }
                 else {
                   return message.channel.send('Sorry, I couldn\'t parse that, or the entry was over 99 (discord\'s max). Please enter an integer (no decimals) 99 or under.');
@@ -477,7 +477,7 @@ Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${q
               }
 
               writeConfig(message);
-              return message.channel.send(`Updated ${config[change.varName][chanID]['Name']}'s defaults. The default size is **${config[change.varName][chanID]['Size']}**`);
+              return message.channel.send(`Updated ${config[change.varName][chanId]['Name']}'s defaults. The default size is **${config[change.varName][chanId]['Size']}**`);
             }
           }
         }
@@ -494,7 +494,7 @@ Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${q
             const response = reply.content.split('/').pop();
             const knownInvites = new Map(config.knownInvites);
             if (!knownInvites.has(response)) {
-              message.guild.fetchInvites().then(async guildInvites => {
+              message.guild.invites.fetch().then(async guildInvites => {
                 let invite = new Discord.Collection();
                 if (guildInvites.has(response)) {
                   invite = guildInvites.get(response);
@@ -575,7 +575,7 @@ Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${q
             reply = await msgCollector();
             if(!reply) {return;}
             const newChannel = await getChannel(reply.content);
-            if (newChannel.type == 'text') {
+            if (newChannel.type == 'GUILD_TEXT') {
               if (!config[change.varName].includes(newChannel.id)) {
                 config[change.varName].push(newChannel.id);
                 writeConfig(message);
@@ -583,7 +583,7 @@ Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${q
               }
               else {return message.channel.send(`${newChannel} is already a part of *${change.description}*`);}
             }
-            else if(newChannel.type == 'category') {
+            else if(newChannel.type == 'GUILD_CATEGORY') {
               const alreadyInListArr = [];
               const addedArr = [];
               for (const childChannel of newChannel.children.values()) {
@@ -601,16 +601,16 @@ Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${q
             const chanArr = [];
             const msgArr = [];
             i = 0;
-            for (const chanID of config[change.varName]) {
+            for (const chanId of config[change.varName]) {
               i++;
-              const chan = await getChannel(chanID);
+              const chan = await getChannel(chanId);
               if (chan) {
                 chanArr.push(chan);
                 msgArr.push(`${i}. ${chan}`);
               }
               else {
                 msgArr.push(`Bad channel ID in config.json! See console for details; type ${i} to just delete this entry.`);
-                console.log(`Could not find channel ID ${chanID} in ${change.varName}!`);
+                console.log(`Could not find channel ID ${chanId} in ${change.varName}!`);
               }
             }
             await message.channel.send(`Please choose from the following to remove:\n${msgArr.join('\n')}\ntype all to remove all items.\ntype 0 to cancel.`, { split: true });

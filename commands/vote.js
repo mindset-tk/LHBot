@@ -84,8 +84,8 @@ class VoteManager {
     this.tick().then(() => {
       // Ensure we're always at (or close to) the 'top' of a minute when we run our tick
       const topOfMinute = 60000 - (Date.now() % 60000);
-      this.timer = this.client.setTimeout(() => {
-        this.timer = this.client.setInterval(() => this.tick(), 60000);
+      this.timer = setTimeout(() => {
+        this.timer = setInterval(() => this.tick(), 60000);
         this.tick();
       }, topOfMinute);
     });
@@ -160,28 +160,28 @@ class VoteManager {
   /**
    * Update votes on an object
    *
-   * @param guildID Snowflake of the Guild to scope votes to.
-   * @param userID Snowflake of the User whose vote will be tallied.
-   * @param msgID MessageID of the vote to be updated.
+   * @param guildId Snowflake of the Guild to scope votes to.
+   * @param userId Snowflake of the User whose vote will be tallied.
+   * @param msgId MessageId of the vote to be updated.
    * @param emoji Emoji of the vote to be tallied; note that 🚫 will always be added to votes; this allows users to remove accidental votes.
    * @returns {boolean} Whether the user was tallied to the vote (false if already voted for the same emoji).
    */
-  async updateVotes(guildID, userID, msgID, emoji) {
-    const user = await this.client.users.fetch(userID);
-    const vote = this.getByMsg(guildID, msgID);
+  async updateVotes(guildId, userId, msgId, emoji) {
+    const user = await this.client.users.fetch(userId);
+    const vote = this.getByMsg(guildId, msgId);
     if (!vote) {
       return false;
     }
-    if (emoji == '🚫' && vote.votes.has(userID)) {
-      vote.votes.delete(userID);
+    if (emoji == '🚫' && vote.votes.has(userId)) {
+      vote.votes.delete(userId);
       user.send('Your vote was removed from the following vote: \'' + vote.summary + '\'');
     }
-    else if (emoji == '🚫' && !vote.votes.has(userID)) {
+    else if (emoji == '🚫' && !vote.votes.has(userId)) {
       user.send('You have no vote on record for \'' + vote.summary + '\'. No action was taken.');
     }
     else if (vote.emoji.includes(emoji)) {
-      const DMreply = vote.votes.has(userID) ? `Your vote was changed to ${emoji}` : `You successfully voted ${emoji}`;
-      vote.votes.set(userID, emoji);
+      const DMreply = vote.votes.has(userId) ? `Your vote was changed to ${emoji}` : `You successfully voted ${emoji}`;
+      vote.votes.set(userId, emoji);
       try {
         await user.send(DMreply + ` for '${vote.summary}'.`);
       }
@@ -193,26 +193,26 @@ class VoteManager {
     return true;
   }
 
-  _indexByMsg(guildID, msgID) {
-    if (!this.ongoingVotes[guildID]) {
+  _indexByMsg(guildId, msgId) {
+    if (!this.ongoingVotes[guildId]) {
       return undefined;
     }
-    const index = this.ongoingVotes[guildID].findIndex(
-      (vote) => vote.message == msgID,
+    const index = this.ongoingVotes[guildId].findIndex(
+      (vote) => vote.message == msgId,
     );
     return index !== -1 ? index : undefined;
   }
 
   /**
- * Get the vote with this messageID on a specific guild.
+ * Get the vote with this messageId on a specific guild.
  *
  * @param guildId The Snowflake corresponding to the vote's guild
- * @param msgID The snowflake of the vote message
+ * @param msgId The snowflake of the vote message
  * @returns Vote data or undefined
  */
-  getByMsg(guildID, msgID) {
-    const index = this._indexByMsg(guildID, msgID);
-    return index !== undefined ? this.ongoingVotes[guildID][index] : index;
+  getByMsg(guildId, msgId) {
+    const index = this._indexByMsg(guildId, msgId);
+    return index !== undefined ? this.ongoingVotes[guildId][index] : index;
   }
 
   /**
@@ -243,11 +243,11 @@ class VoteManager {
 
 let voteManager;
 
-function getActiveVoteMessages(guildID) {
-  // search through vote.json and find the message ID on each active vote.
+function getActiveVoteMessages(guildId) {
+  // search through vote.json and find the message Id on each active vote.
   // then return a list of all messages as an arr.
   const messageArr = [];
-  global.voteData.votes[guildID].forEach(vote => {
+  global.voteData.votes[guildId].forEach(vote => {
     messageArr.push(vote.message);
   });
   return messageArr;

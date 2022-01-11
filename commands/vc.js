@@ -2,7 +2,7 @@ const path = require('path');
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
 const wait = require('util').promisify(setTimeout);
-const {getPermLevel} = require('../extras/common.js');
+const { getPermLevel } = require('../extras/common.js');
 
 async function updateChannel(type, args, message) {
   const permLevel = getPermLevel(message);
@@ -18,7 +18,7 @@ async function updateChannel(type, args, message) {
   if(args.length > 1 && permLevel == 'staff') {
     // Check for second argument
     const vcArg = message.guild.channels.resolve(args[0]);
-    if(vcArg && vcArg.type == 'voice') {
+    if(vcArg && vcArg.type == 'GUILD_VOICE') {
       voiceChannel = vcArg;
       args.shift();
     }
@@ -71,8 +71,8 @@ async function updateChannel(type, args, message) {
 
 function SnapbackCheck(oldState, newState, client) {
   if (!config.voiceChamberDefaultSizes) {return;}
-  const newUserChannel = newState.channelID;
-  const oldUserChannel = oldState.channelID;
+  const newUserChannel = newState.channelId;
+  const oldUserChannel = oldState.channelId;
   const lastVoiceChannel = client.channels.resolve(oldUserChannel);
   // Conditions for when user joins a voice channel after not being in one (not currently needed)
   //  if(!oldUserChannel && newUserChannel) {
@@ -107,13 +107,13 @@ async function snapbackIfEmpty(channel) {
 
 function OnReady(client) {
   if (!config.voiceChamberDefaultSizes) {return;}
-  for (const chanID in config.voiceChamberDefaultSizes) {
-    const channel = client.channels.resolve(chanID);
+  for (const chanId in config.voiceChamberDefaultSizes) {
+    const channel = client.channels.resolve(chanId);
     if (channel) {
       snapbackIfEmpty(channel);
     }
     else {
-      console.log(`Could not find channel ID ${chanID} during voice channel snapback check`);
+      console.log(`Could not find channel ID ${chanId} during voice channel snapback check`);
     }
   }
 }

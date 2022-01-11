@@ -18,7 +18,7 @@ exports.init = function(client) {
 
     // If the message somehow doesn't have any reactions on it, or the channel type is not a guild text channel (like a DM for example),
     // do not emit a reaction add event.
-    if (!reaction || message.channel.type !== 'text') return;
+    if (!reaction || message.channel.type !== 'GUILD_TEXT') return;
 
     if (message == null || message.system) return;
 
@@ -44,7 +44,7 @@ exports.init = function(client) {
         .setDescription(message.content + '\n\n [jump to message](' + message.url + ')')
         .setFooter('Bookmarked message was sent at ' + messagesent + ' UTC')
         .setImage(image);
-      user.send(`🔖: - from ${message.channel}`, bookmarkEmbed);
+      user.send({ contents: `🔖: - from ${message.channel}`, embeds: bookmarkEmbed });
       return;
     }
   });

@@ -19,7 +19,7 @@ async function msgCollector(message) {
   let reply = false;
   // create a filter to ensure output is only accepted from the author who initiated the command.
   const filter = input => (input.author.id === message.author.id);
-  await message.channel.awaitMessages(filter, { max: 1, time: 60000, errors: ['time'] })
+  await message.channel.awaitMessages({ filter, max: 1, time: 60000, errors: ['time'] })
     // this method creates a collection; since there is only one entry we get the data from collected.first
     .then(collected => reply = collected.first())
     .catch(collected => message.channel.send('Sorry, I waited 60 seconds with no response, please run the command again.'));
@@ -50,13 +50,13 @@ function writeData(filePath, file) {
   });
 }
 
-async function getUser(ID, message) {
-  if (ID.startsWith('<@!') && ID.endsWith('>')) {
-    ID = ID.slice(3, -1);
-    return await message.guild.member(ID);
+async function getUser(Id, message) {
+  if (Id.startsWith('<@!') && Id.endsWith('>')) {
+    Id = Id.slice(3, -1);
+    return await message.guild.members.cache.get(Id);
   }
   else {
-    try { return await message.guild.member(ID);}
+    try { return await message.guild.members.cache.get(Id);}
     catch { return null;}
   }
 }
@@ -77,7 +77,7 @@ async function addToPrune(args, message, client) {
   }
 
   const permsRequired = ['MANAGE_ROLES'];
-  if (!message.guild.me.hasPermission(permsRequired)) {
+  if (!message.guild.me.permissions.has(permsRequired)) {
     return message.channel.send('Sorry, I don\'t have all the necessary permissions (' + permsRequired.join(', ') + ')');
   }
 
@@ -155,8 +155,8 @@ async function showRoles(args, message) {
   }
 
   const roleNames = [];
-  for (const thisRoleID of pruneStorage[member.user.id]) {
-    const thisRole = message.guild.roles.cache.find(role => role.id === thisRoleID);
+  for (const thisRoleId of pruneStorage[member.user.id]) {
+    const thisRole = message.guild.roles.cache.find(role => role.id === thisRoleId);
     if (thisRole.name === '@everyone') {continue;}
     roleNames.push('`' + thisRole.name + '`');
   }
@@ -166,7 +166,7 @@ async function showRoles(args, message) {
 }
 
 async function pruneRestore(args, message) {
-  if (!message.guild.me.hasPermission(['MANAGE_CHANNELS', 'MANAGE_ROLES'])) {
+  if (!message.guild.me.permissions.has(['MANAGE_CHANNELS', 'MANAGE_ROLES'])) {
     return message.channel.send('Sorry, I don\'t have the necessary permissions (manage channels and manage roles)');
   }
 
@@ -354,7 +354,7 @@ async function prunePrep(args, message, client) {
   }
 
   const permsRequired = ['VIEW_CHANNEL', 'MANAGE_CHANNELS', 'MANAGE_ROLES', 'SEND_MESSAGES', 'READ_MESSAGE_HISTORY', 'MANAGE_MESSAGES', 'MENTION_EVERYONE'];
-  if (kickNow === 0 && !message.guild.me.hasPermission(permsRequired)) {
+  if (kickNow === 0 && !message.guild.me.permissions.has(permsRequired)) {
     return message.channel.send('Sorry, I don\'t have all the necessary permissions (' + permsRequired.join(', ') + ')');
   }
 
@@ -400,7 +400,7 @@ async function prunePrep(args, message, client) {
 
   // Loop through the prune data, generating the spreadsheet and prune array for later
   for (const usr of pruneData) {
-    const memberObj = await message.guild.member(usr[0]);
+    const memberObj = await message.guild.members.cache.get(usr[0]);
 
     // Make sure we can even manage this user
     if ((!memberObj.manageable || (config.roleComrade && !memberObj.roles.cache.has(config.roleComrade))) && maxTimeSinceActive !== 0) {continue;}
@@ -571,7 +571,7 @@ async function pruneFinish(message) {
   const toPrune = Object.keys(requireUncached(pruneStoragePath));
   const PRUNE_USER_KICKMSG = 'Pruned for inactivity.';
   const PRUNE_USER_DMREASON = 'Pruned for inactivity. You can find another invite code at https://lefthome.info/';
-  const canKick = await message.guild.me.hasPermission('KICK_MEMBERS');
+  const canKick = await message.guild.me.permissions.has('KICK_MEMBERS');
 
   // Make sure we have the necessary permissions
   if (!canKick) {return message.channel.send('You\'ll need to give me kick permissions to proceed');}
@@ -606,7 +606,7 @@ async function pruneFinish(message) {
 
     // Get the next userid in the array, plus the member and user objects
     const userid = toPrune.shift();
-    const memberObj = message.guild.member(userid);
+    const memberObj = message.guild.members.cache.get(userid);
     const usrObj = memberObj.user;
 
     // Make sure we can actually kick the person! Just in case

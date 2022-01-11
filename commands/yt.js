@@ -8,7 +8,7 @@ const path = require('path');
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
 const wait = require('util').promisify(setTimeout);
-const {getPermLevel} = require('../extras/common.js');
+const { getPermLevel } = require('../extras/common.js');
 
 let YT;
 if (!config.youTubeAPIKey) {
@@ -187,7 +187,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
                 .addField('Link:', queue[0].url);
                 // also display next song title, if there is one in queue
               if (queue[1]) videoEmbed.addField('Next Song:', queue[1].title);
-              message.guild.musicData.voiceTextChannel.send(videoEmbed);
+              message.guild.musicData.voiceTextChannel.send({ embeds: [videoEmbed] });
               // dequeue the song.
               return message.guild.musicData.nowPlaying = queue.shift();
             })
@@ -334,7 +334,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
         queueData.push(`**${i + 1}.** ${titleArray[i]}`);
       }
       queueEmbed.addField('Up next:', queueData.join('\n'));
-      return message.channel.send(queueEmbed);
+      return message.channel.send({ embeds: [queueEmbed] });
     }
     else if (args[0].toLowerCase() == 'list' && args[1].toLowerCase() == 'clear') {
       message.guild.musicData.queue.length = 0;
@@ -363,7 +363,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
           queueData.push(`**${i + 1}.** ${titleArray[i]}`);
         }
         queueEmbed.addField('Music queue', queueData.join('\n'));
-        return message.channel.send(queueEmbed);
+        return message.channel.send({ embeds: [queueEmbed] });
       }
       else { return message.channel.send(`Please specify a single number to be removed. Use **${config.prefix}yt list** to see queue numbers.`); }
     }

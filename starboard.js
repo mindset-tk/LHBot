@@ -2,6 +2,7 @@ const path = require('path');
 const Discord = require('discord.js');
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
+const { pkQuery } = require('./extras/common.js');
 
 /*
 TODO UPDATE THIS SCHEMA - CURRENTLY OUT OF DATE
@@ -94,7 +95,7 @@ function embedColor(starcount, threshold) {
 }
 
 async function generateEmbed(message, starcount, starThreshold) {
-  const guildmember = message.guild.member(message.author);
+  const guildmember = message.guild.members.cache.get(message.author);
   let image = '';
   const embed = new Discord.MessageEmbed()
     .setColor(embedColor(starcount, starThreshold))
@@ -143,7 +144,7 @@ function generateEmoji(starcount, threshold) {
 // function to get stars on a message and optional starboard message, but exclude stars from the original author.
 // returns an array of userids (for use with starsGivenUpdater())
 async function retrieveStarGivers(message, starboardMsg) {
-  const PKData = await message.pkQuery();
+  const PKData = await pkQuery(message);
   const starreacts = await message.reactions.cache.get('⭐');
   const usrArr = [];
   if (starreacts) {
@@ -213,7 +214,7 @@ async function queryByStarboard(id, botdb) {
 
 async function blockCheck(message, botdb) {
   let isBlocked = false;
-  await message.pkQuery();
+  message.PKData = await pkQuery(message);
   // first check if the message is explicitly blocked in starboard_message_policies.
   await botdb.get('SELECT * FROM starboard_message_policies WHERE original_msg = ? AND allow_starboard = ?', message.id, false)
     .then(result => {
@@ -249,7 +250,7 @@ policy options are: 'true' (allow direct to starboard posting)
 'false' (item not permitted to go to starboard)
 */
 async function policyCheck(message, botdb) {
-  await message.pkQuery();
+  message.PKData = await pkQuery(message);
   // initialize the effective policy to true (post is starrable and does not need an ask)
   let effectivePolicy = true;
   // get an arr of policy objects; check for guild, channel, and msg level objects to parse through.
@@ -285,7 +286,7 @@ async function policyCheck(message, botdb) {
 async function publicOnStar(message, botdb, force = false) {
   if (!config.starboardChannelId || !config.starboardToggle || config.starboardIgnoreChannels.includes(message.channel.id)) return;
   // initialize PK data for message.
-  await message.pkQuery();
+  message.PKData = await pkQuery(message);
   // check if user or message are on the blocklist
   if(await blockCheck(message, botdb)) return;
   const starboardChannel = await message.client.channels.fetch(config.starboardChannelId);
@@ -305,9 +306,10 @@ async function publicOnStar(message, botdb, force = false) {
       const urlfield = message.embeds[0].fields.find(field => {
         return field.name == 'Source';
       });
-      const target = { chanID: messageRegEx.exec(urlfield.value)[1], msgID: messageRegEx.exec(urlfield.value)[2] };
-      await botdb.run('DELETE FROM starboard WHERE original_msg = ?', target.msgID);
-      await botdb.run('DELETE FROM starboard_stars WHERE original_msg = ?', target.msgID);
+      // chanId not currently used, but the regex pulls it trivially, so it's a prop of target for future use.
+      const target = { chanId: messageRegEx.exec(urlfield.value)[1], msgId: messageRegEx.exec(urlfield.value)[2] };
+      await botdb.run('DELETE FROM starboard WHERE original_msg = ?', target.msgId);
+      await botdb.run('DELETE FROM starboard_stars WHERE original_msg = ?', target.msgId);
       return;
     }
   }
@@ -326,7 +328,7 @@ async function publicOnStar(message, botdb, force = false) {
       // starcount is above the threshold from when it was starboarded and star count has changed. generate new embed and add data to db.
       const starboardEmbed = await generateEmbed(message, starcount, dbdata.starthreshold);
       const starboardEmoji = generateEmoji(starcount, dbdata.starthreshold);
-      starboardMsg.edit(`${starboardEmoji} **${starcount}** ${message.channel}`, starboardEmbed);
+      starboardMsg.edit({ content: `${starboardEmoji} **${starcount}** ${message.channel}`, embeds: [starboardEmbed] });
     }
     else if (starcount < dbdata.starthreshold) {
       // item has dropped below its original threshold of star reacts. Delete from starboard and db.
@@ -350,7 +352,7 @@ async function publicOnStar(message, botdb, force = false) {
       // item is new starboard candidate. generate embed and message
       const starboardEmbed = await generateEmbed(message, starcount, config.starThreshold);
       const starboardEmoji = generateEmoji(starcount, config.starThreshold);
-      const starboardMsg = await starboardChannel.send(`${starboardEmoji} **${starcount}** ${message.channel}`, starboardEmbed);
+      const starboardMsg = await starboardChannel.send({ content: `${starboardEmoji} **${starcount}** ${message.channel}`, embeds: [starboardEmbed] });
       // update starboard_stars table and starboard table
       await starsGivenUpdater(message, usrArr, botdb);
       return await botdb.run('INSERT INTO starboard(original_msg,starboard_msg,channel,author,starthreshold) VALUES(?,?,?,?,?)',
@@ -419,7 +421,7 @@ async function publicBlockUser(user, guild, botdb) {
 async function publicBlockMsg(message, botdb) {
   // exempting/blocking a specific message requires us to check if there's a starboard message already.
   try {
-    await message.pkQuery();
+    message.PKData = await pkQuery(message);
     let dbdata;
     let alreadyBlocked;
     const starboardChannel = await message.client.channels.fetch(config.starboardChannelId);
@@ -489,10 +491,10 @@ async function publicUnblockMessage(message, botdb) {
 
 async function getMessageFromURL(url, client) {
   const messageRegEx = /(?:(?:https*:\/\/)*.*discord.*\/channels\/)\d+\/(\d+)\/(\d+)/;
-  const target = { chanID: messageRegEx.exec(url)[1], msgID: messageRegEx.exec(url)[2] };
+  const target = { chanId: messageRegEx.exec(url)[1], msgId: messageRegEx.exec(url)[2] };
   try {
-    target.chan = await client.channels.fetch(target.chanID);
-    target.msg = await target.chan.messages.fetch(target.msgID);
+    target.chan = await client.channels.fetch(target.chanId);
+    target.msg = await target.chan.messages.fetch(target.msgId);
     return target.msg;
   }
   catch {
@@ -501,7 +503,7 @@ async function getMessageFromURL(url, client) {
 }
 
 async function publicChanPolicyChange(message, channel, change, botdb) {
-  await message.pkQuery();
+  message.PKData = await pkQuery(message);
   let changePolicy;
   // delete any old policy entry.
   await botdb.run('DELETE FROM starboard_policies WHERE author = ? AND snowflake = ?', getAuthorAccount(message), channel.id);
@@ -524,7 +526,7 @@ async function publicChanPolicyChange(message, channel, change, botdb) {
 }
 
 async function publicServPolicyChange(message, change, usrScope, botdb) {
-  await message.pkQuery();
+  message.PKData = await pkQuery(message);
   let changePolicy;
   let type;
   if (usrScope == 'server') {
@@ -591,7 +593,7 @@ async function publicMigrator(fromChannel, toChannel, replyChannel, botdb) {
   let lastSeenMessage = 0;
   let loopbreaker = 0;
   let prevLastSeen;
-  while (fromChannel.lastMessageID != lastSeenMessage && loopbreaker < 2) {
+  while (fromChannel.lastMessageId != lastSeenMessage && loopbreaker < 2) {
     prevLastSeen = lastSeenMessage;
     await fromChannel.messages.fetch({ limit: 100, after: lastSeenMessage }).then(async messagearr => {
       for (const oldStarboardMsg of messagearr.values()) {
@@ -602,7 +604,7 @@ async function publicMigrator(fromChannel, toChannel, replyChannel, botdb) {
           });
           if (urlfield && urlfield.value) {targetmsg = await getMessageFromURL(urlfield.value, fromChannel.client);}
           if (targetmsg) {
-            await targetmsg.pkQuery();
+            targetmsg.PKData = await pkQuery(targetmsg);
             let starThreshold;
             const usrArr = await retrieveStarGivers(targetmsg, oldStarboardMsg);
             // to account for possible differences in star threshold over time, we will assume that any message OVER the current threshold uses the current threshold...
@@ -624,7 +626,7 @@ async function publicMigrator(fromChannel, toChannel, replyChannel, botdb) {
         }
       }
     });
-    // if the last message in a channel was deleted, there will be a mismatch in channel.lastMessageID, leading to an infinite loop.
+    // if the last message in a channel was deleted, there will be a mismatch in channel.lastMessageId, leading to an infinite loop.
     // if that happens, since lastSeenMessage isn't being changed, this conditional will break the loop after 2 tries.
     if (prevLastSeen === lastSeenMessage) {
       loopbreaker++;
@@ -645,7 +647,7 @@ async function publicMigrator(fromChannel, toChannel, replyChannel, botdb) {
     if (starcount >= dbdata.starthreshold && starcount > 0) {
       const starboardEmbed = await generateEmbed(originalMsg, starcount, dbdata.starthreshold);
       const starboardEmoji = generateEmoji(starcount, dbdata.starthreshold);
-      const newStarboardMsg = await toChannel.send(`${starboardEmoji} **${starcount}** ${originalChannel}`, starboardEmbed);
+      const newStarboardMsg = await toChannel.send({ content: `${starboardEmoji} **${starcount}** ${originalChannel}`, embeds: starboardEmbed });
       const starArr = await botdb.all('SELECT stargiver FROM starboard_starsmigrator WHERE original_msg = ?', originalMsg.id);
       for (const { stargiver } of starArr) {
       // for each item of this the array from the migratorstars table, compare to usrArr...

@@ -25,13 +25,13 @@ module.exports = {
       const AIRLOCK_PRUNE_KICKMESSAGE = config.airlockPruneMessage ? config.airlockPruneMessage : 'Kicked during airlock prune';
       const AIRLOCK_CHANNEL = config.airlockChannel;
       const currentGuildUsrs = await message.guild.members.cache;
-      const canKick = await message.guild.me.hasPermission('KICK_MEMBERS');
+      const canKick = await message.guild.me.permissions.has('KICK_MEMBERS');
       const pruneNow = Boolean(args[0] == 'y');
       const now = moment.utc();
       let outMsg = '';
 
       // Loop through any airlock channels to find the last post date of airlock users
-      const airlockChannels = await client.channels.cache.filter(channel => channel.viewable && !channel.deleted && channel.type == 'text' && channel.name.includes(AIRLOCK_CHANNEL));
+      const airlockChannels = await client.channels.cache.filter(channel => channel.viewable && !channel.deleted && channel.type == 'GUILD_TEXT' && channel.name.includes(AIRLOCK_CHANNEL));
       for (const channel of airlockChannels) {
         await channel[1].messages.fetch().then(messages => {
           //          messages = messages.filter(m => m.member.roles.cache.has(AIRLOCK_ROLE_ID));

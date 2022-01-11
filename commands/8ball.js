@@ -35,6 +35,6 @@ module.exports = {
       .setDescription(`${message.author} asked a question of my magic 8-ball.`)
       .addField(':question: **Question**', `*${args.join(' ')}*`)
       .addField(':8ball: **Answer**', answer);
-    message.channel.send(Magic8ballembed);
+    message.channel.send({ embeds: [Magic8ballembed] });
   },
 };

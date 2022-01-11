@@ -12,8 +12,8 @@ module.exports = {
   staffOnly: true,
   args: false,
   async execute(message) {
-    const gID = message.guild.id;
-    if (!dataLog[gID]) return console.log('xlsLog requested for server I have no data for.');
+    const gId = message.guild.id;
+    if (!dataLog[gId]) return console.log('xlsLog requested for server I have no data for.');
     // Date formatter function & storing var for the current month
     function formatDate(timestamp) {
       const messageDate = new Date(timestamp);
@@ -61,10 +61,10 @@ module.exports = {
     // init column headers, then loop through json and populate the headers.
     const msgLogColHeaders = [];
     const usrLogColHeaders = [];
-    Object.keys(dataLog[gID]).forEach(cID => {
-      if (dataLog[gID][cID].numMessages) {
+    Object.keys(dataLog[gId]).forEach(cId => {
+      if (dataLog[gId][cId].numMessages) {
         // get message data for each channel in the guild
-        const numMsgData = new Map(dataLog[gID][cID].numMessages);
+        const numMsgData = new Map(dataLog[gId][cId].numMessages);
         for (const key of numMsgData.keys()) {
           if (!msgLogColHeaders.some(h => h === key)) {
             msgLogColHeaders.push(key);
@@ -72,9 +72,9 @@ module.exports = {
           }
         }
       }
-      if (dataLog[gID][cID].uniqueUsers) {
+      if (dataLog[gId][cId].uniqueUsers) {
         // get user data for each channel
-        const usrData = new Map(dataLog[gID][cID].uniqueUsers);
+        const usrData = new Map(dataLog[gId][cId].uniqueUsers);
         for (const key of usrData.keys()) {
           if (!usrLogColHeaders.some(h => h === key)) {
             usrLogColHeaders.push(key);
@@ -100,14 +100,14 @@ module.exports = {
 
     const msgRowData = [];
     const usrRowData = [];
-    Object.keys(dataLog[gID]).forEach(cID => {
+    Object.keys(dataLog[gId]).forEach(cId => {
       let chanCreationDate = '';
-      if (!isNaN(parseInt(cID))) { chanCreationDate = formatDate(new Date((parseInt(cID) / 4194304) + 1420070400000)); }
-      if (dataLog[gID][cID].numMessages) {
+      if (!isNaN(parseInt(cId))) { chanCreationDate = formatDate(new Date((parseInt(cId) / 4194304) + 1420070400000)); }
+      if (dataLog[gId][cId].numMessages) {
         // console.log(chanCreationDate);
         const newMsgRow = {};
         // get msg data
-        let numMsgData = new Map(dataLog[gID][cID].numMessages);
+        let numMsgData = new Map(dataLog[gId][cId].numMessages);
         for (const month of msgLogColHeaders.slice(1)) {
           // add 0ed months for months after the creationdate of the channel
           if (!numMsgData.has(month) && month.localeCompare(chanCreationDate) >= 0) {
@@ -117,7 +117,7 @@ module.exports = {
         }
         numMsgData = [...numMsgData.entries()];
         numMsgData.sort();
-        numMsgData.splice(0, 0, ['Channels', `#${dataLog[gID][cID].channelName}`]);
+        numMsgData.splice(0, 0, ['Channels', `#${dataLog[gId][cId].channelName}`]);
         numMsgData = new Map(numMsgData);
         numMsgData.forEach((value, key) => {
           return newMsgRow[key] = value;
@@ -125,10 +125,10 @@ module.exports = {
         msgRowData.push(newMsgRow);
       }
       // message log rows are filled and will be added after this loop is over. Now do the same for user data
-      if (dataLog[gID][cID].uniqueUsers) {
+      if (dataLog[gId][cId].uniqueUsers) {
         const newUsrRow = {};
         // get user data for each channel
-        let usrData = new Map(dataLog[gID][cID].uniqueUsers);
+        let usrData = new Map(dataLog[gId][cId].uniqueUsers);
         for (const month of usrLogColHeaders.slice(1)) {
           if (!usrData.has(month) && month.localeCompare(chanCreationDate) >= 0) {
             // month is on or after chanCreationDate
@@ -137,7 +137,7 @@ module.exports = {
         }
         usrData = [...usrData.entries()];
         usrData.sort();
-        usrData.splice(0, 0, ['Channels', `#${dataLog[gID][cID].channelName}`]);
+        usrData.splice(0, 0, ['Channels', `#${dataLog[gId][cId].channelName}`]);
         usrData = new Map(usrData);
         usrData.forEach((value, key) => {
           return newUsrRow[key] = value;
@@ -168,7 +168,7 @@ module.exports = {
     usrRowData.sort((a, b) => a.Channels.localeCompare(b.Channels));
     usrLogSheet.addRows(usrRowData);
     const totalUsrRow = { Channels: 'Serverwide Active Users:' };
-    const guildUniques = new Map(dataLog[gID].guildUniqueUsers);
+    const guildUniques = new Map(dataLog[gId].guildUniqueUsers);
     usrLogSheet.columns.forEach((column) => {
       column.alignment = { horizontal:'center' };
       if (column.key != 'Channels') totalUsrRow[column.key] = guildUniques.get(column.key);
@@ -181,7 +181,7 @@ module.exports = {
 
     usrLogSheet.addRow();
     const guildTotUsrRow = { Channels: 'Total users @ EOM:' };
-    const guildTotUsers = new Map(dataLog[gID].guildTotalUsers);
+    const guildTotUsers = new Map(dataLog[gId].guildTotalUsers);
     usrLogSheet.columns.forEach((column) => {
       if (column.key != 'Channels') guildTotUsrRow[column.key] = guildTotUsers.get(column.key);
     });

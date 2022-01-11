@@ -2,6 +2,7 @@ const path = require('path');
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
 const Discord = require('discord.js');
+const fetch = require('node-fetch');
 
 // function to determine if a user's permission level - returns null, 'comrade', or 'staff'
 function getPermLevel(message) {
@@ -34,7 +35,7 @@ async function dmCollector(dmChannel) {
   let reply = false;
   // awaitmessages needs a filter but we're just going to accept the first reply it gets.
   const filter = m => (m.author.id === dmChannel.recipient.id);
-  await dmChannel.awaitMessages(filter, { max: 1, time: 180000, errors: ['time'] })
+  await dmChannel.awaitMessages({ filter, max: 1, time: 180000, errors: ['time'] })
     // this method creates a collection; since there is only one entry we get the data from collected.first
     .then(collected => reply = collected.first())
     .catch(err => dmChannel.send('Sorry, I waited 3 minutes with no response. You will need to start over.'));
@@ -63,9 +64,11 @@ async function promptForMessage(dmChannel, handler) {
     const result = await handler(reply);
     if (result === 'retry') {
       continue;
-    } else if (result === 'abort') {
+    }
+    else if (result === 'abort') {
       return false;
-    } else {
+    }
+    else {
       return result;
     }
   }
@@ -86,24 +89,71 @@ async function promptYesNo(dmChannel, options) {
   return promptForMessage(dmChannel, (reply) => {
     const content = reply.content.trim();
     switch (content.toLowerCase()) {
-      case 'n':
-      case 'no':
-        if (options.messages.no) dmChannel.send(options.messages.no);
-        return {answer: false};
-      case 'y':
-      case 'yes':
-        if (options.messages.yes) dmChannel.send(options.messages.yes);
-        return {answer: true};
-      case 'cancel':
-        if (options.messages.cancel) dmChannel.send(options.messages.cancel);
-        return 'abort';
-      case false:
-        return 'retry';
-      default:
-        if (options.messages.invalid) dmChannel.send(options.messages.invalid);
-        return 'retry';
+    case 'n':
+    case 'no':
+      if (options.messages.no) dmChannel.send(options.messages.no);
+      return { answer: false };
+    case 'y':
+    case 'yes':
+      if (options.messages.yes) dmChannel.send(options.messages.yes);
+      return { answer: true };
+    case 'cancel':
+      if (options.messages.cancel) dmChannel.send(options.messages.cancel);
+      return 'abort';
+    case false:
+      return 'retry';
+    default:
+      if (options.messages.invalid) dmChannel.send(options.messages.invalid);
+      return 'retry';
     }
   });
+}
+
+/**
+* Asyncronously updates the pluralkit properties of the message it is run from.
+* @method pkQuery()
+* @param {Object} message The message object to be tested for PK info.
+* @param {boolean} [force=false] Whether to skip any cached data and make a new request from the PK API.
+* @returns {Object} returns the PKData props of the message. Property values will be null if it is not a PK message.
+*/
+async function pkQuery(message, force = false) {
+  if (!message.author.bot) {
+    message.PKData = {
+      author: null,
+      system: null,
+      systemMember: null,
+    };
+    return message.PKData;
+  }
+  if (!force && message.pkCached) return message.PKData;
+  const pkAPIurl = 'https://api.pluralkit.me/v1/msg/' + message.id;
+  try {
+    let pkResponse = await fetch(pkAPIurl);
+    if (pkResponse.headers.get('content-type').includes('application/json')) {
+      message.isPKMessage = true;
+      pkResponse = await pkResponse.json();
+      try { message.PKData.author = await message.guild.members.fetch(pkResponse.sender);}
+      catch (err) { message.PKData.author = await message.client.users.fetch(pkResponse.sender);}
+      message.PKData.system = pkResponse.system;
+      message.PKData.systemMember = pkResponse.member;
+      message.pkCached = true;
+      return message.PKData;
+    }
+  }
+  catch (err) {
+    console.log('Error caching PK data on message at:\n' + this.url + '\nError:\n' + err + '\nPK Data for message not cached. Will try again next time pkQuery is called.');
+    return message.PKData = {
+      author: null,
+      system: null,
+      systemMember: null,
+    };
+  }
+  message.pkCached = true;
+  return message.PKData = {
+    author: null,
+    system: null,
+    systemMember: null,
+  };
 }
 
 module.exports = {
@@ -111,4 +161,5 @@ module.exports = {
   dmCollector,
   promptForMessage,
   promptYesNo,
+  pkQuery,
 };

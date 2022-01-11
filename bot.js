@@ -3,7 +3,6 @@ require('console-stamp')(console, { format: ':date(mm/dd/yy HH:MM:ss)' });
 const fs = require('fs');
 const configPath = './config.json';
 let config = undefined;
-const wait = require('util').promisify(setTimeout);
 const fsp = fs.promises;
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
@@ -107,24 +106,25 @@ CONFIG_FILENAMES.forEach(filename => {
 });
 
 const Discord = require('discord.js');
-const myIntents = new Discord.Intents();
+const myIntents = new Discord.Intents(32767);
 const counting = require('./counting.js');
 const disboard = require('./disboard.js');
 const listPath = './gamelist.json';
 const gameList = require(listPath);
 const dataLogger = require('./datalog.js');
-const fetch = require('node-fetch');
-const eventDataPath = './events.json';
-if (fs.existsSync(eventDataPath)) { global.eventData = require(eventDataPath);}
+// const fetch = require('node-fetch');
+// const eventDataPath = './events.json';
+// if (fs.existsSync(eventDataPath)) { global.eventData = require(eventDataPath);}
 const voteDataPath = './votes.json';
 if (fs.existsSync(voteDataPath)) {global.voteData = require(voteDataPath);}
 const moment = require('moment-timezone');
 const vettingLimitPath = './commands/vettinglimit.js';
 const starboard = require('./starboard.js');
-const { getPermLevel } = require('./extras/common.js');
+const { getPermLevel, pkQuery } = require('./extras/common.js');
 
 // Extend guild with music details accessed by the .yt command.
-Discord.Structures.extend('Guild', Guild => {
+// TODO: Structures removed :(
+/* Discord.Structures.extend('Guild', Guild => {
   class MusicGuild extends Guild {
     constructor(client, data) {
       super(client, data);
@@ -140,10 +140,11 @@ Discord.Structures.extend('Guild', Guild => {
     }
   }
   return MusicGuild;
-});
+}); */
 
 // Extending message objects to allow pluralkit integration.
-Discord.Structures.extend('Message', Message => {
+// TODO: Structures removed :(
+/* Discord.Structures.extend('Message', Message => {
 /**
 * Represents a message with pluralkit data appended. Call the pkQuery method to update props.
 * @extends {Message}
@@ -152,7 +153,7 @@ Discord.Structures.extend('Message', Message => {
 * @prop {Object} PKMessage.PKData.system       - data from pk about the plural system this message is from.
 * @prop {Object} PKMessage.PKData.systemMember - data from pk about the system member this message is from.
 */
-  class PKMessage extends Message {
+/*  class PKMessage extends Message {
     constructor(client, data, channel) {
       super(client, data, channel);
       this.pkCached = false;
@@ -169,7 +170,7 @@ Discord.Structures.extend('Message', Message => {
     * @param {boolean} [force=false] Whether to skip any cached data and make a new request from the PK API.
     * @returns {Object} returns the PKData props of the message. Property values will be null if it is not a PK message.
     */
-    async pkQuery(force = false) {
+/*    async pkQuery(force = false) {
       if (!this.author.bot) {
         this.PKData = {
           author: null,
@@ -206,11 +207,11 @@ Discord.Structures.extend('Message', Message => {
     }
   }
   return PKMessage;
-});
+}); */
 
 // initialize client, commands, command cooldown collections
-myIntents.add(Discord.Intents.NON_PRIVILEGED, 'GUILD_MEMBERS');
-const client = new Discord.Client({ ws: { intents: myIntents } });
+// myIntents.add(Discord.Intents.NON_PRIVILEGED, 'GUILD_MEMBERS');
+const client = new Discord.Client({ intents: myIntents });
 client.commands = new Discord.Collection();
 const cooldowns = new Discord.Collection();
 // since the datalogger takes some time to cache messages, especially on larger servers, create a global check digit to block unwanted processing of new messages during datalogging
@@ -281,9 +282,8 @@ client.on('ready', async () => {
   });
   starboard.onReady(botdb);
   // wait 1000ms without holding up the rest of the script. This way we can ensure recieving all guild invite info.
-  await wait(1000);
   client.guilds.cache.forEach(g => {
-    g.fetchInvites().then(guildInvites => {
+    g.invites.fetch().then(guildInvites => {
       invites[g.id] = guildInvites;
     });
     if (g.vanityURLCode) {
@@ -301,7 +301,7 @@ client.on('ready', async () => {
 client.on('channelCreate', async channel => {
   if (fs.existsSync(vettingLimitPath)) {
     const vettingLimit = require(vettingLimitPath);
-    if (vettingLimit.VettingLimitCheck && config.airlockChannel && channel.type === 'text') {
+    if (vettingLimit.VettingLimitCheck && config.airlockChannel && channel.type === 'GUILD_TEXT') {
       if (await channel.name.includes(config.airlockChannel)) {
         vettingLimit.VettingLimitCheck (channel, client);
       }
@@ -316,7 +316,7 @@ client.on('userUpdate', async (oldUser, newUser) => {
     if (config.avatarLogAirlockOnlyToggle && config.roleComrade) {
       for (let g of await client.guilds.cache) {
         g = g[1];
-        const member = await g.member(newUser.id);
+        const member = await g.members.cache.get(newUser.id);
         if (await member.roles.cache.has(config.roleComrade)) {
           return;
         }
@@ -346,12 +346,12 @@ client.on('userUpdate', async (oldUser, newUser) => {
       msgEmbed.setDescription('Profile Picture Removed:');
       msgEmbed.setImage(nullPFP);
     }
-    avatarLogChannel.send({ content: ':exclamation: <@' + newUser.id + '> changed their profile picture:', embed: msgEmbed });
+    avatarLogChannel.send({ content: ':exclamation: <@' + newUser.id + '> changed their profile picture:', embeds: [msgEmbed] });
   }
 });
 
 // command parser
-client.on('message', async message => {
+client.on('messageCreate', async message => {
   // Check for disboard bump messages in a configured channel to schedule a reminder
   disboard.BumpReminder(config, message);
 
@@ -367,16 +367,16 @@ client.on('message', async message => {
 
   // only do datalogging on non-DM text channels. Don't log messages while offline retrieval is proceeding.
   // (offline logging will loop and catch new messages on the fly.)
-  if (message.channel.type === 'text' && client.dataLogLock != 1) { dataLogger.OnMessage(message, config); }
+  if (message.channel.type === 'GUILD_TEXT' && client.dataLogLock != 1) { dataLogger.OnMessage(message, config); }
   if(counting.HandleMessage(message)) {
     return;
   }
   // cache PKData for message.
-  await message.pkQuery();
+  pkQuery(message);
   const permLevel = getPermLevel(message);
   // prevent parsing commands without correct prefix, from bots, and from non-staff non-comrades.
   if (!message.content.startsWith(config.prefix) || (message.author.bot && !message.isPKMessage)) return;
-  if (message.channel.type == 'text' && !(permLevel == 'staff' || permLevel == 'comrade')) return;
+  if (message.channel.type == 'GUILD_TEXT' && !(permLevel == 'staff' || permLevel == 'comrade')) return;
   const args = message.content.slice(config.prefix.length).split(/ +/);
   let commandName = args.shift().toLowerCase();
 
@@ -392,7 +392,7 @@ client.on('message', async message => {
   if (!command) return;
 
   // check if command is server only; prevent it from being run in DMs if so.
-  if (command.guildOnly && message.channel.type !== 'text') { return await message.reply('I can\'t execute that command inside DMs!'); }
+  if (command.guildOnly && message.channel.type !== 'GUILD_TEXT') { return await message.reply('I can\'t execute that command inside DMs!'); }
 
   // check permission level of command. Prevent staffonly commands from being run by non-staff.
   if (command.staffOnly && permLevel != 'staff') return;
@@ -440,7 +440,7 @@ client.on('message', async message => {
 client.on('inviteCreate', async () => {
   // console.log('invite created!');
   client.guilds.cache.forEach(async g => {
-    g.fetchInvites().then(guildInvites => {
+    g.invites.fetch().then(guildInvites => {
       invites[g.id] = guildInvites;
     });
   });
@@ -471,7 +471,7 @@ client.on('guildMemberAdd', async member => {
       await member.guild.fetchVanityData().then(vanityData => {
         if (vanityInvites[member.guild.id] && vanityData.uses > vanityInvites[member.guild.id].uses && vanityData.uses != 0) {
           msgEmbed.setDescription(`Created: ${creationDate}\nInvite: **${member.guild.vanityURLCode}** \nUses: **${member.guild.vanityURLUses}**`);
-          logChannel.send({ content: ':inbox_tray: <@' + member.id + '> joined!', embed: msgEmbed });
+          logChannel.send({ content: ':inbox_tray: <@' + member.id + '> joined!', embeds: [msgEmbed] });
           usedVanityCode = 1;
         }
         // update vanity cache for this guild
@@ -483,7 +483,7 @@ client.on('guildMemberAdd', async member => {
     }
     if (!usedVanityCode) {
       // since vanityinvites weren't incremented, go ahead and load the current invite list.
-      await member.guild.fetchInvites().then(guildInvites => {
+      await member.guild.invites.fetch().then(guildInvites => {
         let invite = new Discord.Collection();
         const knownInvites = new Map(config.knownInvites);
         try {
@@ -525,7 +525,7 @@ client.on('guildMemberAdd', async member => {
         }
         // Update the cached invites for the guild.
         invites[member.guild.id] = guildInvites;
-        logChannel.send({ content: ':inbox_tray: <@' + member.id + '> joined!', embed: msgEmbed });
+        logChannel.send({ content: ':inbox_tray: <@' + member.id + '> joined!', embeds: [msgEmbed] });
       });
     }
   }
@@ -553,7 +553,7 @@ client.on('guildMemberRemove', async member => {
       return console.log(err);
     }
   });
-  if(global.eventData.userTimeZones[member.id]) {
+  /* if(global.eventData.userTimeZones[member.id]) {
     delete global.eventData.userTimeZones[member.id];
     await fsp.writeFile(eventDataPath, JSON.stringify(global.eventData, null, 2, function(err) {
       if (err) {
@@ -562,7 +562,7 @@ client.on('guildMemberRemove', async member => {
       }
     }));
     exitConLog += ' Removed userdata from events.json.';
-  }
+  } */
   console.log(exitConLog);
 });
 

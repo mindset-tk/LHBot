@@ -29,7 +29,7 @@ module.exports = {
       return;
     }
     // Test if user is already banned. If so, report it and return.
-    const banList = await message.guild.fetchBans();
+    const banList = await message.guild.bans.fetch();
     const bannedUser = banList.get(bantarget);
     if (bannedUser) {
       message.channel.send('User ' + targetuser.tag + ' already appears on the ban list for this server!');
