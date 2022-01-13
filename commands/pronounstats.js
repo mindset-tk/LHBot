@@ -6,14 +6,15 @@ module.exports = {
   guildOnly: true,
   staffOnly: true,
   args: false,
-  async execute(message, args, client) {
+  async execute(message) {
 
     function round(number) {
       return Math.round(((number * 100) + Number.EPSILON) * 100) / 100;
     }
 
     let content = '__**Pronoun Role Usage:**__\n';
-    const fullMemberList = await message.guild.members.fetch();
+    await message.guild.members.fetch();
+    const membersMinusBots = await message.guild.members.cache.filter(u => !u.user.bot);
     // Detect pronoun roles by searching for ones with a slash in them. Might update this later to let people exclude certain roles ig? This is fine for our purposes right now
     const pronounRoles = await message.guild.roles.cache.filter(role => role.name.includes('/') || role.name.toLowerCase().includes('pronoun')).sort((a, b) => a.name.localeCompare(b.name));
     // Get total # of members with and without at least one pronoun role
@@ -22,7 +23,7 @@ module.exports = {
     const totalRolesApplied = pronounRoles.reduce((prevVal, role) => prevVal + role.members.size, 0);
 
     // Iterate through each pronoun role to get the stats for it
-    for (curRole of pronounRoles) {
+    for (let curRole of pronounRoles) {
       curRole = curRole[1];
       // Create a new collection without the current role (for exclusive sizing)
       const otherRoles = pronounRoles.filter(r => r.name !== curRole.name);
@@ -45,7 +46,7 @@ module.exports = {
   `> Total Applied: ${totalRolesApplied}
   > Members with: ${membersWithPronounRoles}
   > Members without: ${membersWithoutPronounRoles}
-  > Total Server Members: ${fullMemberList.size}`;
+  > Total Server Members (excluding bots): ${membersMinusBots.size}`;
 
     // And, send
     message.channel.send(content);

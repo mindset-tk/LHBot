@@ -25,9 +25,9 @@ function convertToD(dice, sides, mod) {
 }
 
 async function getnickname(message, client) {
-  const user = client.users.cache.get(message.author.id);
+  const user = await client.users.fetch(message.author.id);
   const guild = message.guild;
-  const guildmember = guild.members.cache.get(user);
+  const guildmember = await guild.members.fetch(user);
   return guildmember.displayName;
 }
 

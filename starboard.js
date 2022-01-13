@@ -100,10 +100,10 @@ async function generateEmbed(message, starcount, starThreshold) {
   const embed = new Discord.MessageEmbed()
     .setColor(embedColor(starcount, starThreshold))
     // if guildmember is null (eg, because person has left the guild or is a PK bot, use their raw username)
-    .setAuthor(guildmember ? guildmember.displayName : message.author.username, message.author.displayAvatarURL())
+    .setAuthor({ name: (guildmember ? guildmember.displayName : message.author.username), url: message.author.displayAvatarURL() })
     .setDescription(message.content)
     .addField('Source', '[Jump!](' + message.url + ')')
-    .setFooter(`${message.author.username}${(message.author.discriminator && message.author.discriminator != '0000') ? `#${message.author.discriminator}` : '' }`)
+    .setFooter({ text: `${message.author.username}${(message.author.discriminator && message.author.discriminator != '0000') ? `#${message.author.discriminator}` : '' }` })
     .setTimestamp(message.createdTimestamp);
   if (message.attachments.size > 0) {
     // will only work on the first image, currently.
@@ -214,7 +214,7 @@ async function queryByStarboard(id, botdb) {
 
 async function blockCheck(message, botdb) {
   let isBlocked = false;
-  message.PKData = await pkQuery(message);
+  await pkQuery(message);
   // first check if the message is explicitly blocked in starboard_message_policies.
   await botdb.get('SELECT * FROM starboard_message_policies WHERE original_msg = ? AND allow_starboard = ?', message.id, false)
     .then(result => {
@@ -250,7 +250,7 @@ policy options are: 'true' (allow direct to starboard posting)
 'false' (item not permitted to go to starboard)
 */
 async function policyCheck(message, botdb) {
-  message.PKData = await pkQuery(message);
+  await pkQuery(message);
   // initialize the effective policy to true (post is starrable and does not need an ask)
   let effectivePolicy = true;
   // get an arr of policy objects; check for guild, channel, and msg level objects to parse through.
@@ -286,7 +286,7 @@ async function policyCheck(message, botdb) {
 async function publicOnStar(message, botdb, force = false) {
   if (!config.starboardChannelId || !config.starboardToggle || config.starboardIgnoreChannels.includes(message.channel.id)) return;
   // initialize PK data for message.
-  message.PKData = await pkQuery(message);
+  await pkQuery(message);
   // check if user or message are on the blocklist
   if(await blockCheck(message, botdb)) return;
   const starboardChannel = await message.client.channels.fetch(config.starboardChannelId);
@@ -421,7 +421,7 @@ async function publicBlockUser(user, guild, botdb) {
 async function publicBlockMsg(message, botdb) {
   // exempting/blocking a specific message requires us to check if there's a starboard message already.
   try {
-    message.PKData = await pkQuery(message);
+    await pkQuery(message);
     let dbdata;
     let alreadyBlocked;
     const starboardChannel = await message.client.channels.fetch(config.starboardChannelId);
@@ -503,7 +503,7 @@ async function getMessageFromURL(url, client) {
 }
 
 async function publicChanPolicyChange(message, channel, change, botdb) {
-  message.PKData = await pkQuery(message);
+  await pkQuery(message);
   let changePolicy;
   // delete any old policy entry.
   await botdb.run('DELETE FROM starboard_policies WHERE author = ? AND snowflake = ?', getAuthorAccount(message), channel.id);
@@ -526,7 +526,7 @@ async function publicChanPolicyChange(message, channel, change, botdb) {
 }
 
 async function publicServPolicyChange(message, change, usrScope, botdb) {
-  message.PKData = await pkQuery(message);
+  await pkQuery(message);
   let changePolicy;
   let type;
   if (usrScope == 'server') {
@@ -604,7 +604,7 @@ async function publicMigrator(fromChannel, toChannel, replyChannel, botdb) {
           });
           if (urlfield && urlfield.value) {targetmsg = await getMessageFromURL(urlfield.value, fromChannel.client);}
           if (targetmsg) {
-            targetmsg.PKData = await pkQuery(targetmsg);
+            await pkQuery(targetmsg);
             let starThreshold;
             const usrArr = await retrieveStarGivers(targetmsg, oldStarboardMsg);
             // to account for possible differences in star threshold over time, we will assume that any message OVER the current threshold uses the current threshold...

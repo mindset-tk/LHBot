@@ -40,11 +40,11 @@ exports.init = function(client) {
       }
       const bookmarkEmbed = new Discord.MessageEmbed()
         .setColor('#0099ff')
-        .setAuthor(embedAuthor, message.author.displayAvatarURL())
+        .setAuthor({ name: embedAuthor, url: message.author.displayAvatarURL() })
         .setDescription(message.content + '\n\n [jump to message](' + message.url + ')')
-        .setFooter('Bookmarked message was sent at ' + messagesent + ' UTC')
+        .setFooter({ text: 'Bookmarked message was sent at ' + messagesent + ' UTC' })
         .setImage(image);
-      user.send({ contents: `🔖: - from ${message.channel}`, embeds: bookmarkEmbed });
+      user.send({ contents: `🔖: - from ${message.channel}`, embeds: [bookmarkEmbed] });
       return;
     }
   });

@@ -117,6 +117,9 @@ async function promptYesNo(dmChannel, options) {
 * @returns {Object} returns the PKData props of the message. Property values will be null if it is not a PK message.
 */
 async function pkQuery(message, force = false) {
+  if (!message.PKData) {
+    message.PKData = {};
+  }
   if (!message.author.bot) {
     message.PKData = {
       author: null,
@@ -142,18 +145,20 @@ async function pkQuery(message, force = false) {
   }
   catch (err) {
     console.log('Error caching PK data on message at:\n' + this.url + '\nError:\n' + err + '\nPK Data for message not cached. Will try again next time pkQuery is called.');
-    return message.PKData = {
+    message.PKData = {
       author: null,
       system: null,
       systemMember: null,
     };
+    return message.PKData;
   }
   message.pkCached = true;
-  return message.PKData = {
+  message.PKData = {
     author: null,
     system: null,
     systemMember: null,
   };
+  return message.PKData;
 }
 
 module.exports = {

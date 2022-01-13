@@ -23,13 +23,13 @@ module.exports = {
   args: true,
   async execute(message, args, client, config) {
     if(args.length != 1) {
-      message.channel.send("Try using my help command to learn how to set counting.");
+      message.channel.send('Try using my help command to learn how to set counting.');
       return;
     }
 
     const number = parseInt(args[0]);
     if(!number) {
-      message.channel.send("Sorry, I can't set counting to " + args[0] + " because it isn't a number");
+      message.channel.send('Sorry, I can\'t set counting to ' + args[0] + ' because it isn\'t a number');
       return;
     }
 

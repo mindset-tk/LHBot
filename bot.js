@@ -372,7 +372,7 @@ client.on('messageCreate', async message => {
     return;
   }
   // cache PKData for message.
-  pkQuery(message);
+  await pkQuery(message);
   const permLevel = getPermLevel(message);
   // prevent parsing commands without correct prefix, from bots, and from non-staff non-comrades.
   if (!message.content.startsWith(config.prefix) || (message.author.bot && !message.isPKMessage)) return;
