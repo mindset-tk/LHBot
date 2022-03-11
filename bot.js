@@ -108,7 +108,7 @@ CONFIG_FILENAMES.forEach(filename => {
 const Discord = require('discord.js');
 const myIntents = new Discord.Intents(32767);
 const counting = require('./counting.js');
-const disboard = require('./disboard.js');
+// const disboard = require('./disboard.js'); temp disabled
 const listPath = './gamelist.json';
 const gameList = require(listPath);
 const dataLogger = require('./datalog.js');
@@ -118,7 +118,6 @@ const dataLogger = require('./datalog.js');
 const voteDataPath = './votes.json';
 if (fs.existsSync(voteDataPath)) {global.voteData = require(voteDataPath);}
 const moment = require('moment-timezone');
-const vettingLimitPath = './commands/vettinglimit.js';
 const starboard = require('./starboard.js');
 const { getPermLevel, pkQuery } = require('./extras/common.js');
 
@@ -297,17 +296,6 @@ client.on('ready', async () => {
   });
 });
 
-// set up listener for channel creation events
-client.on('channelCreate', async channel => {
-  if (fs.existsSync(vettingLimitPath)) {
-    const vettingLimit = require(vettingLimitPath);
-    if (vettingLimit.VettingLimitCheck && config.airlockChannel && channel.type === 'GUILD_TEXT') {
-      if (await channel.name.includes(config.airlockChannel)) {
-        vettingLimit.VettingLimitCheck (channel, client);
-      }
-    }
-  }
-});
 
 // set up listener for user update events
 client.on('userUpdate', async (oldUser, newUser) => {
@@ -352,7 +340,8 @@ client.on('userUpdate', async (oldUser, newUser) => {
 
 // command parser
 client.on('messageCreate', async message => {
-  // Check for disboard bump messages in a configured channel to schedule a reminder
+  /* Check for disboard bump messages in a configured channel to schedule a reminder
+  * TODO: D.JS 13 pass; determine if needed in future.
   disboard.BumpReminder(config, message);
 
   // VettingLimit: listen for lobby panel message
@@ -363,7 +352,7 @@ client.on('messageCreate', async message => {
         vettingLimit.VettingPanelCheck(message);
       }
     }
-  }
+  }*/
 
   // only do datalogging on non-DM text channels. Don't log messages while offline retrieval is proceeding.
   // (offline logging will loop and catch new messages on the fly.)

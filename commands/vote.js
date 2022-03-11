@@ -109,11 +109,6 @@ class VoteManager {
 
       if (endingVotes.length > 0) {
         for (const vote of endingVotes) {
-          /* const voteAge = moment.duration(now.diff(vote.due));
-          // Discard votes we missed for more than 5 minutes
-          if (voteAge.asMinutes() >= 5) {
-            break;
-          } */
           const destChannel = await this.client.channels.fetch(vote.channel);
           if (!destChannel) {
             console.log('Got vote for unknown channel', vote.channel);
@@ -125,6 +120,7 @@ class VoteManager {
           totals.forEach((v, k) => resultString += `${k} : ${v}\n`);
           // send vote results to channel
           await destChannel.send(`In the matter of '${vote.summary}', the vote results are: \n ${resultString}`);
+          await destChannel.messages.fetch(vote.message).then(async msg => msg.reactions.removeAll());
         }
       }
     }
@@ -325,6 +321,7 @@ module.exports = {
         invalid: 'Reply not recognized! Please answer Y or N.',
       },
     });
+    if (!result || !result.answer) return false;
     voteData.channel = message.channel.id;
     voteData.creator = message.author.id;
     voteData.guild = message.guild.id;
