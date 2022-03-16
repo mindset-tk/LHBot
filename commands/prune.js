@@ -66,7 +66,7 @@ function requireUncached(module) {
   return require(module);
 }
 
-async function addToPrune(args, message, client) {
+async function addToPrune(args, message) {
 
   // Get users' temporarily stored roles
   const pruneStorage = requireUncached(pruneStoragePath);
@@ -187,7 +187,7 @@ async function pruneRestore(args, message) {
   if (!args || args.length === 0) {
     // Do they intend to restore all people in limbo?
     message.channel.send('Restore the roles of anyone currently waiting to be pruned and clean up?');
-    let reply = await msgCollector(message);
+    const reply = await msgCollector(message);
     if (!reply) { return; }
     if (reply.content.toLowerCase() == 'n' || reply.content.toLowerCase() == 'no') {
       return message.channel.send('Okay! No changes have been made');
@@ -461,7 +461,7 @@ async function prunePrep(args, message, client) {
     else {
       message.channel.send(`This will affect **${usersToPrune.length}** member(s) in this spreadsheet that haven't posted in at least **${maxTimeSinceActive} month(s)**. Are you sure you want to move ahead with removing all their (non-pronoun) roles and put them in a pruning channel?`);
     }
-    let reply = await msgCollector(message);
+    const reply = await msgCollector(message);
     if (!reply) { return; }
     if (reply.content.toLowerCase() !== 'y' && reply.content.toLowerCase() !== 'yes') {
       return message.channel.send('Prune canceled');
@@ -583,7 +583,7 @@ async function pruneFinish(message) {
 
   // Make sure they want to kick for sure!
   message.channel.send(`Are you 100% sure you want to kick **${toPrune.length} member(s) now**?`);
-  let reply = await msgCollector(message);
+  const reply = await msgCollector(message);
   if (!reply) { return; }
   if (reply.content.toLowerCase() !== 'y' && reply.content.toLowerCase() !== 'yes') {
     return message.channel.send('Okay! No changes were made.');

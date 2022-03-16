@@ -34,7 +34,7 @@ function writeConfig(cfg) {
 }
 
 // initialize or load any configs the a new instance doesn't start with to avoid breaking
-const CONFIG_FILENAMES = ['config.json', 'counting.json', 'gamelist.json', 'datalog.json', 'prunestorage.json'];
+const CONFIG_FILENAMES = ['config.json', 'counting.json', 'gamelist.json', 'prunestorage.json'];
 CONFIG_FILENAMES.forEach(filename => {
 
   if (filename != 'config.json') {
@@ -111,7 +111,6 @@ const counting = require('./counting.js');
 // const disboard = require('./disboard.js'); temp disabled
 const listPath = './gamelist.json';
 const gameList = require(listPath);
-const dataLogger = require('./datalog.js');
 // const fetch = require('node-fetch');
 // const eventDataPath = './events.json';
 // if (fs.existsSync(eventDataPath)) { global.eventData = require(eventDataPath);}
@@ -272,13 +271,6 @@ client.on('ready', async () => {
   }
   if (config.currentActivity) { client.user.setActivity(config.currentActivity.Name, { type: config.currentActivity.Type }); }
   counting.OnReady(config, client);
-  // Lock datalog while caching offline messages. When that finishes, the callback will unlock the log.
-  client.dataLogLock = 1;
-  console.log('Fetching offline messages...');
-  dataLogger.OnReady(config, client, function() {
-    client.dataLogLock = 0;
-    console.log('Offline message fetch complete!');
-  });
   starboard.onReady(botdb);
   // wait 1000ms without holding up the rest of the script. This way we can ensure recieving all guild invite info.
   client.guilds.cache.forEach(g => {
@@ -354,9 +346,6 @@ client.on('messageCreate', async message => {
     }
   }*/
 
-  // only do datalogging on non-DM text channels. Don't log messages while offline retrieval is proceeding.
-  // (offline logging will loop and catch new messages on the fly.)
-  if (message.channel.type === 'GUILD_TEXT' && client.dataLogLock != 1) { dataLogger.OnMessage(message, config); }
   if(counting.HandleMessage(message)) {
     return;
   }

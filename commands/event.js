@@ -12,7 +12,7 @@ const config = require(configPath);
 const moment = require('moment-timezone');
 const tz = require('../extras/timezones');
 const eventDataPath = path.resolve('./events.json');
-const { promptForMessage, promptYesNo } = require('../extras/common.js');
+const { promptForMessage, promptYesNo, pkQuery } = require('../extras/common.js');
 
 let eventInfoChannel = null;
 
@@ -366,8 +366,8 @@ class EventManager {
     this.tick().then(() => {
       // Ensure we're always at (or close to) the 'top' of a minute when we run our tick
       const topOfMinute = 60000 - (Date.now() % 60000);
-      this.timer = this.client.setTimeout(() => {
-        this.timer = this.client.setInterval(() => this.tick(), 60000);
+      this.timer = setTimeout(() => {
+        this.timer = setInterval(() => this.tick(), 60000);
         this.tick();
       }, topOfMinute);
     });
@@ -803,7 +803,7 @@ function DMembedEvent(event, guild, options = {}) {
   eventEmbed
     .addField('Creator', `<@${event.owner}>`)
     .addField('Channel', `<#${event.channel}>`)
-    .setFooter('Event')
+    // .setFooter('Event')
     .setTimestamp(event.due.toISOString());
   if (event.description) {
     eventEmbed.addField('Description', event.description);
@@ -813,7 +813,7 @@ function DMembedEvent(event, guild, options = {}) {
 }
 
 async function editCommand(message, client, name) {
-  const guildmember = message.guild.member(message.author);
+  const guildmember = message.guild.members.cache.get(message.author);
   if (!name) {
     return message.channel.send(
       'You must specify which event you want to edit.',
@@ -1132,7 +1132,7 @@ async function editCommand(message, client, name) {
 }
 
 async function deleteCommand(message, client, name) {
-  const guildmember = message.guild.member(message.author);
+  const guildmember = message.guild.members.cache.get(message.author);
   if (!name) {
     return message.channel.send(
       'You must specify which event you want to delete.',
@@ -1239,16 +1239,14 @@ async function listCommand(message, client, timeZone) {
         ${eventList}`,
     )
     .setFooter(
-      `All event times are in ${getTimeZoneCanonicalDisplayName(timeZone)}.` +
-        (timeZone
-          ? ''
-          : ` Use ${config.prefix}event list [timezone] to show in a different time zone.`),
+      { text:`All event times are in ${getTimeZoneCanonicalDisplayName(timeZone)}. ${timeZone ? '' : ` Use ${config.prefix}event list [timezone] to show in a different time zone.`}` },
     );
-  return message.channel.send('Here are the upcoming events:', embed);
+
+  return message.channel.send({ content: 'Here are the upcoming events:', embeds: [embed] });
 }
 
 async function servertzCommand(message, client, timeZone) {
-  const member = message.guild.member(message.author);
+  const member = message.guild.members.cache.get(message.author);
   if (!timeZone) {
     const defaultTimeZone = getGuildTimeZone(message.guild);
     return message.channel.send(
@@ -1395,7 +1393,7 @@ async function leaveCommand(message, client, eventName) {
 }
 
 async function updateInfoPostCommand(message, client, retry = false) {
-  const member = message.guild.member(message.author);
+  const member = message.guild.members.cache.get(message.author);
   if (!member.roles.cache.has(config.roleStaff)) {
     return message.channel.send(
       'Only staff can force the event info to be updated.',
@@ -1792,7 +1790,7 @@ Staff can add users to the event by hand simply by giving any user the associate
   staffOnly: false,
   args: true,
   async execute(message, args, client) {
-    await message.pkQuery();
+    await pkQuery(message);
     if (message.isPKMessage) {
       return message.reply(
         'Unfortunately, due to how roles work in Discord, the event system cannot be accessed by PluralKit webhooks at this time.',
