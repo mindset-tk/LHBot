@@ -1,7 +1,8 @@
 // This file houses all the modules for playing audio through voice chat.
 // Primarily it will play youtube audio, but with a little work it can be
 // extended to other sources
-const Discord = require('discord.js');
+// NOTE: currently commented out. TODO: convert for discord.js 13 - will need full rewrite.
+/* const Discord = require('discord.js');
 const YouTube = require('simple-youtube-api');
 const ytdl = require('ytdl-core-discord');
 const path = require('path');
@@ -9,14 +10,35 @@ const configPath = path.resolve('./config.json');
 const config = require(configPath);
 const wait = require('util').promisify(setTimeout);
 const { getPermLevel } = require('../extras/common.js');
+const { joinVoiceChannel } = require('@discordjs/voice'); */
 
-let YT;
+// Extend guild with music details accessed by the .yt command.
+// TODO: Structures removed :(
+/* Discord.Structures.extend('Guild', Guild => {
+  class MusicGuild extends Guild {
+    constructor(client, data) {
+      super(client, data);
+      this.musicData = {
+        queue: [],
+        isPlaying: false,
+        volume: 0.2,
+        songDispatcher: null,
+        voiceChannel: null,
+        voiceTextChannel: null,
+        nowPlaying: null,
+      };
+    }
+  }
+  return MusicGuild;
+}); */
+
+/* let YT;
 if (!config.youTubeAPIKey) {
   console.log('No youtube API Key set! until it is set by editing config.json, the YT voice features will not work.');
 }
-else { YT = new YouTube(config.youTubeAPIKey); }
+else { YT = new YouTube(config.youTubeAPIKey); } */
 
-module.exports = {
+/* module.exports = {
   name: 'yt',
   description: 'Play any song or playlist from youtube in the voice channel you\'re currently in.',
   aliases: ['play'],
@@ -43,6 +65,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
   guildOnly: true,
   cooldown: 0.1,
   async execute(message, args, client) {
+    let musicSettings = client.musicData.get(message.guild.id);
     const permLevel = getPermLevel(message);
     if (!YT) { return message.channel.send('I can\'t perform that function until a Youtube API Key is set in the config file.'); }
 
@@ -86,32 +109,32 @@ If the bot is the only user in a voice channel when it finishes playback of the 
       if (parseInt(args[1]) > 0) {
         waitTime = parseInt(args[1]) * 60000;
         message.channel.send(`Locking out ${config.prefix}yt commands for ${minsAndSeconds(waitTime)}. Use ${config.prefix}yt timeout stop or ${config.prefix}yt timeout 0 will clear the time out early.`);
-        message.guild.musicData.timeOutExp = now + waitTime;
+        musicSettings.timeOutExp = now + waitTime;
         setTimeout(() => {
-          if (message.guild.musicData.timeOutExp != 0) {
-            message.guild.musicData.timeOutExp = 0;
+          if (musicSettings.timeOutExp != 0) {
+            musicSettings.timeOutExp = 0;
             message.channel.send(`${config.prefix}yt command unlocked.`);
           }
         }, waitTime);
-        message.guild.musicData.volume = 0.2;
-        message.guild.musicData.songDispatcher = null;
-        message.guild.musicData.nowPlaying = null;
-        message.guild.musicData.isPlaying = false;
-        if (message.guild.musicData.voiceChannel) {
-          message.guild.musicData.voiceChannel.leave();
-          resizeIfNeeded(message.guild.musicData.voiceChannel, 'decrement');
+        musicSettings.volume = 0.2;
+        musicSettings.songDispatcher = null;
+        musicSettings.nowPlaying = null;
+        musicSettings.isPlaying = false;
+        if (musicSettings.voiceChannel) {
+          musicSettings.voiceChannel.leave();
+          resizeIfNeeded(musicSettings.voiceChannel, 'decrement');
           return;
         }
         return;
       }
       if (args[1].toLowerCase() == 'stop' || parseInt(args[1]) == 0) {
-        message.guild.musicData.timeOutExp = 0;
+        musicSettings.timeOutExp = 0;
         return message.channel.send(`${config.prefix}yt command unlocked.`);
       }
     }
 
-    if (message.guild.musicData.timeOutExp > now && args[0].toLowerCase() != 'timeout' && permLevel != 'staff') {
-      const timeLeft = (message.guild.musicData.timeOutExp - now);
+    if (musicSettings.timeOutExp > now && args[0].toLowerCase() != 'timeout' && permLevel != 'staff') {
+      const timeLeft = (musicSettings.timeOutExp - now);
       return message.channel.send(`Sorry, the ${config.prefix}yt command is locked out for ${minsAndSeconds(timeLeft)} more minutes.`);
     }
 
@@ -141,24 +164,24 @@ If the bot is the only user in a voice channel when it finishes playback of the 
     if (!mypermissions.has(['VIEW_CHANNEL', 'CONNECT', 'SPEAK'])) {
       return message.channel.send(`Sorry, I don't have permissions to join ${voiceChannel}.`);
     }
-    /*
-    else if (voiceChannel.full) {
-      return message.channel.send(`Sorry, ${voiceChannel} is full!`);
-    }
-    */
+    // else if (voiceChannel.full) {
+    //  return message.channel.send(`Sorry, ${voiceChannel} is full!`);
+    //}
+
     else if (!voiceChannel.joinable) {
       try { voiceChannel.join(); }
       catch(err) { console.log(`Unable to join voice channel ID ${voiceChannel.id} due to following error: ${err}`); }
       return message.channel.send(`I couldn't join ${voiceChannel}, but I'm not sure why. Please see log for details.`);
     }
-    if ((message.guild.musicData.isPlaying == true && voiceChannel != message.guild.musicData.voiceChannel) && permLevel != 'staff') {
+    if ((musicSettings.isPlaying == true && voiceChannel != musicSettings.voiceChannel) && permLevel != 'staff') {
       if (!safeCommands.includes(args[0])) {
         return message.channel.send(`Sorry, I'm already playing in another voice channel! I can only be in one voice channel at a time. The **${config.prefix}yt stop** command will forcibly end playback, but please be conscientious of other users!`);
       }
     }
 
     async function playSong(queue) {
-      await message.guild.musicData.voiceChannel.join().then(async connection => {
+      joinVoiceChannel();
+      await musicSettings.voiceChannel.join().then(async connection => {
         try {
           const dispatcher = connection
             .play(
@@ -168,13 +191,13 @@ If the bot is the only user in a voice channel when it finishes playback of the 
                 // buffer 32MB prior to playing.
                 highWaterMark: 1024 * 1024 * 32,
               }),
-              { volume: message.guild.musicData.volume, type: 'opus' },
+              { volume: musicSettings.volume, type: 'opus' },
             )
             .on('start', () => {
               dispatcher.setBitrate(96);
-              message.guild.musicData.songDispatcher = dispatcher;
-              message.guild.musicData.songDispatcher.pausedTime = null;
-              // dispatcher.setVolume(message.guild.musicData.volume);
+              musicSettings.songDispatcher = dispatcher;
+              musicSettings.songDispatcher.pausedTime = null;
+              // dispatcher.setVolume(musicSettings.volume);
               // ugly spacer line in the .setDescription in order to account for a known discord issue where mobile clients see embeds as long and 0-width
               const videoEmbed = new Discord.MessageEmbed()
                 .setThumbnail(queue[0].thumbnail)
@@ -187,14 +210,14 @@ If the bot is the only user in a voice channel when it finishes playback of the 
                 .addField('Link:', queue[0].url);
                 // also display next song title, if there is one in queue
               if (queue[1]) videoEmbed.addField('Next Song:', queue[1].title);
-              message.guild.musicData.voiceTextChannel.send({ embeds: [videoEmbed] });
+              musicSettings.voiceTextChannel.send({ embeds: [videoEmbed] });
               // dequeue the song.
-              return message.guild.musicData.nowPlaying = queue.shift();
+              return musicSettings.nowPlaying = queue.shift();
             })
             .on('finish', async () => {
-              // if there are more songs in queue, and the voice channel has at least one user other than the bot, continue playing
+              // if there are more songs in queue, and the voice channel has at least one user other than the bot, continueplaying
               const VCUsersNotMe = [];
-              message.guild.musicData.voiceChannel.members.forEach((value, key) => {
+              musicSettings.voiceChannel.members.forEach((value, key) => {
                 if (key != client.user.id) {
                   VCUsersNotMe.push(key);
                 }
@@ -204,49 +227,49 @@ If the bot is the only user in a voice channel when it finishes playback of the 
               }
               // else if there are no more songs in queue, leave the voice channel after 60 seconds.
               else {
-                message.guild.musicData.songDispatcher = null;
-                message.guild.musicData.nowPlaying = null;
-                message.guild.musicData.isPlaying = false;
+                musicSettings.songDispatcher = null;
+                musicSettings.nowPlaying = null;
+                musicSettings.isPlaying = false;
                 if (VCUsersNotMe.length == 0) {
-                  message.guild.musicData.volume = 0.2;
-                  message.guild.musicData.voiceTextChannel.send('Seems like nobody is listening. Goodbye!');
-                  message.guild.musicData.voiceChannel.leave();
+                  musicSettings.volume = 0.2;
+                  musicSettings.voiceTextChannel.send('Seems like nobody is listening. Goodbye!');
+                  musicSettings.voiceChannel.leave();
                 }
                 await wait(60000);
-                if (!message.guild.musicData.isPlaying) {
-                  message.guild.musicData.volume = 0.2;
-                  message.guild.musicData.voiceChannel.leave();
-                  resizeIfNeeded(message.guild.musicData.voiceChannel, 'decrement');
+                if (!musicSettings.isPlaying) {
+                  musicSettings.volume = 0.2;
+                  musicSettings.voiceChannel.leave();
+                  resizeIfNeeded(musicSettings.voiceChannel, 'decrement');
                   return;
                 }
               }
             })
             .on('error', async e => {
-              message.guild.musicData.voiceTextChannel.send('Error playing a song. See console log for details. Skipping to next song...');
+              musicSettings.voiceTextChannel.send('Error playing a song. See console log for details. Skipping to next song...');
               console.error('Youtube playback error! Error Details: ', e);
-              if (message.guild.musicData.nowPlaying) console.error('Song playing at time of error: ', message.guild.musicData.nowPlaying);
+              if (musicSettings.nowPlaying) console.error('Song playing at time of error: ', musicSettings.nowPlaying);
               if (queue[0]) console.error('Video at top of queue: ', queue[0]);
               if (queue.length > 0) {
                 return await playSong(queue);
               }
               else {
-                message.guild.musicData.isPlaying = false;
-                message.guild.musicData.volume = 0.2;
-                message.guild.musicData.songDispatcher = null;
-                message.guild.musicData.nowPlaying = null;
-                return message.guild.musicData.voiceChannel.leave();
+                musicSettings.isPlaying = false;
+                musicSettings.volume = 0.2;
+                musicSettings.songDispatcher = null;
+                musicSettings.nowPlaying = null;
+                return musicSettings.voiceChannel.leave();
               }
             });
         }
         catch(err) {
-          message.guild.musicData.voiceTextChannel.send('Whoops, there was an error in playback. Check console log for details.  Resetting youtube queue.');
+          musicSettings.voiceTextChannel.send('Whoops, there was an error in playback. Check console log for details.  Resetting youtube queue.');
           console.log('Video playback error!', err);
-          message.guild.musicData.volume = 0.2;
-          message.guild.musicData.songDispatcher = null;
-          message.guild.musicData.nowPlaying = null;
-          message.guild.musicData.isPlaying = false;
-          message.guild.musicData.voiceChannel.leave();
-          resizeIfNeeded(message.guild.musicData.voiceChannel, 'decrement');
+          musicSettings.volume = 0.2;
+          musicSettings.songDispatcher = null;
+          musicSettings.nowPlaying = null;
+          musicSettings.isPlaying = false;
+          musicSettings.voiceChannel.leave();
+          resizeIfNeeded(musicSettings.voiceChannel, 'decrement');
           return;
         }
       });
@@ -286,7 +309,7 @@ If the bot is the only user in a voice channel when it finishes playback of the 
         addedBy,
       };
       // push the song into the queue.
-      message.guild.musicData.queue.push(song);
+      musicSettings.queue.push(song);
       // delete the original message to save space.
       message.delete();
       // not using YT playlists so this is debug stuff for now.
@@ -295,8 +318,8 @@ If the bot is the only user in a voice channel when it finishes playback of the 
       // message.channel.send(`Video title: ${video.title} ${playlist ? `\n Playlist title: ${playlist.title}` : ''}`);
 
       // if nothing is playing yet
-      if (!message.guild.musicData.isPlaying) {
-        message.guild.musicData.volume = 0.2;
+      if (!musicSettings.isPlaying) {
+        musicSettings.volume = 0.2;
         // If the bot is being called to a user-capped voice channel, try to increment it.
         // Returning false means "it's limited but I can't increment the users"
         if (resizeIfNeeded(voiceChannel, 'increment') === 0) {
@@ -304,30 +327,30 @@ If the bot is the only user in a voice channel when it finishes playback of the 
         }
         // edge case if staff initiated video play from outside of the #voice-chat channels, bot will default to the first voice chat channel.
         if (!config.voiceTextChannelIds.includes(message.channel.id)) {
-          message.guild.musicData.voiceTextChannel = await client.channels.fetch(config.voiceTextChannelIds[0]);
+          musicSettings.voiceTextChannel = await client.channels.fetch(config.voiceTextChannelIds[0]);
         }
-        else { message.guild.musicData.voiceTextChannel = message.channel; }
-        message.guild.musicData.voiceChannel = voiceChannel;
-        message.guild.musicData.isPlaying = true;
-        return await playSong(message.guild.musicData.queue);
+        else { musicSettings.voiceTextChannel = message.channel; }
+        musicSettings.voiceChannel = voiceChannel;
+        musicSettings.isPlaying = true;
+        return await playSong(musicSettings.queue);
       }
       // if something is already playing
-      else if (message.guild.musicData.isPlaying == true) {
+      else if (musicSettings.isPlaying == true) {
         return message.channel.send(`${addedBy} added :musical_note: ${song.title} :musical_note: to the queue!`);
       }
     }
     if ((query.match(isPlaylist) || query.match(isPlaylist)) && args.length > 1) { return message.channel.send(`Too many arguments! Please try **${config.prefix}help yt** for help.`); }
     if (args[0].toLowerCase() == 'list' && !args[1]) {
-      if (!message.guild.musicData.isPlaying) { return message.channel.send('Nothing is currently playing!'); }
+      if (!musicSettings.isPlaying) { return message.channel.send('Nothing is currently playing!'); }
       const titleArray = [];
-      message.guild.musicData.queue.map(obj => {
+      musicSettings.queue.map(obj => {
         titleArray.push(obj.title);
       });
       const queueEmbed = new Discord.MessageEmbed()
         .setColor('#ff7373')
         .setTitle('Youtube Playlist')
         .setDescription('\u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B \u200B ')
-        .addField('Now Playing', `${ message.guild.musicData.nowPlaying.title}`);
+        .addField('Now Playing', `${ musicSettings.nowPlaying.title}`);
       const queueData = [];
       if (titleArray.length == 0) {queueData.push('There are no songs in queue after the current song.'); }
       for (let i = 0; i < titleArray.length; i++) {
@@ -337,27 +360,27 @@ If the bot is the only user in a voice channel when it finishes playback of the 
       return message.channel.send({ embeds: [queueEmbed] });
     }
     else if (args[0].toLowerCase() == 'list' && args[1].toLowerCase() == 'clear') {
-      message.guild.musicData.queue.length = 0;
+      musicSettings.queue.length = 0;
       return message.channel.send('Cleared all songs queued after the current playing song.');
     }
     else if (args[0].toLowerCase() == 'list' && args[1].toLowerCase() == 'remove') {
-      if (message.guild.musicData.queue.length == 0) {
+      if (musicSettings.queue.length == 0) {
         return message.channel.send('There are no songs in queue!');
       }
       if (args[2] && parseInt(args[2])) {
-        if (parseInt(args[2]) > message.guild.musicData.queue.length) {
-          return message.channel.send(`There are only ${ message.guild.musicData.queue.length} songs in queue!`);
+        if (parseInt(args[2]) > musicSettings.queue.length) {
+          return message.channel.send(`There are only ${ musicSettings.queue.length} songs in queue!`);
         }
         const removeIdx = parseInt(args[2]) - 1;
-        message.channel.send(`Removing ${message.guild.musicData.queue[removeIdx].title} from queue. Here is the new queue:`);
-        message.guild.musicData.queue.splice(removeIdx, 1);
+        message.channel.send(`Removing ${musicSettings.queue[removeIdx].title} from queue. Here is the new queue:`);
+        musicSettings.queue.splice(removeIdx, 1);
         const titleArray = [];
-        message.guild.musicData.queue.map(obj => {
+        musicSettings.queue.map(obj => {
           titleArray.push(obj.title);
         });
         const queueEmbed = new Discord.MessageEmbed()
           .setColor('#ff7373');
-        const queueData = [`**Now Playing**: ${ message.guild.musicData.nowPlaying.title}`];
+        const queueData = [`**Now Playing**: ${ musicSettings.nowPlaying.title}`];
         if (titleArray.length == 0) {queueData.push('There are no songs in queue after the current song.'); }
         for (let i = 0; i < titleArray.length; i++) {
           queueData.push(`**${i + 1}.** ${titleArray[i]}`);
@@ -368,66 +391,81 @@ If the bot is the only user in a voice channel when it finishes playback of the 
       else { return message.channel.send(`Please specify a single number to be removed. Use **${config.prefix}yt list** to see queue numbers.`); }
     }
     else if (args[0].toLowerCase() == 'pause' && !args[1]) {
-      if (!message.guild.musicData.songDispatcher) { return message.channel.send('There is no song playing right now!'); }
-      if (message.guild.musicData.songDispatcher.paused) { return message.channel.send('Playback is already paused!'); }
-      message.guild.musicData.songDispatcher.paused = true;
+      if (!musicSettings.songDispatcher) { return message.channel.send('There is no song playing right now!'); }
+      if (musicSettings.songDispatcher.paused) { return message.channel.send('Playback is already paused!'); }
+      musicSettings.songDispatcher.paused = true;
       message.channel.send('Song paused :pause_button:');
-      message.guild.musicData.songDispatcher.pause();
+      musicSettings.songDispatcher.pause();
       await wait(300000);
-      if (message.guild.musicData.songDispatcher.pausedTime && message.guild.musicData.songDispatcher.pausedTime >= 290000) {
-        message.guild.musicData.volume = 0.2;
-        message.guild.musicData.queue.length = 0;
-        message.guild.musicData.songDispatcher = null;
-        message.guild.musicData.nowPlaying = null;
-        message.guild.musicData.isPlaying = false;
-        message.guild.musicData.voiceChannel.leave();
-        resizeIfNeeded(message.guild.musicData.voiceChannel, 'decrement');
-        message.guild.musicData.voiceChannel = null;
+      if (musicSettings.songDispatcher.pausedTime && musicSettings.songDispatcher.pausedTime >= 290000) {
+        musicSettings.volume = 0.2;
+        musicSettings.queue.length = 0;
+        musicSettings.songDispatcher = null;
+        musicSettings.nowPlaying = null;
+        musicSettings.isPlaying = false;
+        musicSettings.voiceChannel.leave();
+        resizeIfNeeded(musicSettings.voiceChannel, 'decrement');
+        musicSettings.voiceChannel = null;
         return;
       }
     }
     else if ((args[0].toLowerCase() == 'play' || args[0].toLowerCase() == 'resume') && !args[1]) {
-      if (!message.guild.musicData.songDispatcher) { return message.channel.send('There is no song playing right now!'); }
-      if (!message.guild.musicData.songDispatcher.paused) { return message.channel.send('Playback is not paused!'); }
-      message.guild.musicData.songDispatcher.paused = false;
+      if (!musicSettings.songDispatcher) { return message.channel.send('There is no song playing right now!'); }
+      if (!musicSettings.songDispatcher.paused) { return message.channel.send('Playback is not paused!'); }
+      musicSettings.songDispatcher.paused = false;
       message.channel.send('Song resumed :play_pause:');
-      return message.guild.musicData.songDispatcher.resume();
+      return musicSettings.songDispatcher.resume();
     }
     else if (args[0].toLowerCase() == 'skip' && !args[1]) {
-      if (!message.guild.musicData.songDispatcher) { return message.channel.send('There is no song playing right now!'); }
-      message.channel.send(`Skipping ${ message.guild.musicData.nowPlaying.title}...`);
-      if (message.guild.musicData.queue.length < 1) {
+      if (!musicSettings.songDispatcher) { return message.channel.send('There is no song playing right now!'); }
+      message.channel.send(`Skipping ${ musicSettings.nowPlaying.title}...`);
+      if (musicSettings.queue.length < 1) {
         message.channel.send('Queue is empty. I will wait 1 minute before leaving the voice channel');
-        message.guild.musicData.songDispatcher.pause();
-        message.guild.musicData.isPlaying = false;
+        musicSettings.songDispatcher.pause();
+        musicSettings.isPlaying = false;
         await wait(60000);
-        if (message.guild.musicData.isPlaying == false) {
-          message.guild.musicData.volume = 0.2;
-          message.guild.musicData.songDispatcher = null;
-          message.guild.musicData.nowPlaying = null;
-          message.guild.musicData.isPlaying = false;
-          message.guild.musicData.voiceChannel.leave();
-          resizeIfNeeded(message.guild.musicData.voiceChannel, 'decrement');
+        if (musicSettings.isPlaying == false) {
+          musicSettings.volume = 0.2;
+          musicSettings.songDispatcher = null;
+          musicSettings.nowPlaying = null;
+          musicSettings.isPlaying = false;
+          musicSettings.voiceChannel.leave();
+          resizeIfNeeded(musicSettings.voiceChannel, 'decrement');
           return;
         }
       }
-      return await playSong(message.guild.musicData.queue);
+      return await playSong(musicSettings.queue);
     }
     else if (args[0].toLowerCase() == 'stop' && !args[1]) {
-      if (!message.guild.musicData.songDispatcher) { message.channel.send('Playback reset.'); }
+      if (!musicSettings.songDispatcher) { message.channel.send('Playback reset.'); }
       else { message.channel.send('Stopping playback. Goodbye!'); }
-      message.guild.musicData.volume = 0.2;
-      message.guild.musicData.queue.length = 0;
-      message.guild.musicData.songDispatcher = null;
-      message.guild.musicData.nowPlaying = null;
-      message.guild.musicData.isPlaying = false;
-      if (message.guild.musicData.voiceChannel) {
-        message.guild.musicData.voiceChannel.leave();
-        resizeIfNeeded(message.guild.musicData.voiceChannel, 'decrement');
+      musicSettings.volume = 0.2;
+      musicSettings.queue.length = 0;
+      musicSettings.songDispatcher = null;
+      musicSettings.nowPlaying = null;
+      musicSettings.isPlaying = false;
+      if (musicSettings.voiceChannel) {
+        musicSettings.voiceChannel.leave();
+        resizeIfNeeded(musicSettings.voiceChannel, 'decrement');
         return;
       }
       return;
     }
     else { return message.channel.send(`Invalid or too many arguments! Please try **${config.prefix}help yt** for help.`); }
   },
-};
+  async init(client) {
+    client.musicData = new Discord.Collection();
+    const musicDefaults = {
+      queue: [],
+      isPlaying: false,
+      volume: 0.2,
+      songDispatcher: null,
+      voiceChannel: null,
+      voiceTextChannel: null,
+      nowPlaying: null,
+    };
+    for (const guild of await client.guilds.fetch()) {
+      client.musicData.set(guild[1].id, musicDefaults);
+    }
+  },
+}; */

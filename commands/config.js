@@ -67,7 +67,7 @@ const configurableProps = [{ varName:'prefix', description:'Command Prefix', var
   { varName:'channelLobby', description:'Lobby channel', varType:'channel' },
   { varName:'countingToggle', description:'Toggle counting', varType:'boolean' },
   { varName:'countingChannelId', description:'Counting channel', varType:'channel' },
-  { varName:'questionChannelIds', description:'Text channel(s) for Thoughtful Question Generator', varType:'channelArray' },
+  // { varName:'questionChannelIds', description:'Text channel(s) for Thoughtful Question Generator', varType:'channelArray' },
   { varName:'voiceTextChannelIds', description:'Text channel(s) for voice commands', varType:'channelArray' },
   { varName:'voiceChamberDefaultSizes', description:'Default limits for size-limited channels', varType:'voiceChamberSettings' },
   { varName:'voiceChamberSnapbackDelay', description:'Minutes before cofigured voice channels revert once empty', varType:'integer' },
@@ -144,7 +144,6 @@ module.exports = {
 
     function outputConfig() {
       const ignoreChans = [];
-      const questionChans = config.questionChannelIds.map((id) => getChannelName(id));
       const voiceTextChans = [];
       const cfgVoiceChans = [];
       const starboardIgnoreChans = [];
@@ -197,10 +196,7 @@ Starboard: **${(config.starboardToggle) ? 'ON' : 'OFF'}**
 Starboard Channel: ${config.starboardChannelId ? `**#${getChannelName(config.starboardChannelId)}**` : 'Not set. Starboard functionality disabled.'}
 Star reaction threshold to post starboard: **${(config.starThreshold) ? config.starThreshold : (config.starboardChannelId) ? 'Not set. Starboard functionality disabled.' : 'N/A'}**
 Channels to ignore for starboarding: **${(config.starboardIgnoreChannels[0]) ? '#' + starboardIgnoreChans.join(', #') : 'None.'}**
-Channels considered private for starboarding (user must affirm they are OK with a post going to starboard): **${(config.starboardPrivateChannels[0]) ? '#' + starboardPrivateChans.join(', #') : 'None.'}**
-
-__Miscellaneous:__
-Thoughtful Question Generator channels: **${config.questionChannelIds[0] ? `#${questionChans.join(', #')}` : 'None.'}**`;
+Channels considered private for starboarding (user must affirm they are OK with a post going to starboard): **${(config.starboardPrivateChannels[0]) ? '#' + starboardPrivateChans.join(', #') : 'None.'}**`;
     }
     // initialize disallowed prefix characters. None of these will be permitted in any part of the command prefix.
     const disallowedPrefix = ['@', '#', '/', '\\', '\\\\', '*', '~', '_'];

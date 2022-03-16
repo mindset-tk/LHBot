@@ -100,24 +100,24 @@ async function generateEmbed(message, starcount, starThreshold) {
   const embed = new Discord.MessageEmbed()
     .setColor(embedColor(starcount, starThreshold))
     // if guildmember is null (eg, because person has left the guild or is a PK bot, use their raw username)
-    .setAuthor({ name: (guildmember ? guildmember.displayName : message.author.username), url: message.author.displayAvatarURL() })
+    .setAuthor({ name: (guildmember ? guildmember.displayName : message.author.username), iconURL: message.author.displayAvatarURL() })
     .setDescription(message.content)
     .addField('Source', '[Jump!](' + message.url + ')')
     .setFooter({ text: `${message.author.username}${(message.author.discriminator && message.author.discriminator != '0000') ? `#${message.author.discriminator}` : '' }` })
     .setTimestamp(message.createdTimestamp);
   if (message.attachments.size > 0) {
     // will only work on the first image, currently.
-    const isimage = /(jpg|jpeg|png|gif)/gi.test((message.attachments.array()[0].url).split('.').pop());
+    const isimage = /(jpg|jpeg|png|gif)/gi.test((message.attachments.first().url).split('.').pop());
     // don't add spoilered images to the embed as rich embeds cannot currently contain spoilered images. Prevents unspoilered NSFW/CW content from hitting starboard.
-    if (isimage && !message.attachments.array()[0].spoiler && message.attachments.size == 1) {
-      image = message.attachments.array()[0].url;
+    if (isimage && !message.attachments.first().spoiler && message.attachments.size == 1) {
+      image = message.attachments.first().url;
       embed.setImage(image);
     }
-    else if (message.attachments.array()[0].spoiler) {
-      embed.addField('Attachment', `||[${message.attachments.array()[0].name}](${message.attachments.array()[0].url})||`);
+    else if (message.attachments.first().spoiler) {
+      embed.addField('Attachment', `||[${message.attachments.first().name}](${message.attachments.first().url})||`);
     }
     else if (message.attachments.size == 1) {
-      embed.addField('Attachment', `[${message.attachments.array()[0].name}](${message.attachments.array()[0].url})`);
+      embed.addField('Attachment', `[${message.attachments.first().name}](${message.attachments.first().url})`);
     }
     else if (message.attachments.size > 1) {
       const descarr = [];
@@ -603,7 +603,7 @@ async function publicMigrator(fromChannel, toChannel, replyChannel, botdb) {
             return field.name == 'Source';
           });
           if (urlfield && urlfield.value) {targetmsg = await getMessageFromURL(urlfield.value, fromChannel.client);}
-          if (targetmsg) {
+          if (targetmsg && targetmsg.id) {
             await pkQuery(targetmsg);
             let starThreshold;
             const usrArr = await retrieveStarGivers(targetmsg, oldStarboardMsg);
@@ -637,37 +637,43 @@ async function publicMigrator(fromChannel, toChannel, replyChannel, botdb) {
   const migratordbdata = await botdb.all('SELECT * FROM starmigrator ORDER BY old_starboard_msg');
   // then run through each item, enumerate data about starboard and original post, and post in new starboard
   for (const dbdata of migratordbdata) {
-    const oldstarboardChannel = await fromChannel.client.channels.cache.get(dbdata.old_starboard_channel);
-    const originalChannel = await fromChannel.client.channels.cache.get(dbdata.channel);
-    const originalMsg = await originalChannel.messages.fetch(dbdata.original_msg);
-    const oldstarboardMsg = await oldstarboardChannel.messages.fetch(dbdata.starboard_msg);
-    const usrArr = await retrieveStarGivers(originalMsg, oldstarboardMsg);
-    const starcount = usrArr.length;
-    // checking if starcount is greater than 0; edge case relating to
-    if (starcount >= dbdata.starthreshold && starcount > 0) {
-      const starboardEmbed = await generateEmbed(originalMsg, starcount, dbdata.starthreshold);
-      const starboardEmoji = generateEmoji(starcount, dbdata.starthreshold);
-      const newStarboardMsg = await toChannel.send({ content: `${starboardEmoji} **${starcount}** ${originalChannel}`, embeds: starboardEmbed });
-      const starArr = await botdb.all('SELECT stargiver FROM starboard_starsmigrator WHERE original_msg = ?', originalMsg.id);
-      for (const { stargiver } of starArr) {
-      // for each item of this the array from the migratorstars table, compare to usrArr...
-        if (!usrArr.includes(stargiver)) {
-        // if usrArr passed to this function does not contain a migratorstars item, that must mean the user has removed their star.
-          await botdb.run('DELETE FROM starboard_starsmigrator WHERE original_msg = ? AND stargiver = ?', originalMsg.id, stargiver);
+    try {
+      const oldstarboardChannel = await fromChannel.client.channels.cache.get(dbdata.old_starboard_channel);
+      const originalChannel = await fromChannel.client.channels.cache.get(dbdata.channel);
+      const originalMsg = await originalChannel.messages.fetch(dbdata.original_msg);
+      const oldstarboardMsg = await oldstarboardChannel.messages.fetch(dbdata.starboard_msg);
+      const usrArr = await retrieveStarGivers(originalMsg, oldstarboardMsg);
+      const starcount = usrArr.length;
+      // checking if starcount is greater than 0; edge case relating to
+      if (starcount >= dbdata.starthreshold && starcount > 0) {
+        const starboardEmbed = await generateEmbed(originalMsg, starcount, dbdata.starthreshold);
+        const starboardEmoji = generateEmoji(starcount, dbdata.starthreshold);
+        const newStarboardMsg = await toChannel.send({ content: `${starboardEmoji} **${starcount}** ${originalChannel}`, embeds: [starboardEmbed] });
+        const starArr = await botdb.all('SELECT stargiver FROM starboard_starsmigrator WHERE original_msg = ?', originalMsg.id);
+        for (const { stargiver } of starArr) {
+          // for each item of this the array from the migratorstars table, compare to usrArr...
+          if (!usrArr.includes(stargiver)) {
+            // if usrArr passed to this function does not contain a migratorstars item, that must mean the user has removed their star.
+            await botdb.run('DELETE FROM starboard_starsmigrator WHERE original_msg = ? AND stargiver = ?', originalMsg.id, stargiver);
+          }
+          else {
+            // else if usrarr DOES contain the item, discard it.
+            usrArr.splice(usrArr.indexOf(stargiver), 1);
+          }
         }
-        else {
-        // else if usrarr DOES contain the item, discard it.
-          usrArr.splice(usrArr.indexOf(stargiver), 1);
+        if (usrArr.length > 0) {
+          // remaining items in usrArr do not exist in migratorstars table. attempt to insert into starboard_stars.
+          for (const usr of usrArr) {
+            await botdb.run('INSERT OR IGNORE INTO starboard_starsmigrator(original_msg, stargiver) VALUES(?,?)', originalMsg.id, usr);
+          }
         }
+        await botdb.run('INSERT INTO newstarboard(original_msg,starboard_msg,channel,author,starthreshold) VALUES(?,?,?,?,?)',
+          originalMsg.id, newStarboardMsg.id, originalMsg.channel.id, getAuthorAccount(originalMsg), config.starThreshold);
       }
-      if (usrArr.length > 0) {
-      // remaining items in usrArr do not exist in migratorstars table. attempt to insert into starboard_stars.
-        for (const usr of usrArr) {
-          await botdb.run('INSERT OR IGNORE INTO starboard_starsmigrator(original_msg, stargiver) VALUES(?,?)', originalMsg.id, usr);
-        }
-      }
-      await botdb.run('INSERT INTO newstarboard(original_msg,starboard_msg,channel,author,starthreshold) VALUES(?,?,?,?,?)',
-        originalMsg.id, newStarboardMsg.id, originalMsg.channel.id, getAuthorAccount(originalMsg), config.starThreshold);
+    }
+    catch (err) { 
+      console.error('Error during migration. Skipping the inciting post. Details below:');
+      console.error(err);
     }
   }
   await botdb.run('DROP TABLE IF EXISTS starboard');
