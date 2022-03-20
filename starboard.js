@@ -671,7 +671,7 @@ async function publicMigrator(fromChannel, toChannel, replyChannel, botdb) {
           originalMsg.id, newStarboardMsg.id, originalMsg.channel.id, getAuthorAccount(originalMsg), config.starThreshold);
       }
     }
-    catch (err) { 
+    catch (err) {
       console.error('Error during migration. Skipping the inciting post. Details below:');
       console.error(err);
     }
