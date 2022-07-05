@@ -4,7 +4,7 @@
   "description": "bot for pinning",
   "main": "bot.js",
   "dependencies": {
-    "@discordjs/opus": "^0.5.0",
+    "@discordjs/opus": "^0.8.0",
     "console-stamp": "^3.0.2",
     "discord.js": "^12.5.3",
     "exceljs": "^4.2.1",
