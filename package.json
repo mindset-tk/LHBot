@@ -10,7 +10,7 @@
     "exceljs": "^4.2.1",
     "ffmpeg-static": "^4.3.0",
     "fs": "^0.0.1-security",
-    "moment-timezone": "^0.5.33",
+    "moment-timezone": "^0.5.35",
     "node-fetch": "^2.6.1",
     "simple-youtube-api": "^5.2.1",
     "sqlite": "^4.0.21",
