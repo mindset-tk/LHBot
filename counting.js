@@ -1,3 +1,4 @@
+// TODO move anything important out of Config.json
 const fs = require('fs');
 const path = require('path');
 let config = null;

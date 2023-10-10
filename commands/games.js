@@ -6,7 +6,7 @@ const listPath = path.resolve('./gamelist.json');
 const gameList = require(listPath);
 const Discord = require('discord.js');
 const { getPermLevel } = require('../extras/common.js');
-
+// TODO sql-ify
 module.exports = {
   name: 'games',
   description: 'Display/manage rosters for the specified game or system.',
@@ -110,8 +110,8 @@ module.exports = {
           .setColor(gameList[system].embedColor)
           .setTitle(capitalize(system) + ' Roster')
           .setDescription('*Member Game Profiles for ' + capitalize(system) + '*')
-          .addField('Member', column1.join('\n'), true)
-          .addField('Account', column2.join('\n'), true);
+          .addFields([{ name: 'Member', value: column1.join('\n'), inline: true },
+            { name: 'Account', value: column2.join('\n'), inline: true }]);
         // try to include the embedicon for the system in question.  If this causes an error, log to console and continue sending the embed.
         if (gameList[system].embedIcon) {
           gameListEmbed.setThumbnail(gameList[system].embedIcon);

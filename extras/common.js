@@ -40,7 +40,7 @@ function getMessagePermLevel(message) {
     return 'staff';
   }
   if (message.isPKMessage) {
-    if (message.PKData.author.roles.cache.has(config.roleStaff) || message.PKData.author.permissions.has('ADMINISTRATOR')) {
+    if (message.PKData.author.roles.cache.has(config.roleStaff) || message.PKData.author.permissions.has(Discord.Permissions.FLAGS.ADMINISTRATOR)) {
       return 'staff';
     }
     else if (message.PKData.author.roles.cache.has(config.roleUser)) {
@@ -49,7 +49,7 @@ function getMessagePermLevel(message) {
     else {return null;}
   }
   else if (!message.isPKMessage && message.member) {
-    if (message.member.roles.cache.has(config.roleStaff) || message.member.permissions.has('ADMINISTRATOR')) {
+    if (message.member.roles.cache.has(config.roleStaff) || message.member.permissions.has(Discord.Permissions.FLAGS.ADMINISTRATOR)) {
       return 'staff';
     }
     else if (message.member.roles.cache.has(config.roleUser)) {
@@ -76,7 +76,7 @@ function getUserPermLevel(member, guild, client) {
     return 'staff';
   }
 
-  if (member.roles.cache.has(config.roleStaff) || member.permissions.has('ADMINISTRATOR')) {
+  if (member.roles.cache.has(config.roleStaff) || member.permissions.has(Discord.Permissions.FLAGS.ADMINISTRATOR)) {
     return 'staff';
   }
   else if (member.roles.cache.has(config.roleComrade)) {

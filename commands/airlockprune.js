@@ -2,6 +2,7 @@ const path = require('path');
 const configPath = path.resolve('./config.json');
 const config = require(configPath);
 const moment = require('moment-timezone');
+const { Permissions } = require('discord.js');
 
 function kickUser(user, reason) {
   user.send(`You've been kicked from **${user.guild.name}** with reason: "${reason}"`);
@@ -25,7 +26,7 @@ module.exports = {
       const AIRLOCK_PRUNE_KICKMESSAGE = config.airlockPruneMessage ? config.airlockPruneMessage : 'Kicked during airlock prune';
       const AIRLOCK_CHANNEL = config.airlockChannel;
       const currentGuildUsrs = await message.guild.members.cache;
-      const canKick = await message.guild.me.permissions.has('KICK_MEMBERS');
+      const canKick = await message.guild.members.me.permissions.has(Permissions.FLAGS.KICK_MEMBERS);
       const pruneNow = Boolean(args[0] == 'y');
       const now = moment.utc();
       let outMsg = '';

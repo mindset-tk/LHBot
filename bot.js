@@ -1,134 +1,75 @@
 // require the filesystem and discord.js modules
 require('console-stamp')(console, { format: ':date(mm/dd/yy HH:MM:ss)' });
 const fs = require('fs');
-const configPath = './config.json';
-let config = undefined;
-const fsp = fs.promises;
+// const fsp = fs.promises; probably can be removed?
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 const dbpath = ('./db/');
-
-// function to pretty print the config data so that arrays show on one line, so it's easier to visually parse the config file when hand opening it. Purely cosmetic.
-function prettyPrintConfig(cfg) {
-  const output = JSON.stringify(cfg, function(k, v) {
-    if (v instanceof Array) {
-      return JSON.stringify(v);
-    }
-    return v;
-  }, 2).replace(/\\/g, '')
-    .replace(/"\[/g, '[')
-    .replace(/\]"/g, ']')
-    .replace(/"\{/g, '{')
-    .replace(/\}"/g, '}');
-  return output;
-}
-
-// function to write config to file.
-function writeConfig(cfg) {
-  fs.writeFileSync(configPath, prettyPrintConfig(cfg), function(err) {
-    if (err) {
-      console.log('There was an error saving the config file!');
-      return console.log(err);
-    }
-  });
-}
-
-// initialize or load any configs the a new instance doesn't start with to avoid breaking
-const CONFIG_FILENAMES = ['config.json', 'counting.json', 'gamelist.json', 'prunestorage.json'];
-CONFIG_FILENAMES.forEach(filename => {
-
-  if (filename != 'config.json') {
-    if (!fs.existsSync(filename)) {
-      fs.writeFileSync(filename, '{}', function(err) {
-        if (err) return console.log(err);
-      });
-    }
-  }
-  else {
-    const lastArg = process.argv[process.argv.length - 1];
-    if (!fs.existsSync(filename)) {
-      const freshConfig = new Object();
-      freshConfig.prefix = '.';
-      freshConfig.authtoken = (lastArg.length == 59) ? lastArg : '';
-      freshConfig.roleStaff = '';
-      freshConfig.roleComrade = '';
-      freshConfig.roleAirlock = '';
-      freshConfig.airlockPruneDays = '';
-      freshConfig.airlockPruneMessage = '';
-      freshConfig.pruneTitle = '';
-      freshConfig.invLogToggle = false;
-      freshConfig.channelInvLogs = '';
-      freshConfig.countingToggle = false;
-      freshConfig.avatarLogToggle = false;
-      freshConfig.channelAvatarLogs = '';
-      freshConfig.avatarLogAirlockOnlyToggle = false;
-      freshConfig.countingChannelId = '';
-      freshConfig.countingFailMessages = [],
-      freshConfig.countingStartMessages = [],
-      freshConfig.countingFailRepeatMessages = [],
-      freshConfig.repeatReacts = [],
-      freshConfig.knownInvites = [],
-      freshConfig.botChannelId = '';
-      freshConfig.disboardChannelId = '';
-      freshConfig.eventInfoChannelId = '';
-      freshConfig.pinIgnoreChannels = [];
-      freshConfig.pinsToPin = 5;
-      freshConfig.questionChannelIds = [];
-      freshConfig.voiceTextChannelIds = [];
-      freshConfig.voiceChamberDefaultSizes = new Object();
-      freshConfig.voiceChamberSnapbackDelay = '';
-      freshConfig.currentActivity = new Object();
-      freshConfig.currentActivity.Type = '';
-      freshConfig.currentActivity.Name = '';
-      freshConfig.youTubeAPIKey = '';
-      freshConfig.starboardChannelId = '';
-      freshConfig.starThreshold = 5;
-      freshConfig.starboardIgnoreChannels = [];
-      writeConfig(freshConfig);
-      console.log('You haven\'t setup your \'config.json\' file yet. A fresh one has been generated for you!');
-    }
-
-    config = require(configPath);
-    if (!config.authtoken) {
-      if (lastArg.length == 59) {
-        config.authtoken = lastArg;
-        writeConfig(config);
-      }
-      else {
-        console.log ('ERROR: ' +
-                       '\n- You still need to enter your bot\'s discord auth key to continue!' +
-                       '\n- You can do this by entering it into your \'config.json\' *or*' +
-                       '\n  by passing your discord bot auth token as the final arg (just one time) when running this script next');
-        process.exit(1);
-      }
-    }
-  }
-});
-
 const Discord = require('discord.js');
-const myIntents = new Discord.Intents(32767);
-const counting = require('./counting.js');
-// const disboard = require('./disboard.js'); temp disabled
-const listPath = './gamelist.json';
-const gameList = require(listPath);
-// const fetch = require('node-fetch');
-// const eventDataPath = './events.json';
-// if (fs.existsSync(eventDataPath)) { global.eventData = require(eventDataPath);}
+const register = require('./register.js');
+// const counting = require('./counting.js'); TODO fix counting
+
+
+// TODO maybe - create sql db of votes so they are not listed in plaintext? is this worth the work?
 const voteDataPath = './votes.json';
 if (fs.existsSync(voteDataPath)) {global.voteData = require(voteDataPath);}
 const moment = require('moment-timezone');
+// TODO: move starboard into modules.
 const starboard = require('./starboard.js');
-const { getPermLevel, pkQuery } = require('./extras/common.js');
+const { getMessagePermLevel, pkQuery, getConfig, isTextChannel } = require('./extras/common.js');
+const { prepTables: prepConfigTables } = require('./commands/config.js');
+
+
+// initialize apitokens.json and error out if api token is missing.
+if (!fs.existsSync('apitokens.json')) {
+  const filedata = { discordAuthToken: '', youTubeAPIKey: '' };
+  fs.writeFileSync('apitokens.json', filedata, function(err) {
+    if (err) return console.log(err);
+  });
+}
+const { discordAuthToken } = require('./apitokens.json');
+if (!discordAuthToken || discordAuthToken == '') {
+  console.log ('ERROR: ' +
+              '\n- You still need to enter your bot\'s discord auth key to continue!' +
+              '\n- You can do this by entering it into your \'config.json\' *or*' +
+              '\n  by passing your discord bot auth token as the final arg (just one time) when running this script next');
+  process.exit(1);
+}
+
+// preserving this as a list of old JSON stuff to be converted/removed. TODO: remove when done.
+/* const CONFIG_FILENAMES = ['config.json', 'counting.json', 'gamelist.json', 'datalog.json', 'prunestorage.json']; */
+
+// Extend guild with music details accessed by the .yt command.
+// TODO: Structures removed, rework .yt command
+/* Discord.Structures.extend('Guild', Guild => {
+  class MusicGuild extends Guild {
+    constructor(client, data) {
+      super(client, data);
+      this.musicData = {
+        queue: [],
+        isPlaying: false,
+        volume: 0.2,
+        songDispatcher: null,
+        voiceChannel: null,
+        voiceTextChannel: null,
+        nowPlaying: null,
+      };
+    }
+  }
+  return MusicGuild;
+}); */
 
 // initialize client, commands, command cooldown collections
-// myIntents.add(Discord.Intents.NON_PRIVILEGED, 'GUILD_MEMBERS');
-const client = new Discord.Client({ intents: myIntents });
+// discord "give me all intents" bitfield.
+const myIntents = new Discord.Intents(32767);
+const client = new Discord.Client({ intents: myIntents, partials: ['MESSAGE', 'CHANNEL', 'REACTION'] });
 client.commands = new Discord.Collection();
+client.slashCommands = new Discord.Collection();
 const cooldowns = new Discord.Collection();
-// since the datalogger takes some time to cache messages, especially on larger servers, create a global check digit to block unwanted processing of new messages during datalogging
-client.dataLogLock = 0;
 
-// initiate the sql db with various bot data, then initiate commands and modules
+// initiate the sql db with various bot data
+// then initiate commands and modules
+// TODO: clear out any servers the bot has exited from when initializing DBs
 let botdb;
 (async () => {
   try {
@@ -142,6 +83,9 @@ let botdb;
       console.log('Bot data db opened.');
       botdb = value;
     });
+    // prepTables preps any new config related tables.
+    // cannot be used via init() as it sets up values that init processes will need.
+    await prepConfigTables(client, botdb);
     const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
     for (const file of commandFiles) {
       const command = require(`./commands/${file}`);
@@ -151,16 +95,28 @@ let botdb;
         client.commands.set(command.name, command);
       }
       if (command.init) {
-        command.init(client, config, botdb);
+        command.init(client, botdb);
       }
     }
-    const modules = fs.readdirSync('.').filter(file => file.endsWith('.js'));
+    const modules = fs.readdirSync('./modules').filter(file => file.endsWith('.js'));
     for (const file of modules) {
-      if (file != 'bot.js') {
-        const module = require(`./${file}`);
-        if (module.init) {
-          module.init(client, config, botdb);
-        }
+      const module = require(`./modules/${file}`);
+      // if the module exports have an "execute" func, it's a command; add it to the commands collection.
+      if (typeof module.execute === 'function') {
+        client.commands.set(module.name, module);
+      }
+      if (module.init) {
+        await module.init(client, botdb);
+      }
+    }
+    // ./modules/register.js handles registering slash commands with Discord.
+    // but we do need to process the .init segment, and add to the list of useable slash commands.
+    const slashCommandFiles = fs.readdirSync('./slashcommands').filter(file => file.endsWith('.js'));
+    for (const file of slashCommandFiles) {
+      const command = require(`./slashcommands/${file}`);
+      client.slashCommands.set(command.data.name, command);
+      if (command.init) {
+        await command.init(client, botdb);
       }
     }
   }
@@ -168,7 +124,11 @@ let botdb;
 })();
 
 // login to Discord with your app's token
-client.login(config.authtoken);
+client.login(discordAuthToken);
+
+client.on('guildCreate', async () => {
+  // TODO Initialize config items on guild join.
+});
 
 // initialize invite cache
 const invites = {};
@@ -177,15 +137,12 @@ const vanityInvites = {};
 // when the client is ready, run this code.
 client.on('ready', async () => {
   console.log('Ready!');
-  if (!config.prefix) {
-    config.prefix = '.';
-    console.log('No command prefix was set! Defaulting to \'.\' (single period)');
-    writeConfig(config);
-  }
-  if (config.currentActivity) { client.user.setActivity(config.currentActivity.Name, { type: config.currentActivity.Type }); }
-  counting.OnReady(config, client);
-  starboard.onReady(botdb);
-  // wait 1000ms without holding up the rest of the script. This way we can ensure recieving all guild invite info.
+  register.onReady(client);
+  // TODO fix activity command
+  // if (config.currentActivity) { client.user.setActivity(config.currentActivity.Name, { type: config.currentActivity.Type }); }
+  // client.user.setActivity('Wrestlemania', { type: 'WATCHING' });
+  // counting.OnReady(config, client);
+  await starboard.onReady(botdb, client);
   client.guilds.cache.forEach(g => {
     g.invites.fetch().then(guildInvites => {
       invites[g.id] = guildInvites;
@@ -201,9 +158,12 @@ client.on('ready', async () => {
   });
 });
 
+// set up listener for channel creation events
+// client.on('channelCreate', async channel => { });
 
 // set up listener for user update events
-client.on('userUpdate', async (oldUser, newUser) => {
+// TODO: move to modules
+/* client.on('userUpdate', async (oldUser, newUser) => {
   if (oldUser.avatar !== newUser.avatar && config.avatarLogToggle && config.channelAvatarLogs) {
     // If the toggle to make this feature airlock-role-only is on, then check if the user has that role
     if (config.avatarLogAirlockOnlyToggle && config.roleComrade) {
@@ -241,38 +201,46 @@ client.on('userUpdate', async (oldUser, newUser) => {
     }
     avatarLogChannel.send({ content: ':exclamation: <@' + newUser.id + '> changed their profile picture:', embeds: [msgEmbed] });
   }
+}); */
+
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isCommand()) return;
+  const command = client.slashCommands.get(interaction.commandName);
+  if (!command) return;
+  if (command.guildOnly && !interaction.guild) {
+    return await interaction.reply({ content: 'Sorry, this command can only be run from in a server!', ephemeral: true });
+  }
+  try {
+    await command.execute(interaction, botdb);
+  }
+  catch (error) {
+    console.error(error);
+    await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+  }
 });
 
 // command parser
 client.on('messageCreate', async message => {
-  /* Check for disboard bump messages in a configured channel to schedule a reminder
-  * TODO: D.JS 13 pass; determine if needed in future.
-  disboard.BumpReminder(config, message);
-
-  // VettingLimit: listen for lobby panel message
-  if (fs.existsSync(vettingLimitPath)) {
-    const vettingLimit = require(vettingLimitPath);
-    if (vettingLimit.VettingPanelCheck && config.channelLobby) {
-      if (message.channel.id === config.channelLobby) {
-        vettingLimit.VettingPanelCheck(message);
-      }
-    }
-  }*/
-
-  if(counting.HandleMessage(message)) {
+  // currently, there is no support for commands used in DMs.
+  if (message.channel instanceof Discord.DMChannel) return;
+  const config = getConfig(client, message.guild.id);
+  // skip all handling for counting messages that successfully increment a count.
+  // TODO fix counting
+  /* if(counting.HandleMessage(message)) {
     return;
-  }
+  } */
   // cache PKData for message.
   await pkQuery(message);
-  const permLevel = getPermLevel(message);
-  // prevent parsing commands without correct prefix, from bots, and from non-staff non-comrades.
+  const permLevel = getMessagePermLevel(message);
+  // prevent parsing commands without correct prefix, from bots, and from non-staff non-users.
   if (!message.content.startsWith(config.prefix) || (message.author.bot && !message.isPKMessage)) return;
-  if (message.channel.type == 'GUILD_TEXT' && !(permLevel == 'staff' || permLevel == 'comrade')) return;
+  // ensure the channel is a guild text or guild thread channel.
+  if ((isTextChannel(message.channel)) && !(permLevel == 'staff' || permLevel == 'user')) return;
   const args = message.content.slice(config.prefix.length).split(/ +/);
   let commandName = args.shift().toLowerCase();
 
   // handle using help as an argument - transpose '!command help' to !help command
-  if (args[0] && args[0].toLowerCase() === 'help') {
+  if (args[0] && args[0].toLowerCase() === 'help' && client.commands.has(commandName)) {
     args.length = 1;
     args[0] = commandName;
     commandName = 'help';
@@ -292,7 +260,7 @@ client.on('messageCreate', async message => {
   if (command.args && !args.length) {
     let reply = 'You didn\'t provide any arguments!';
     if (command.usage) {
-      reply += `\nThe proper usage would be: \`${config.prefix}${command.name} ${command.usage}\``;
+      reply += `\nThe proper usage would be: \`${config.prefix}${command.name} ${command.usage(config)}\``;
     }
     return await message.channel.send(reply);
   }
@@ -318,7 +286,7 @@ client.on('messageCreate', async message => {
 
   // Try to execute the command and return an error if it fails.
   try {
-    await command.execute(message, args, client, config, botdb);
+    await command.execute(message, args, botdb);
   }
   catch (error) {
     console.error(error);
@@ -345,7 +313,9 @@ client.on('shardError', err => {
 // all other error logging
 client.on('error', err => {console.error(err);});
 
+// tracking origin of guild members when added
 client.on('guildMemberAdd', async member => {
+  const config = getConfig(client, member.guild.id);
   if (config.invLogToggle) {
     const pfp = member.user.displayAvatarURL();
     const creationDate = (moment(member.user.createdAt)).tz('America/Los_Angeles').format('MMM Do YYYY, h:mma z');
@@ -356,14 +326,14 @@ client.on('guildMemberAdd', async member => {
       .setTimestamp()
       .setFooter('Joined', member.guild.iconURL());
     const logChannel = client.channels.cache.get(config.channelInvLogs);
-    let usedVanityCode = 0;
+    let usedVanityCode = false;
     // if vanity url uses has increased since last user added we can assume this new member used the vanity url.
     if (member.guild.vanityURLCode) {
       await member.guild.fetchVanityData().then(vanityData => {
         if (vanityInvites[member.guild.id] && vanityData.uses > vanityInvites[member.guild.id].uses && vanityData.uses != 0) {
           msgEmbed.setDescription(`Created: ${creationDate}\nInvite: **${member.guild.vanityURLCode}** \nUses: **${member.guild.vanityURLUses}**`);
           logChannel.send({ content: ':inbox_tray: <@' + member.id + '> joined!', embeds: [msgEmbed] });
-          usedVanityCode = 1;
+          usedVanityCode = true;
         }
         // update vanity cache for this guild
         vanityInvites[member.guild.id] = {
@@ -423,27 +393,12 @@ client.on('guildMemberAdd', async member => {
 });
 
 client.on('guildMemberRemove', async member => {
+  const config = getConfig(client, member.guild.id);
   const canLog = (config.invLogToggle && Boolean(config.channelInvLogs));
   const logChannel = client.channels.cache.get(config.channelInvLogs);
-  const data = [];
   if (canLog) { logChannel.send(`📤 ${member} (${member.user.tag} / ${member.id}) left :<`); }
-  let exitConLog = `${member.user.tag} exited.`;
-  Object.keys(gameList).forEach(sysname => {
-    if (!gameList[sysname].accounts[0]) return;
-    const accountInfo = gameList[sysname].accounts.filter(info => info.userID === member.id);
-    if (accountInfo[0]) {
-      const accountIndex = gameList[sysname].accounts.findIndex(info => info.userID === member.id);
-      gameList[sysname].accounts.splice(accountIndex, 1);
-      data.push(sysname);
-    }
-  });
-  if (data.length > 0) {exitConLog += ` removing from the following game rosters: ${data.join(', ')}.`;}
-  await fsp.writeFile(listPath, JSON.stringify(gameList, null, 2), function(err) {
-    if (err) {
-      if (canLog) { logChannel.send('There was an error updating games list information for exited user!'); }
-      return console.log(err);
-    }
-  });
+  const exitConLog = `${member.user.tag} exited.`;
+  // TODO: rework this segment for sql events
   /* if(global.eventData.userTimeZones[member.id]) {
     delete global.eventData.userTimeZones[member.id];
     await fsp.writeFile(eventDataPath, JSON.stringify(global.eventData, null, 2, function(err) {
@@ -455,6 +410,18 @@ client.on('guildMemberRemove', async member => {
     exitConLog += ' Removed userdata from events.json.';
   } */
   console.log(exitConLog);
+});
+
+// joined a server
+client.on('guildCreate', guild => {
+  console.log('Joined a new guild: ' + guild.name);
+  // Your other stuff like adding to guildArray
+});
+
+// removed from a server
+client.on('guildDelete', guild => {
+  console.log('Left a guild: ' + guild.name);
+  // remove from guildArray
 });
 
 process.on('unhandledRejection', error => console.error('Uncaught Promise Rejection! Error details:\n', error));

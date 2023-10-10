@@ -1,7 +1,7 @@
-function PublicBumpReminder(config, message) {
+/* function PublicBumpReminder(config, message) {
   if(!config || !config.disboardChannelId || !config.botChannelId || message.channel.type != 'GUILD_TEXT') { return; }
   const permsRequired = ['VIEW_CHANNEL', 'MANAGE_CHANNELS', 'MANAGE_ROLES', 'SEND_MESSAGES'];
-  if (!message.guild.me.permissions.has(permsRequired)) {
+  if (!message.guild.members.me.permissions.has(permsRequired)) {
     return message.channel.send('Sorry, I don\'t have all the necessary permissions (' + permsRequired.join(', ') + ')');
   }
 
@@ -23,4 +23,4 @@ function PublicBumpReminder(config, message) {
   }
 }
 
-exports.BumpReminder = PublicBumpReminder;
+exports.BumpReminder = PublicBumpReminder; */

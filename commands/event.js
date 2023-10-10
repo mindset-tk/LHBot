@@ -734,15 +734,14 @@ function embedEvent(event, guild, options = {}) {
         `A message will be posted in <#${event.channel}> when this event starts. ` +
           `You can join this event with '${config.prefix}event join ${event.name}'.`,
     )
-    .addField('Event name', event.name)
-    .addField(
-      'Starts at (your time)',
+    .addFields([{ name: 'Event name', value: event.name },
+      { name: 'Starts at (your time)', value:
       `${discordMomentFullDate(event.due)} ${
         getRelativeTime(event.due) != ''
           ? `(${discordMomentRelativeDate(event.due)})`
           : '(starting now)'
       }`,
-      true,
+      inline: true }],
     );
   if (userTimeZone) {
     eventEmbed.addField(
@@ -757,24 +756,20 @@ function embedEvent(event, guild, options = {}) {
     );
   }
   eventEmbed
-    .addField('Creator', `<@${event.owner}>`)
-    .addField('Channel', `<#${event.channel}>`)
-    .addField('Event role', `<@&${event.role}>`);
+    .addField([{ name: 'Creator', value: `<@${event.owner}>` },
+      { name:'Channel', value:`<#${event.channel}>` },
+      { name:'Event role', value:`<@&${event.role}>` }]);
   if (event.description) {
-    eventEmbed.addField('Description', event.description);
+    eventEmbed.addFields({ name: 'Description', value: event.description });
   }
 
   if (role && !firstRun) {
-    eventEmbed.addField('Participants', `${role.members.keyArray().length}`);
+    eventEmbed.addFields({ name: 'Participants', value:`${role.members.keyArray().length}` });
     if (forUser) {
-      eventEmbed.addField(
-        `Have you (${
-          member.nickname ? member.nickname : member.user.username
-        }) RSVPed?`,
-        forUser === event.owner || member.roles.cache.has(event.role)
-          ? 'Yes'
-          : 'No',
-      );
+      eventEmbed.addFields({
+        name: `Have you (${member.nickname ? member.nickname : member.user.username}) RSVPed?`,
+        value: forUser === event.owner || member.roles.cache.has(event.role) ? 'Yes' : 'No',
+      });
     }
   }
 
@@ -794,21 +789,18 @@ function DMembedEvent(event, guild, options = {}) {
         `A message will be posted in <#${event.channel}> when this event starts. ` +
           `Users can join this event with '${config.prefix}event join ${event.name}'.`,
     )
-    .addField('Event name', event.name)
-    .addField(
-      'Event time',
-      `${discordMomentFullDate(event.due)}`,
-      true,
-    );
-  eventEmbed
-    .addField('Creator', `<@${event.owner}>`)
-    .addField('Channel', `<#${event.channel}>`)
-    // .setFooter('Event')
+    .addFields([{ name: 'Event name', value: event.name },
+      { name: 'Event time',
+        value: `${discordMomentFullDate(event.due)}`,
+        inline: true },
+      { name:'Creator', value:`<@${event.owner}>` },
+      { name:'Channel', value:`<#${event.channel}>` }],
+    )
     .setTimestamp(event.due.toISOString());
   if (event.description) {
-    eventEmbed.addField('Description', event.description);
+    eventEmbed.addFields({ name: 'Description', value: event.description });
   }
-  eventEmbed.addField('Event role', `@Event - ${event.name}`);
+  eventEmbed.addFields({ name: 'Event role', value: `@Event - ${event.name}` });
   return eventEmbed;
 }
 
@@ -887,23 +879,23 @@ async function editCommand(message, client, name) {
       }
     });
     if (!result) return false;
-    const name = result.name;
+    const newName = result.name;
     dmChannel.send(
-      `Great, **${event.name}** will be renamed to **${name}**. Is this OK? **Y/N**`,
+      `Great, **${event.name}** will be renamed to **${newName}**. Is this OK? **Y/N**`,
     );
     result = await promptYesNo(dmChannel, {
       messages: {
-        yes: `OK, your event is now called ${name}.`,
+        yes: `OK, your event is now called ${newName}.`,
         no: 'OK, please type a new name for the event.',
         cancel:
           'Event edit cancelled. Please run the command again to edit an event.',
-        invalid: `Reply not recognized! Please answer Y or N. **${event.name}** will be renamed to **${name}**. Is this OK? **Y/N**`,
+        invalid: `Reply not recognized! Please answer Y or N. **${event.name}** will be renamed to **${newName}**. Is this OK? **Y/N**`,
       },
     });
     if (!result) return false;
     editing = !result.answer;
     if (result.answer) {
-      event.name = name;
+      event.name = newName;
       renamed = true;
     }
   }
@@ -1392,7 +1384,7 @@ async function leaveCommand(message, client, eventName) {
   }
 }
 
-async function updateInfoPostCommand(message, client, retry = false) {
+async function updateInfoPostCommand(message) {
   const member = message.guild.members.cache.get(message.author);
   if (!member.roles.cache.has(config.roleStaff)) {
     return message.channel.send(
@@ -1846,7 +1838,7 @@ Staff can add users to the event by hand simply by giving any user the associate
             'Please try again and make sure you either #mention the channel or copy/paste the channel ID.',
           );
         }
-        if (!newChannel.permissionsFor(message.author).has('SEND_MESSAGES')) {
+        if (!newChannel.permissionsFor(message.author).has(Discord.Permissions.FLAGS.SEND_MESSAGES)) {
           return message.channel.send(
             'Please choose a channel that you have the ability to send messages in',
           );

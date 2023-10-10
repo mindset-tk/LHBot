@@ -33,10 +33,10 @@ exports.init = function(client) {
       else {
         embedAuthor = message.author.username;
       }
-
+      // TODO: multiattachment
       if (message.attachments.size > 0) {
-        const isimage = /(jpg|jpeg|png|gif)/gi.test((message.attachments.array()[0].url).split('.'));
-        if (isimage) { image = message.attachments.array()[0].url; }
+        const isimage = /(jpg|jpeg|png|gif)/gi.test((message.attachments.first().url).split('.'));
+        if (isimage) { image = message.attachments.first().url; }
       }
       const bookmarkEmbed = new Discord.MessageEmbed()
         .setColor('#0099ff')

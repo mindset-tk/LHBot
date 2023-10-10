@@ -414,7 +414,7 @@ Examples:
       return message.reply(`Sorry, I couldn't process ${firstarg}`);
     }
   },
-  init(client, c, botdb) {
+  init(client, botdb) {
     client.on('raw', async (packet) => {
       // return if the event isn't a reaction add or remove.
       if (packet.t !== 'MESSAGE_REACTION_ADD' && packet.t !== 'MESSAGE_REACTION_REMOVE') {

@@ -33,8 +33,8 @@ module.exports = {
     const Magic8ballembed = new Discord.MessageEmbed()
       .setTitle('Magic 8-Ball')
       .setDescription(`${message.author} asked a question of my magic 8-ball.`)
-      .addField(':question: **Question**', `*${args.join(' ')}*`)
-      .addField(':8ball: **Answer**', answer);
+      .addFields([{ name: ':question: **Question**', value: `*${args.join(' ')}*` },
+        { name: ':8ball: **Answer**', value: answer }]);
     message.channel.send({ embeds: [Magic8ballembed] });
   },
 };

@@ -1,11 +1,8 @@
-const path = require('path');
 const Discord = require('discord.js');
-const configPath = path.resolve('./config.json');
-const config = require(configPath);
-const { pkQuery } = require('./extras/common.js');
+const { pkQuery, getConfig } = require('./extras/common.js');
 
 /*
-TODO UPDATE THIS SCHEMA - CURRENTLY OUT OF DATE
+TODO UPDATE THIS DOCUMENTATION - CURRENTLY OUT OF DATE
 starboard.db schema:
 starboard - contains data for individual starboarded posts. Columns: original_msg, starboard_msg, channel, author, starthreshold
 starboard_blocked_messages - contains ids of messages that were blocked from starboard. One column: original_msg
@@ -29,26 +26,27 @@ async function prepTables(botdb) {
   await botdb.run('DROP TABLE IF EXISTS starboard_starsmigrator');
   await botdb.run('DROP TABLE IF EXISTS newstarboard');
   // ensure standard starboard tables are created.
-  await botdb.run('CREATE TABLE IF NOT EXISTS starboard (original_msg text NOT NULL UNIQUE, starboard_msg text NOT NULL UNIQUE, channel text NOT NULL, author text NOT NULL, starthreshold integer NOT NULL, PRIMARY KEY(original_msg, starboard_msg)) ');
+  await botdb.run('CREATE TABLE IF NOT EXISTS starboard (original_msg text NOT NULL UNIQUE, starboard_msg text NOT NULL UNIQUE, guild text NOT NULL, channel text NOT NULL, author text NOT NULL, starthreshold integer NOT NULL, PRIMARY KEY(original_msg, starboard_msg)) ');
   await botdb.run('CREATE TABLE IF NOT EXISTS starboard_stars (original_msg text NOT NULL, stargiver text NOT NULL, UNIQUE(original_msg, stargiver))');
   await botdb.run('CREATE INDEX IF NOT EXISTS idx_starsgiven_originals ON starboard_stars(original_msg)');
   await botdb.run('CREATE INDEX IF NOT EXISTS idx_stargiver ON starboard_stars(stargiver)');
   await botdb.run('CREATE TABLE IF NOT EXISTS starboard_message_policies (original_msg text NOT NULL UNIQUE, author NOT NULL, channel NOT NULL, allow_starboard)');
   await botdb.run('CREATE TABLE IF NOT EXISTS starboard_policies (author text NOT NULL, snowflake text NOT NULL, type NOT NULL, allow_starboard, UNIQUE(author, snowflake, type))');
-  await botdb.run('CREATE TABLE IF NOT EXISTS starboard_limbo (author text NOT NULL, channel text NOT NULL, original_msg text NOT NULL UNIQUE, dm_id NOT NULL UNIQUE)');
+  await botdb.run('CREATE TABLE IF NOT EXISTS starboard_limbo (author text NOT NULL, guild text NOT NULL, channel text NOT NULL, original_msg text NOT NULL UNIQUE, dm_id NOT NULL UNIQUE)');
 }
 
-async function publicOnReady(botdb) {
+async function publicOnReady(botdb, client) {
   await prepTables(botdb);
-  if (!config.starboardChannelId) {
-    console.log('No starboard channel set! Starboard functions disabled.');
-    return;
+  for (const [id, g] of client.guilds.cache) {
+    const config = getConfig(client, id);
+    if (!config.starboardChannelId) {
+      console.log(`No starboard channel set for ${g.name}/${g.id}! Starboard functions disabled.`);
+    }
+    else if (!config.starThreshold) {
+      console.log(`Star threshold not set for ${g.name}/${g.id}! Starboard functions disabled.`);
+    }
+    else {console.log(`starboard ready in ${g.name}/${g.id}!`);}
   }
-  else if (!config.starThreshold) {
-    console.log('Star threshold not set! Starboard functions disabled.');
-    return;
-  }
-  console.log('starboard ready!');
 }
 
 function getAuthorAccount(message) {
@@ -56,6 +54,7 @@ function getAuthorAccount(message) {
 }
 
 function getPublicPrivate(channel) {
+  const config = getConfig(channel.client, channel.guild.id);
   return config.starboardPrivateChannels.includes(channel.id) ? 'guildprivate' : 'guildpublic';
 }
 
@@ -102,35 +101,42 @@ async function generateEmbed(message, starcount, starThreshold) {
     // if guildmember is null (eg, because person has left the guild or is a PK bot, use their raw username)
     .setAuthor({ name: (guildmember ? guildmember.displayName : message.author.username), iconURL: message.author.displayAvatarURL() })
     .setDescription(message.content)
-    .addField('Source', '[Jump!](' + message.url + ')')
+    .addFields({ name: 'Source', value: '[Jump!](' + message.url + ')' })
     .setFooter({ text: `${message.author.username}${(message.author.discriminator && message.author.discriminator != '0000') ? `#${message.author.discriminator}` : '' }` })
     .setTimestamp(message.createdTimestamp);
   if (message.attachments.size > 0) {
-    // will only work on the first image, currently.
+    // will only work on the first image, currently. TODO: see if we can upload all images
     const isimage = /(jpg|jpeg|png|gif)/gi.test((message.attachments.first().url).split('.').pop());
     // don't add spoilered images to the embed as rich embeds cannot currently contain spoilered images. Prevents unspoilered NSFW/CW content from hitting starboard.
-    if (isimage && !message.attachments.first().spoiler && message.attachments.size == 1) {
+    if (isimage && !message.attachments.first().spoiler) {
       image = message.attachments.first().url;
       embed.setImage(image);
     }
     else if (message.attachments.first().spoiler) {
-      embed.addField('Attachment', `||[${message.attachments.first().name}](${message.attachments.first().url})||`);
+      embed.addFields({ name: 'Attachment', value: `||[${message.attachments.first().name}](${message.attachments.first().url})||` });
     }
     else if (message.attachments.size == 1) {
-      embed.addField('Attachment', `[${message.attachments.first().name}](${message.attachments.first().url})`);
+      embed.addFields({ name:'Attachment', value:`[${message.attachments.first().name}](${message.attachments.first().url})` });
     }
-    else if (message.attachments.size > 1) {
+    // Todo - see if we can reupload picture attachments
+    if (message.attachments.size > 1) {
       const descarr = [];
-      message.attachments.array().forEach(attach => {
+      message.attachments.forEach(attach => {
         if (attach.spoiler) {
           descarr.push(`||[${attach.name}](${attach.url})||`);
         }
         else { descarr.push(`[${attach.name}](${attach.url})`); }
       });
-      embed.addField('Attachments', descarr.join('\n'));
+      embed.addFields({ name: 'Attachments', value: descarr.join('\n') });
     }
   }
-  return embed;
+  // set an image from the embeds if there's not an attachment.
+  if (message.embeds.length > 0 && !embed.image) {
+    if (/(jpg|jpeg|png|gif)/gi.test((message.embeds[0].url).split('.').pop())) {
+      embed.setImage(message.embeds[0].url);
+    }
+  }
+  return [embed];
 }
 
 function generateEmoji(starcount, threshold) {
@@ -213,6 +219,7 @@ async function queryByStarboard(id, botdb) {
 }
 
 async function blockCheck(message, botdb) {
+  const config = getConfig(message.client, message.guild.id);
   let isBlocked = false;
   await pkQuery(message);
   // first check if the message is explicitly blocked in starboard_message_policies.
@@ -250,6 +257,7 @@ policy options are: 'true' (allow direct to starboard posting)
 'false' (item not permitted to go to starboard)
 */
 async function policyCheck(message, botdb) {
+  const config = getConfig(message.client, message.guild.id);
   await pkQuery(message);
   // initialize the effective policy to true (post is starrable and does not need an ask)
   let effectivePolicy = true;
@@ -284,6 +292,7 @@ async function policyCheck(message, botdb) {
 
 // Force is an optional variable to bypass the starboard policy check.
 async function publicOnStar(message, botdb, force = false) {
+  const config = getConfig(message.client, message.guild.id);
   if (!config.starboardChannelId || !config.starboardToggle || config.starboardIgnoreChannels.includes(message.channel.id)) return;
   // initialize PK data for message.
   await pkQuery(message);
@@ -326,9 +335,9 @@ async function publicOnStar(message, botdb, force = false) {
     await starsGivenUpdater(message, usrArr, botdb);
     if (starcount >= dbdata.starthreshold) {
       // starcount is above the threshold from when it was starboarded and star count has changed. generate new embed and add data to db.
-      const starboardEmbed = await generateEmbed(message, starcount, dbdata.starthreshold);
+      const starboardEmbeds = await generateEmbed(message, starcount, dbdata.starthreshold);
       const starboardEmoji = generateEmoji(starcount, dbdata.starthreshold);
-      starboardMsg.edit({ content: `${starboardEmoji} **${starcount}** ${message.channel}`, embeds: [starboardEmbed] });
+      starboardMsg.edit({ content: `${starboardEmoji} **${starcount}** ${message.channel}`, embeds: starboardEmbeds });
     }
     else if (starcount < dbdata.starthreshold) {
       // item has dropped below its original threshold of star reacts. Delete from starboard and db.
@@ -350,13 +359,13 @@ async function publicOnStar(message, botdb, force = false) {
     ) { return; }
     else if (starcount >= config.starThreshold && msgPolicy == true) {
       // item is new starboard candidate. generate embed and message
-      const starboardEmbed = await generateEmbed(message, starcount, config.starThreshold);
+      const starboardEmbeds = await generateEmbed(message, starcount, config.starThreshold);
       const starboardEmoji = generateEmoji(starcount, config.starThreshold);
-      const starboardMsg = await starboardChannel.send({ content: `${starboardEmoji} **${starcount}** ${message.channel}`, embeds: [starboardEmbed] });
+      const starboardMsg = await starboardChannel.send({ content: `${starboardEmoji} **${starcount}** ${message.channel}`, embeds: starboardEmbeds });
       // update starboard_stars table and starboard table
       await starsGivenUpdater(message, usrArr, botdb);
-      return await botdb.run('INSERT INTO starboard(original_msg,starboard_msg,channel,author,starthreshold) VALUES(?,?,?,?,?)',
-        message.id, starboardMsg.id, message.channel.id, getAuthorAccount(message), config.starThreshold);
+      return await botdb.run('INSERT INTO starboard(original_msg,starboard_msg,guild,channel,author,starthreshold) VALUES(?,?,?,?,?,?)',
+        message.id, starboardMsg.id, message.guild.id, message.channel.id, getAuthorAccount(message), config.starThreshold);
     }
     else if (starcount >= config.starThreshold && msgPolicy == 'ask') {
       // starboard_limbo - Columns: author channel original_msg dm_id
@@ -419,6 +428,7 @@ async function publicBlockUser(user, guild, botdb) {
 }
 
 async function publicBlockMsg(message, botdb) {
+  const config = getConfig(message.client, message.guild.id);
   // exempting/blocking a specific message requires us to check if there's a starboard message already.
   try {
     await pkQuery(message);
@@ -581,15 +591,18 @@ async function publicServPolicyChange(message, change, usrScope, botdb) {
 }
 
 async function publicMigrator(fromChannel, toChannel, replyChannel, botdb) {
+  const config = getConfig(fromChannel.client, fromChannel.guild.id);
   await prepTables(botdb);
   // create a temporary migrator db to integrate extant starboard with migrated; this is a copy of the old starboard.
-  await botdb.run('CREATE TABLE IF NOT EXISTS starmigrator (original_msg text NOT NULL UNIQUE, starboard_msg text NOT NULL UNIQUE, channel text NOT NULL, author text NOT NULL, starthreshold integer NOT NULL, PRIMARY KEY(original_msg, starboard_msg))');
-  await botdb.run('INSERT INTO starmigrator SELECT * FROM starboard');
+  await botdb.run('CREATE TABLE IF NOT EXISTS starmigrator (original_msg text NOT NULL UNIQUE, starboard_msg text NOT NULL UNIQUE, guild text NOT NULL, channel text NOT NULL, author text NOT NULL, starthreshold integer NOT NULL, PRIMARY KEY(original_msg, starboard_msg))');
+  await botdb.run('INSERT INTO starmigrator SELECT * FROM starboard WHERE guild = ?', fromChannel.guild.id);
   await botdb.run('ALTER TABLE starmigrator RENAME COLUMN starboard_msg TO old_starboard_msg');
   await botdb.run(`ALTER TABLE starmigrator ADD COLUMN old_starboard_channel text NOT NULL DEFAULT ${config.starboardChannelId}`);
   await botdb.run('CREATE TABLE IF NOT EXISTS starboard_starsmigrator (original_msg text NOT NULL, stargiver text NOT NULL, UNIQUE(original_msg, stargiver))');
   // create a temporary blank starboard table to push data into. This will be renamed to replace starboard at the end of this process.
-  await botdb.run('CREATE TABLE IF NOT EXISTS newstarboard (original_msg text NOT NULL UNIQUE, starboard_msg text NOT NULL UNIQUE, channel text NOT NULL, author text NOT NULL, starthreshold integer NOT NULL, PRIMARY KEY(original_msg, starboard_msg)) ');
+  await botdb.run('CREATE TABLE IF NOT EXISTS newstarboard (original_msg text NOT NULL UNIQUE, starboard_msg text NOT NULL UNIQUE, guild text NOT NULL, channel text NOT NULL, author text NOT NULL, starthreshold integer NOT NULL, PRIMARY KEY(original_msg, starboard_msg)) ');
+  // ...and insert everything from the old table that's not being touched.
+  await botdb.run('INSERT INTO newstarboard SELECT * FROM starboard WHERE guild != ?', fromChannel.guild.id);
   let lastSeenMessage = 0;
   let loopbreaker = 0;
   let prevLastSeen;
@@ -614,8 +627,8 @@ async function publicMigrator(fromChannel, toChannel, replyChannel, botdb) {
             // ...but any message that doesn't meet that criteria is legacied in with its threshold set to its current star count.
             else { starThreshold = usrArr.length; }
             // add it all to the migrator table and migrator star table.
-            await botdb.run('INSERT OR IGNORE INTO starmigrator(original_msg,old_starboard_msg,channel,author,starthreshold,old_starboard_channel) VALUES(?,?,?,?,?,?)',
-              targetmsg.id, oldStarboardMsg.id, targetmsg.channel.id, getAuthorAccount(targetmsg), starThreshold, oldStarboardMsg.channel.id);
+            await botdb.run('INSERT OR IGNORE INTO starmigrator(original_msg,old_starboard_msg,guild,channel,author,starthreshold,old_starboard_channel) VALUES(?,?,?,?,?,?,?)',
+              targetmsg.id, oldStarboardMsg.id, targetmsg.guild.id, targetmsg.channel.id, getAuthorAccount(targetmsg), starThreshold, oldStarboardMsg.channel.id);
             for (const usr of usrArr) {
               await botdb.run('INSERT OR IGNORE INTO starboard_starsmigrator(original_msg, stargiver) VALUES(?,?)', targetmsg.id, usr);
             }
@@ -646,9 +659,9 @@ async function publicMigrator(fromChannel, toChannel, replyChannel, botdb) {
       const starcount = usrArr.length;
       // checking if starcount is greater than 0; edge case relating to
       if (starcount >= dbdata.starthreshold && starcount > 0) {
-        const starboardEmbed = await generateEmbed(originalMsg, starcount, dbdata.starthreshold);
+        const starboardEmbeds = await generateEmbed(originalMsg, starcount, dbdata.starthreshold);
         const starboardEmoji = generateEmoji(starcount, dbdata.starthreshold);
-        const newStarboardMsg = await toChannel.send({ content: `${starboardEmoji} **${starcount}** ${originalChannel}`, embeds: [starboardEmbed] });
+        const newStarboardMsg = await toChannel.send({ content: `${starboardEmoji} **${starcount}** ${originalChannel}`, embeds: starboardEmbeds });
         const starArr = await botdb.all('SELECT stargiver FROM starboard_starsmigrator WHERE original_msg = ?', originalMsg.id);
         for (const { stargiver } of starArr) {
           // for each item of this the array from the migratorstars table, compare to usrArr...
@@ -667,8 +680,8 @@ async function publicMigrator(fromChannel, toChannel, replyChannel, botdb) {
             await botdb.run('INSERT OR IGNORE INTO starboard_starsmigrator(original_msg, stargiver) VALUES(?,?)', originalMsg.id, usr);
           }
         }
-        await botdb.run('INSERT INTO newstarboard(original_msg,starboard_msg,channel,author,starthreshold) VALUES(?,?,?,?,?)',
-          originalMsg.id, newStarboardMsg.id, originalMsg.channel.id, getAuthorAccount(originalMsg), config.starThreshold);
+        await botdb.run('INSERT INTO newstarboard(original_msg,starboard_msg,guild,channel,author,starthreshold) VALUES(?,?,?,?,?,?)',
+          originalMsg.id, newStarboardMsg.id, originalMsg.guild.id, originalMsg.channel.id, getAuthorAccount(originalMsg), config.starThreshold);
       }
     }
     catch (err) {
