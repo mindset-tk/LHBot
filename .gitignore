@@ -17,3 +17,5 @@ pm2.json
 /.idea/*
 /.vscode/*
 commands/testcommand.js
+/disabled/*
+apitokens.json
